@@ -19,7 +19,7 @@ public partial class Raylib : IDisposable
     public EventCallback<(int Width, int Height)> OnResize { get; set; }
     
     [Parameter]
-    public Action? OnInit { get; set; } 
+    public Func<Task>? OnInit { get; set; } 
     
     [Parameter]
     public bool UseEmscriptenMainLoop { get; set; }
@@ -36,13 +36,13 @@ public partial class Raylib : IDisposable
     {
         await JSHost.ImportAsync("Raylib", "../js/raylib.js");
         Init(this, _id);
-        InitRaylib();
+        await InitRaylib();
         ManageRenderLoop();
     }
 
-    private void InitRaylib()
+    private async Task InitRaylib()
     {
-       OnInit?.Invoke();
+        if (OnInit != null) await OnInit();
     }
 
     private void ManageRenderLoop()
@@ -56,6 +56,9 @@ public partial class Raylib : IDisposable
     }
 
     #region Interop
+
+    [JSImport("raylib.preloadFile", "Raylib")]
+    public static partial Task PreloadFile(string path);
 
     [JSImport("raylib.init", "Raylib")]
     public static partial void Init([JSMarshalAs<JSType.Any>] object reference, string id);
