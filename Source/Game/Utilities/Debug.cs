@@ -45,7 +45,9 @@ public static class Debug
         _animationSystem = animationSystem;
         _enemySystem = enemySystem;
         
-        rlImGui.Setup(true);
+        // cimgui native library is not available in browser WASM
+        if (!OperatingSystem.IsBrowser())
+            rlImGui.Setup(true);
     }
 
     /// <summary>
@@ -111,7 +113,7 @@ public static class Debug
 
     public static void Draw(bool isDebugEnabled)
     {
-        if (!isDebugEnabled)
+        if (!isDebugEnabled || OperatingSystem.IsBrowser())
             return;
         
         rlImGui.Begin();

@@ -24,13 +24,13 @@ public class Application
         var mapData = LoadMapData();
 
         // Create scenes with shared data
-        // _gameScene = new World(mapData);
-        // var world = (World)_gameScene;
+        _gameScene = new World(mapData);
+        var world = (World)_gameScene;
         // _editorScene = new Editor.LevelEditorScene(mapData, world.EnemySystem, world.DoorSystem, world.Player);
 
         // // Start with the game scene
-        // _activeScene = _gameScene;
-        // _activeScene.OnEnter();
+        _activeScene = _gameScene;
+        _activeScene.OnEnter();
     }
 
     public void Run()
@@ -84,7 +84,7 @@ public class Application
         var mapData = new MapData { Textures = textures };
         Editor.LevelSerializer.LoadFromJson(mapData, "resources/level.json");
 
-        return new MapData();
+        return mapData;
     }
 
     private void Cleanup()

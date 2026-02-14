@@ -64,6 +64,10 @@ public partial class ThreeDFirstPerson : IDisposable
 
     private void OnResize((int width, int height) Size)
     {
+        var deltaTime = GetFrameTime();
+        _activeScene.Update(deltaTime);
+        _activeScene.Render();
+        
         SetWindowSize(Size.width, Size.height);
     }
 
