@@ -17,7 +17,7 @@ jobs:
                 dotnet-version: '10.0'
 
             - name: Restore workloads
-              run: cd Wolfrender.Blazor.Raylib && dotnet workload restore
+              run: dotnet workload restore
 
             - name: Publish .NET Core Project
               run: dotnet publish Wolfrender.Blazor.Raylib/Wolfrender.Blazor.Raylib.csproj -c Release -o release --nologo
