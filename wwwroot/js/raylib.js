@@ -1,5 +1,31 @@
 class Raylib {
     
+    async preloadFile(path) {
+        try {
+            const response = await fetch(path);
+            if (!response.ok) {
+                console.error(`Failed to fetch: ${path} (${response.status})`);
+                return;
+            }
+            const data = new Uint8Array(await response.arrayBuffer());
+            
+            // Ensure parent directories exist in the Emscripten VFS
+            const parts = path.split('/');
+            let dir = '';
+            for (let i = 0; i < parts.length - 1; i++) {
+                dir += (i > 0 ? '/' : '') + parts[i];
+                try {
+                    Blazor.runtime.Module.FS.mkdir(dir);
+                } catch(e) { /* directory may already exist */ }
+            }
+            
+            Blazor.runtime.Module.FS.writeFile(path, data);
+            console.log(`Preloaded: ${path}`);
+        } catch(e) {
+            console.error(`Error preloading ${path}:`, e);
+        }
+    }
+
     init(dotnetObject, id) {
         const canvas = document.getElementById(id)
         if (canvas) {
