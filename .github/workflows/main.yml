@@ -17,11 +17,10 @@ jobs:
                 dotnet-version: '10.0'
 
             - name: Restore workloads
-              run: cd Examples/Wolfrender.Blazor.Raylib && dotnet workload restore
-
+              run: cd Wolfrender.Blazor.Raylib && dotnet workload restore
 
             - name: Publish .NET Core Project
-              run: dotnet publish Examples/Wolfrender.Blazor.Raylib/Wolfrender.Blazor.Raylib.csproj -c Release -o release --nologo
+              run: dotnet publish Wolfrender.Blazor.Raylib/Wolfrender.Blazor.Raylib.csproj -c Release -o release --nologo
 
             - name: copy index.html to 404.html
               run: cp release/wwwroot/index.html release/wwwroot/404.html 
