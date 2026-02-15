@@ -20,7 +20,13 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.*" PrivateAssets="all" />
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.*" />
     <PackageReference Include="Raylib-cs" Version="7.0.2" />
+    <PackageReference Include="dottiled" Version="0.3.0" />
   </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\rlImGui-cs\rlImGui\rlImGui.csproj" />
+  </ItemGroup> 
+
 
   <Import Project="Raylib.props" />
 

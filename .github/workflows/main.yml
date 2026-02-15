@@ -42,8 +42,8 @@ jobs:
       - name: Publish
         run: dotnet publish -c Release -o output
 
-      - name: Rewrite base href for GitHub Pages
-        run: sed -i 's|<base href="/" />|<base href="/${{ github.event.repository.name }}/" />|g' output/wwwroot/index.html
+      - name: Add CNAME for custom domain
+        run: echo 'wolf3d.m0b.tech' > output/wwwroot/CNAME
 
       - name: Add .nojekyll
         run: touch output/wwwroot/.nojekyll
@@ -58,6 +58,7 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: output/wwwroot
+          overwrite: true
 
       - name: Deploy to GitHub Pages
         id: deployment
