@@ -46,6 +46,8 @@ public class InputSystem
         if (IsKeyPressed(KeyboardKey.P))
         {
             _isGamePaused = !_isGamePaused;
+            EnableCursor();
+            DisableCursor();
         }
 
         if (IsKeyPressed(KeyboardKey.I))
@@ -55,7 +57,9 @@ public class InputSystem
 
         if (IsKeyPressed(KeyboardKey.M))
         {
-            _isMinimapEnabled = !_isMinimapEnabled;
+            EnableCursor();
+            DisableCursor();
+            // _isMinimapEnabled = !_isMinimapEnabled;
         }
     }
 
