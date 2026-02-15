@@ -80,12 +80,13 @@ public class World : IScene
     public void OnEnter()
     {
         // Hide and center cursor for FPS-style controls
-        HideCursor();
+        // HideCursor();
         // _inputSystem.CenterMouse();
 
         // Rebuild doors and enemies from current MapData (may have changed in the editor)
         _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
         _enemySystem.Rebuild(_mapData.Enemies, _mapData);
+        DisableCursor();
     }
 
     public void OnExit()
@@ -100,7 +101,7 @@ public class World : IScene
         var mouseDelta = _inputState.MouseDelta;
         
         // Center mouse AFTER getting input state (which calculates delta from center)
-        _inputSystem.CenterMouse();
+        // _inputSystem.CenterMouse();
         _inputSystem.Update();
 
         if (_inputState.IsGamePaused)
