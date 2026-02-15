@@ -9,8 +9,8 @@ namespace Wolfrender.Blazor.Raylib.Pages;
 
 public partial class ThreeDFirstPerson : IDisposable
 {
-    private const int ScreenWidth = 800;
-    private const int ScreenHeight = 450;
+    private int ScreenWidth = 1920;
+    private int ScreenHeight = 1080;
 
     private IScene? _activeScene = null;
     private IScene? _gameScene = null;
@@ -39,7 +39,7 @@ public partial class ThreeDFirstPerson : IDisposable
             Wolfrender.Blazor.Raylib.Components.Raylib.PreloadFile));
 
         InitWindow(ScreenWidth, ScreenHeight, "Wolfrender");
-        DisableCursor();
+        // DisableCursor();
 
         OnResize((ScreenWidth, ScreenHeight));
 
