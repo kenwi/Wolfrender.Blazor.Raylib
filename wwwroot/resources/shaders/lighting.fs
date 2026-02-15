@@ -1,16 +1,15 @@
-#version 330
+#version 100
+
+precision mediump float;
 
 // Input vertex attributes (from vertex shader)
-in vec2 fragTexCoord;
-in vec4 fragColor;
-in vec3 fragWorldPos; // World position passed from vertex shader
+varying vec2 fragTexCoord;
+varying vec4 fragColor;
+varying vec3 fragWorldPos; // World position passed from vertex shader
 
 // Input uniform values
 uniform sampler2D texture0;
 uniform vec4 colDiffuse;
-
-// Output fragment color
-out vec4 finalColor;
 
 // Lighting uniforms
 uniform vec3 playerPosition;      // Player position in world space
@@ -19,7 +18,7 @@ uniform float minBrightness;      // Minimum brightness (0-1)
 
 void main()
 {
-    vec4 texColor = texture(texture0, fragTexCoord);
+    vec4 texColor = texture2D(texture0, fragTexCoord);
     
     // Calculate distance from player to this pixel's world position
     float distance = length(fragWorldPos - playerPosition);
@@ -45,5 +44,5 @@ void main()
     // Apply brightness to color
     vec3 litColor = texColor.rgb * brightness;
     
-    finalColor = vec4(litColor, texColor.a) * colDiffuse * fragColor;
+    gl_FragColor = vec4(litColor, texColor.a) * colDiffuse * fragColor;
 }

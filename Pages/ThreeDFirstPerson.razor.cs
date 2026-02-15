@@ -41,6 +41,8 @@ public partial class ThreeDFirstPerson : IDisposable
         InitWindow(ScreenWidth, ScreenHeight, "Wolfrender");
         DisableCursor();
 
+        OnResize((ScreenWidth, ScreenHeight));
+
         RenderData.Resolution = new Vector2(GetScreenWidth(), GetScreenHeight());
         var mapData = Application.LoadMapData();
 
@@ -52,22 +54,20 @@ public partial class ThreeDFirstPerson : IDisposable
         // Start with the game scene
         _activeScene = _gameScene;
         _activeScene.OnEnter();
-
-        OnResize((ScreenWidth, ScreenHeight));
     }
 
     // Main game loop
     private async void Render(float delta)
     {
+        var deltaTime = GetFrameTime();
+        _activeScene.Update(deltaTime);
+        _activeScene.Render();
+
         await Task.CompletedTask;
     }
 
     private void OnResize((int width, int height) Size)
     {
-        var deltaTime = GetFrameTime();
-        _activeScene.Update(deltaTime);
-        _activeScene.Render();
-        
         SetWindowSize(Size.width, Size.height);
     }
 

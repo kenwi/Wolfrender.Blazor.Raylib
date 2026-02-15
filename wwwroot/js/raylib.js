@@ -44,7 +44,7 @@ class Raylib {
         const canvas = Blazor.runtime.Module['canvas']
         const dotnetObject =  Blazor.runtime.Module['canvasInstance'];
         
-        const dpr = window.devicePixelRatio;
+        const dpr = Math.round(window.devicePixelRatio);
         const width =  canvas.widthNative = canvas.width =  canvas.clientWidth;
         const height = canvas.heightNative = canvas.height =  canvas.clientHeight;
 

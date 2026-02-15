@@ -1,22 +1,21 @@
-#version 330
+#version 100
+
+precision mediump float;
 
 // Input vertex attributes (from vertex shader)
-in vec2 fragTexCoord;
-in vec4 fragColor;
+varying vec2 fragTexCoord;
+varying vec4 fragColor;
 
 // Input uniform values
 uniform sampler2D texture0;
 uniform vec4 colDiffuse;
-
-// Output fragment color
-out vec4 finalColor;
 
 // Color key uniform (RGB values in 0-255 range)
 uniform vec3 colorKey;
 
 void main()
 {
-    vec4 texColor = texture(texture0, fragTexCoord);
+    vec4 texColor = texture2D(texture0, fragTexCoord);
     
     // Convert texture color to 0-255 range for comparison
     vec3 texRGB = texColor.rgb * 255.0;
@@ -30,5 +29,5 @@ void main()
         discard; // Make pixel transparent
     }
     
-    finalColor = texColor * colDiffuse * fragColor;
+    gl_FragColor = texColor * colDiffuse * fragColor;
 }
