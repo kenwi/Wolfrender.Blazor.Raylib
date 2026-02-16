@@ -1,4 +1,7 @@
 using System.Numerics;
+using System.Text;
+using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 using static Raylib_cs.Raylib;
 using Color = Raylib_cs.Color;
 using Raylib_cs;
@@ -9,6 +12,8 @@ namespace Wolfrender.Blazor.Raylib.Pages;
 
 public partial class ThreeDFirstPerson : IDisposable
 {
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+
     private int ScreenWidth = 1920;
     private int ScreenHeight = 1080;
 
@@ -16,6 +21,25 @@ public partial class ThreeDFirstPerson : IDisposable
     private IScene? _gameScene = null;
     private IScene? _editorScene = null;
 
+    private ElementReference _logTextArea;
+    private readonly StringBuilder _logBuilder = new();
+    public string BlazorUILog => _logBuilder.ToString();
+    public bool ShowBlazorUI = true;
+
+    public void Log(string message)
+    {
+        _logBuilder.AppendLine(message);
+    }
+
+    private async Task ScrollLogToBottom()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("eval", "document.querySelector('textarea[readonly]').scrollTop = document.querySelector('textarea[readonly]').scrollHeight");
+        }
+        catch { }
+    }
+    
     private async Task Init()
     {
         // Preload all resources into the Emscripten VFS before Raylib/File APIs can use them
@@ -59,11 +83,23 @@ public partial class ThreeDFirstPerson : IDisposable
     // Main game loop
     private async void Render(float delta)
     {
+        if (IsKeyPressed(KeyboardKey.Backspace))
+        {
+            ShowBlazorUI = !ShowBlazorUI;
+            await InvokeAsync(StateHasChanged);
+            await ScrollLogToBottom();
+        }
+
+        if (IsKeyPressed(KeyboardKey.Enter))
+        {
+            Log("Enter pressed");
+            await InvokeAsync(StateHasChanged);
+            await ScrollLogToBottom();
+        }
+
         var deltaTime = GetFrameTime();
         _activeScene.Update(deltaTime);
         _activeScene.Render();
-
-        await Task.CompletedTask;
     }
 
     private void OnResize((int width, int height) Size)
