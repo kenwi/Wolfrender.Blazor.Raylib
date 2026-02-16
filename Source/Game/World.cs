@@ -11,6 +11,7 @@ namespace Game;
 public class World : IScene
 {
     private readonly Player _player;
+    private readonly SoundSystem _soundSystem;
     private readonly MapData _mapData;
     private readonly LevelData _level;
     private readonly List<Texture2D> _textures;
@@ -59,6 +60,7 @@ public class World : IScene
         };
 
         // Initialize systems (note: collision system is created first as camera system depends on it)
+        _soundSystem = new SoundSystem();
         _inputSystem = new InputSystem();
         _movementSystem = new MovementSystem();
         _doorSystem = new DoorSystem(mapData.Doors, mapData.Width, _textures);
