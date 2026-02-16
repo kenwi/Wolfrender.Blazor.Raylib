@@ -24,7 +24,7 @@ public partial class ThreeDFirstPerson : IDisposable
     private ElementReference _logTextArea;
     private readonly StringBuilder _logBuilder = new();
     public string BlazorUILog => _logBuilder.ToString();
-    public bool ShowBlazorUI = true;
+    public bool ShowBlazorUI = false;
 
     public void Log(string message)
     {
