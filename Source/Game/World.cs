@@ -31,6 +31,7 @@ public class World : IScene
     private readonly RenderTexture2D _sceneRenderTexture;
     private InputState _inputState = new();
     private readonly EnemySystem _enemySystem;
+    private Music _music;
 
     public Player Player => _player;
     public EnemySystem EnemySystem => _enemySystem;
@@ -77,6 +78,9 @@ public class World : IScene
         // Initialize render textures
         _sceneRenderTexture = LoadRenderTexture(screenWidth, screenHeight);
         Debug.Setup(_doorSystem.Doors, _player, _animationSystem, _enemySystem);
+
+        _music = LoadMusicStream("resources/03.mp3");
+        PlayMusicStream(_music);
     }
 
     public void OnEnter()
@@ -99,6 +103,7 @@ public class World : IScene
 
     public void Update(float deltaTime)
     {
+        UpdateMusicStream(_music);
         _inputState = _inputSystem.GetInputState();
         var mouseDelta = _inputState.MouseDelta;
         
