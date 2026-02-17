@@ -1,3 +1,9 @@
+#if DEBUG
+using Game;
+
+var app = new Application();
+app.Run();
+#else
 using Wolfrender.Blazor.Raylib;
 using Wolfrender.Blazor.Raylib.Services;
 using Microsoft.AspNetCore.Components.Web;
@@ -11,3 +17,4 @@ builder.Services.AddScoped(_ => new HttpClient { BaseAddress = new Uri(builder.H
 builder.Services.AddRaylibServices();
 
 await builder.Build().RunAsync();
+#endif
