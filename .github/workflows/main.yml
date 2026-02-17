@@ -48,7 +48,7 @@ jobs:
         run: dotnet workload install wasm-tools
 
       - name: Publish
-        run: dotnet publish Wolfrender.Blazor.Raylib -c Release -o output
+        run: dotnet publish Wolfrender.Blazor.Raylib/Wolfrender.Blazor.Raylib.csproj -c Release -o output
 
       - name: Add CNAME for custom domain
         run: echo 'wolf3d.m0b.tech' > output/wwwroot/CNAME
