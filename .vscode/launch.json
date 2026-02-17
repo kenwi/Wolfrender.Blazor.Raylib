@@ -12,7 +12,7 @@
             "program": "${workspaceFolder}/bin/Debug/net10.0/Wolfrender.Blazor.Raylib.Console.dll",
             "args": [],
             "cwd": "${workspaceFolder}/wwwroot",
-            "console": "integratedTerminal",
+            "console": "internalConsole",
             "stopAtEntry": false
         }
     ]

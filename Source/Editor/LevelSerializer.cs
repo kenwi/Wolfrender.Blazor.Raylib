@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Raylib_cs;
+using static Raylib_cs.Raylib;
 
 namespace Game.Editor;
 
@@ -28,12 +30,43 @@ public class LevelFileData
     public List<EnemyPlacementData> Enemies { get; set; } = new();
 }
 
+public enum BmpTileLayer { Floor, Walls, Ceiling, Doors }
+
 public static class LevelSerializer
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true
     };
+
+    // BMP tile constants
+    private const int TilePixelSize = 7;
+    private const int BorderSize = 1;
+
+    // All-black tile: 49 pixels * 3 bytes (RGB) = 147 bytes -> 294 hex chars, all zeroes
+    private static readonly string BlackTileHash = new('0', TilePixelSize * TilePixelSize * 3 * 2);
+
+    private static readonly Dictionary<string, (uint TileId, BmpTileLayer Layer)> TileHashMap = new()
+    {
+        { BlackTileHash, (1, BmpTileLayer.Floor) } // greystone on floor
+    };
+
+    private static string ComputeTileHash(Image image, int startX, int startY, int tileSize)
+    {
+        Span<byte> pixels = stackalloc byte[tileSize * tileSize * 3];
+        int i = 0;
+        for (int py = 0; py < tileSize; py++)
+        {
+            for (int px = 0; px < tileSize; px++)
+            {
+                var color = GetImageColor(image, startX + px, startY + py);
+                pixels[i++] = color.R;
+                pixels[i++] = color.G;
+                pixels[i++] = color.B;
+            }
+        }
+        return Convert.ToHexString(pixels);
+    }
 
     public static void SaveToJson(MapData mapData, string path)
     {
@@ -108,5 +141,90 @@ public static class LevelSerializer
         mapData.Walls = (uint[])walls.Data!.Value.GlobalTileIDs!.Value.Clone();
         mapData.Ceiling = (uint[])ceiling.Data!.Value.GlobalTileIDs!.Value.Clone();
         mapData.Doors = (uint[])doors.Data!.Value.GlobalTileIDs!.Value.Clone();
+    }
+
+    public static void LoadFromBmp(MapData mapData, string path)
+    {
+        var image = LoadImage(path);
+
+        int mapWidth = (image.Width - 2 * BorderSize) / TilePixelSize;
+        int mapHeight = (image.Height - 2 * BorderSize) / TilePixelSize;
+
+        if (mapWidth <= 0 || mapHeight <= 0)
+        {
+            UnloadImage(image);
+            throw new InvalidOperationException(
+                $"BMP dimensions ({image.Width}x{image.Height}) are too small for {TilePixelSize}px tiles with {BorderSize}px border");
+        }
+
+        int tileCount = mapWidth * mapHeight;
+
+        mapData.Width = mapWidth;
+        mapData.Height = mapHeight;
+        mapData.Floor = new uint[tileCount];
+        mapData.Walls = new uint[tileCount];
+        mapData.Ceiling = new uint[tileCount];
+        mapData.Doors = new uint[tileCount];
+        mapData.Enemies = new List<EnemyPlacement>();
+
+        for (int tileY = 0; tileY < mapHeight; tileY++)
+        {
+            for (int tileX = 0; tileX < mapWidth; tileX++)
+            {
+                int pixelX = BorderSize + tileX * TilePixelSize;
+                int pixelY = BorderSize + tileY * TilePixelSize;
+                string hash = ComputeTileHash(image, pixelX, pixelY, TilePixelSize);
+
+                if (TileHashMap.TryGetValue(hash, out var mapping))
+                {
+                    uint[] targetLayer = mapping.Layer switch
+                    {
+                        BmpTileLayer.Floor => mapData.Floor,
+                        BmpTileLayer.Walls => mapData.Walls,
+                        BmpTileLayer.Ceiling => mapData.Ceiling,
+                        BmpTileLayer.Doors => mapData.Doors,
+                        _ => mapData.Floor
+                    };
+                    targetLayer[tileY * mapWidth + tileX] = mapping.TileId;
+                }
+            }
+        }
+
+        UnloadImage(image);
+    }
+
+    public static Dictionary<string, int> DiscoverBmpTileHashes(string path)
+    {
+        var image = LoadImage(path);
+
+        int mapWidth = (image.Width - 2 * BorderSize) / TilePixelSize;
+        int mapHeight = (image.Height - 2 * BorderSize) / TilePixelSize;
+
+        if (mapWidth <= 0 || mapHeight <= 0)
+        {
+            UnloadImage(image);
+            throw new InvalidOperationException(
+                $"BMP dimensions ({image.Width}x{image.Height}) are too small for {TilePixelSize}px tiles with {BorderSize}px border");
+        }
+
+        var hashCounts = new Dictionary<string, int>();
+
+        for (int tileY = 0; tileY < mapHeight; tileY++)
+        {
+            for (int tileX = 0; tileX < mapWidth; tileX++)
+            {
+                int pixelX = BorderSize + tileX * TilePixelSize;
+                int pixelY = BorderSize + tileY * TilePixelSize;
+                string hash = ComputeTileHash(image, pixelX, pixelY, TilePixelSize);
+
+                if (hashCounts.ContainsKey(hash))
+                    hashCounts[hash]++;
+                else
+                    hashCounts[hash] = 1;
+            }
+        }
+
+        UnloadImage(image);
+        return hashCounts;
     }
 }
