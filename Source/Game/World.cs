@@ -11,6 +11,7 @@ namespace Game;
 public class World : IScene
 {
     private readonly Player _player;
+    private readonly SoundSystem _soundSystem;
     private readonly MapData _mapData;
     private readonly LevelData _level;
     private readonly List<Texture2D> _textures;
@@ -30,6 +31,7 @@ public class World : IScene
     private readonly RenderTexture2D _sceneRenderTexture;
     private InputState _inputState = new();
     private readonly EnemySystem _enemySystem;
+    private Music _music;
 
     public Player Player => _player;
     public EnemySystem EnemySystem => _enemySystem;
@@ -59,6 +61,7 @@ public class World : IScene
         };
 
         // Initialize systems (note: collision system is created first as camera system depends on it)
+        _soundSystem = new SoundSystem();
         _inputSystem = new InputSystem();
         _movementSystem = new MovementSystem();
         _doorSystem = new DoorSystem(mapData.Doors, mapData.Width, _textures);
@@ -75,6 +78,9 @@ public class World : IScene
         // Initialize render textures
         _sceneRenderTexture = LoadRenderTexture(screenWidth, screenHeight);
         Debug.Setup(_doorSystem.Doors, _player, _animationSystem, _enemySystem);
+
+        _music = LoadMusicStream("resources/03.mp3");
+        PlayMusicStream(_music);
     }
 
     public void OnEnter()
@@ -93,6 +99,7 @@ public class World : IScene
 
     public void Update(float deltaTime)
     {
+        UpdateMusicStream(_music);
         _inputState = _inputSystem.GetInputState();
         var mouseDelta = _inputState.MouseDelta;
         
