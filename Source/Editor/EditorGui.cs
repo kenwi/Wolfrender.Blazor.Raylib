@@ -24,9 +24,11 @@ public class EditorGui
     private bool _showSaveDialog;
     private bool _showLoadJsonDialog;
     private bool _showLoadTmxDialog;
+    private bool _showLoadBmpDialog;
     private string _savePath = "resources/level.json";
     private string _loadJsonPath = "resources/level.json";
     private string _loadTmxPath = "resources/map1.tmx";
+    private string _loadBmpPath = "resources/level.bmp";
     private string _statusMessage = "";
     private float _statusTimer;
 
@@ -140,6 +142,11 @@ public class EditorGui
                     _showLoadTmxDialog = true;
                 }
 
+                if (ImGui.MenuItem("Load BMP..."))
+                {
+                    _showLoadBmpDialog = true;
+                }
+
                 ImGui.EndMenu();
             }
 
@@ -228,6 +235,11 @@ public class EditorGui
             ImGui.OpenPopup("Load Level TMX");
             _showLoadTmxDialog = false;
         }
+        if (_showLoadBmpDialog)
+        {
+            ImGui.OpenPopup("Load Level BMP");
+            _showLoadBmpDialog = false;
+        }
 
         // Save dialog
         ImGui.SetNextWindowSize(new Vector2(500, 0));
@@ -312,6 +324,39 @@ public class EditorGui
                 catch (Exception ex)
                 {
                     _statusMessage = $"Error loading TMX: {ex.Message}";
+                }
+                _statusTimer = 4f;
+                ImGui.CloseCurrentPopup();
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Cancel", new Vector2(120, 0)))
+            {
+                ImGui.CloseCurrentPopup();
+            }
+            ImGui.EndPopup();
+        }
+
+        // Load BMP dialog
+        ImGui.SetNextWindowSize(new Vector2(500, 0));
+        if (ImGui.BeginPopupModal("Load Level BMP", ImGuiWindowFlags.AlwaysAutoResize))
+        {
+            ImGui.SetWindowFontScale(_guiScale);
+            ImGui.Text("Load level from BMP image (7x7 pixel tiles, 1px border):");
+            ImGui.TextWrapped("Black tiles will be placed as greystone on the floor layer.");
+            ImGui.InputText("Path", ref _loadBmpPath, 512);
+
+            ImGui.Spacing();
+            if (ImGui.Button("Load", new Vector2(120, 0)))
+            {
+                try
+                {
+                    LevelSerializer.LoadFromBmp(_mapData, _loadBmpPath);
+                    refreshLayers();
+                    _statusMessage = $"Loaded BMP from {_loadBmpPath}";
+                }
+                catch (Exception ex)
+                {
+                    _statusMessage = $"Error loading BMP: {ex.Message}";
                 }
                 _statusTimer = 4f;
                 ImGui.CloseCurrentPopup();
