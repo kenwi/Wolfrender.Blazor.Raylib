@@ -1,3 +1,14 @@
 @page "/"
 
+@if (ShowBlazorUI)
+{
+    <div style="position: absolute; top: 10px; left: 10px; z-index: 10;">
+        <textarea @ref="_logTextArea"
+                  readonly
+                  rows="20"
+                  style="width: 400px; color: #0f0; background: rgba(0,0,0,0.85); border: 1px solid #333; font-family: monospace; font-size: 13px; padding: 6px; resize: both; overflow-y: auto;"
+                  value="@BlazorUILog"></textarea>
+    </div>
+}
+
 <Raylib OnInit="Init" OnResize="OnResize" OnRender="Render"></Raylib>
