@@ -79,10 +79,6 @@ public class World : IScene
 
     public void OnEnter()
     {
-        // Hide and center cursor for FPS-style controls
-        // HideCursor();
-        // _inputSystem.CenterMouse();
-
         // Rebuild doors and enemies from current MapData (may have changed in the editor)
         _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
         _enemySystem.Rebuild(_mapData.Enemies, _mapData);
