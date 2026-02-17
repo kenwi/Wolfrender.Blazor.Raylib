@@ -33,12 +33,14 @@ public partial class ThreeDFirstPerson : IDisposable
             "resources/shaders/transparency.fs",
             "resources/shaders/lighting.vs",
             "resources/shaders/lighting.fs",
+            "resources/03.mp3",
         };
 
         await Task.WhenAll(resourceFiles.Select(
             Wolfrender.Blazor.Raylib.Components.Raylib.PreloadFile));
 
         InitWindow(ScreenWidth, ScreenHeight, "Wolfrender");
+        InitAudioDevice();
         // DisableCursor();
 
         OnResize((ScreenWidth, ScreenHeight));
