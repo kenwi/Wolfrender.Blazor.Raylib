@@ -110,6 +110,36 @@ public class Enemy
     /// Accumulator used to throttle how often a new path is computed.
     /// </summary>
     public float PathRefreshTimer { get; set; }
+
+    // --- Wolf3D-style combat tracking ---
+
+    /// <summary>
+    /// Whether this enemy is in attack/combat mode (equivalent to FL_ATTACKMODE in Wolf3D).
+    /// When alerted, the enemy chases at increased speed and tries to shoot.
+    /// Once alerted, the enemy stays in combat mode until it loses the player entirely.
+    /// </summary>
+    public bool IsAlerted { get; set; }
+
+    /// <summary>
+    /// Reaction delay countdown before responding to player detection (seconds).
+    /// Original Wolf3D guards have a random delay (1 + RndT()/4 tics) before "first sighting".
+    /// Negative value means no detection is in progress.
+    /// </summary>
+    public float ReactionTimer { get; set; } = -1f;
+
+    /// <summary>
+    /// The movement direction the enemy has committed to for the current "think" cycle.
+    /// In the original Wolf3D, SelectDodgeDir/SelectChaseDir picks a direction once per tile.
+    /// The enemy then moves in that direction until the next think cycle evaluates a new one.
+    /// This prevents frame-rate-dependent jitter from re-rolling direction every frame.
+    /// </summary>
+    public Vector3 CommittedMoveDirection { get; set; }
+
+    /// <summary>
+    /// Countdown until the next chase "think" where a new direction/shoot decision is made.
+    /// Analogous to the T_Chase call frequency in the original (~4 times per tile crossing).
+    /// </summary>
+    public float ChaseThinkTimer { get; set; }
 }
 
 public class EnemyGuard : Enemy
