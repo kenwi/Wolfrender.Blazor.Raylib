@@ -1,4 +1,4 @@
-#if DEBUG
+#if CONSOLE_APP
 using Game;
 
 var app = new Application();
