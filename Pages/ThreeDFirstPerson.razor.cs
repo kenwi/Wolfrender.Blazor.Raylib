@@ -33,6 +33,7 @@ public partial class ThreeDFirstPerson : IDisposable
     public void Log(string message)
     {
         _logBuilder.AppendLine(message);
+        ScrollLogToBottom();
     }
 
     private void OnVolumeChanged(ChangeEventArgs e)
@@ -41,6 +42,7 @@ public partial class ThreeDFirstPerson : IDisposable
         {
             Volume = value;
             VolumeChanged?.Invoke(Volume);
+            Log($"Volume changed to {Volume}");
         }
     }
 
@@ -115,20 +117,12 @@ public partial class ThreeDFirstPerson : IDisposable
                 DisableCursor();
             }
             await InvokeAsync(StateHasChanged);
-            await ScrollLogToBottom();
         }
 
         if (IsKeyPressed(KeyboardKey.I))
         {
             ShowDebugLogUI = !ShowDebugLogUI;
             await InvokeAsync(StateHasChanged);
-        }
-
-        if (IsKeyPressed(KeyboardKey.Enter))
-        {
-            Log("Enter pressed");
-            await InvokeAsync(StateHasChanged);
-            await ScrollLogToBottom();
         }
 
         var deltaTime = GetFrameTime();
