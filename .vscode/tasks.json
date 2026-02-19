@@ -16,6 +16,20 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "build-editor",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${workspaceFolder}/Wolfrender.Blazor.Raylib.Console.Editor.csproj",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary;ForceNoAlign",
+                "-c",
+                "Debug"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "publish",
             "command": "dotnet",
             "type": "process",
