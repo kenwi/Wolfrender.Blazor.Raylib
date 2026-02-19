@@ -110,7 +110,6 @@ public class EditorGui
         bool toggleSimulation = false;
 
         ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(8, 10));
-        ImGui.SetWindowFontScale(_guiScale);
 
         if (ImGui.BeginMainMenuBar())
         {
