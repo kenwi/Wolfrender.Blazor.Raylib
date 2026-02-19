@@ -32,6 +32,9 @@ public class Application
 
         // // Start with the game scene
         _activeScene = _gameScene;
+#if EDITOR
+        _activeScene = _editorScene;
+#endif
         _activeScene.OnEnter();
     }
 
