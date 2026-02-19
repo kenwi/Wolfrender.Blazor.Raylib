@@ -24,11 +24,24 @@ public partial class ThreeDFirstPerson : IDisposable
     private ElementReference _logTextArea;
     private readonly StringBuilder _logBuilder = new();
     public string BlazorUILog => _logBuilder.ToString();
-    public bool ShowBlazorUI = false;
+    public bool ShowDebugLogUI = false;
+    public bool ShowOptionsUI = false;
+
+    public float Volume { get; set; } = 0.5f;
+    public event Action<float>? VolumeChanged;
 
     public void Log(string message)
     {
         _logBuilder.AppendLine(message);
+    }
+
+    private void OnVolumeChanged(ChangeEventArgs e)
+    {
+        if (float.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value))
+        {
+            Volume = value;
+            VolumeChanged?.Invoke(Volume);
+        }
     }
 
     private async Task ScrollLogToBottom()
@@ -77,6 +90,9 @@ public partial class ThreeDFirstPerson : IDisposable
         var world = (World)_gameScene;
         _editorScene = new Game.Editor.LevelEditorScene(mapData, world.EnemySystem, world.DoorSystem, world.Player);
 
+        VolumeChanged += world.SetVolume;
+        VolumeChanged?.Invoke(Volume);
+
         // Start with the game scene
         _activeScene = _gameScene;
         _activeScene.OnEnter();
@@ -87,9 +103,25 @@ public partial class ThreeDFirstPerson : IDisposable
     {
         if (IsKeyPressed(KeyboardKey.Backspace))
         {
-            ShowBlazorUI = !ShowBlazorUI;
+            ShowOptionsUI = !ShowOptionsUI;
+            if (ShowOptionsUI)
+            {
+                Log("Enabling cursor");
+                EnableCursor();
+            }
+            else
+            {
+                Log("Disabling cursor");
+                DisableCursor();
+            }
             await InvokeAsync(StateHasChanged);
             await ScrollLogToBottom();
+        }
+
+        if (IsKeyPressed(KeyboardKey.I))
+        {
+            ShowDebugLogUI = !ShowDebugLogUI;
+            await InvokeAsync(StateHasChanged);
         }
 
         if (IsKeyPressed(KeyboardKey.Enter))
@@ -111,6 +143,7 @@ public partial class ThreeDFirstPerson : IDisposable
 
     public void Dispose()
     {
+        CloseAudioDevice();
         CloseWindow();
     }
 }
