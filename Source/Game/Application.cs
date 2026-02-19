@@ -17,6 +17,8 @@ public class Application
         SetTargetFPS(120);
         InitWindow(0, 0, "");
         SetWindowState(ConfigFlags.FullscreenMode);
+        InitAudioDevice();
+
 
         RenderData.Resolution = new Vector2(GetScreenWidth(), GetScreenHeight());
 
@@ -89,6 +91,7 @@ public class Application
 
     private void Cleanup()
     {
+        CloseAudioDevice();
         CloseWindow();
     }
 }
