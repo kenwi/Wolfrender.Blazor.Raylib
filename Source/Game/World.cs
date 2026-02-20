@@ -32,7 +32,6 @@ public class World : IScene
     private readonly RenderTexture2D _sceneRenderTexture;
     private InputState _inputState = new();
     private readonly EnemySystem _enemySystem;
-    private bool _cursorHidden = true;
 
     public Player Player => _player;
     public EnemySystem EnemySystem => _enemySystem;
@@ -91,20 +90,18 @@ public class World : IScene
         // Rebuild doors and enemies from current MapData (may have changed in the editor)
         _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
         _enemySystem.Rebuild(_mapData.Enemies, _mapData);
-        
-        EnableCursor();
-        DisableCursor();
+        _inputSystem.DisableMouse();
     }
 
     public void OnExit()
     {
         // Restore cursor when leaving the game scene
-        ShowCursor();
+        _inputSystem.EnableMouse();
     }
 
-    public void TogggleCursor()
+    public void ToggleMouse()
     {
-        _cursorHidden = !_cursorHidden;
+        _inputSystem.ToggleMouse();
     }
 
     public void Update(float deltaTime)
@@ -113,7 +110,7 @@ public class World : IScene
         _inputState = _inputSystem.GetInputState();
         var mouseDelta = _inputState.MouseDelta;
         
-        if (!_cursorHidden)
+        if (_inputState.IsMouseFree)
         {
             mouseDelta = new Vector2(0, 0);
         }
