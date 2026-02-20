@@ -30,6 +30,14 @@ public class InputSystem
 
     public void Update()
     {
+        // Click-to-capture: locks the cursor on first click so the browser's
+        // pointer lock API receives the required user gesture. Also gives desktop
+        // users a natural "click to play" entry point after toggling mouse free.
+        if (_isMouseFree && IsMouseButtonPressed(MouseButton.Left))
+        {
+            DisableMouse();
+        }
+
         if (IsKeyPressed(KeyboardKey.L))
         {
             _isMouseFree = !_isMouseFree;

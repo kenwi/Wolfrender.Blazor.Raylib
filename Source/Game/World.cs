@@ -90,7 +90,14 @@ public class World : IScene
         // Rebuild doors and enemies from current MapData (may have changed in the editor)
         _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
         _enemySystem.Rebuild(_mapData.Enemies, _mapData);
-        _inputSystem.DisableMouse();
+
+        // Browser pointer lock requires a user gesture (click) before it can activate,
+        // so start with mouse free and let InputSystem lock on first click.
+        // On desktop we can grab the cursor immediately.
+        if (OperatingSystem.IsBrowser())
+            _inputSystem.EnableMouse();
+        else
+            _inputSystem.DisableMouse();
     }
 
     public void OnExit()
@@ -184,6 +191,10 @@ public class World : IScene
 
         // _hudSystem.DrawToScreen(screenWidth, screenHeight);
         DrawFPS(10, GetScreenHeight() - 120);
+        var mouseLabel = _inputState.IsMouseFree ? "MOUSE: FREE" : "MOUSE: LOCKED";
+        var mouseColor = _inputState.IsMouseFree ? Color.Green : Color.Red;
+        int mouseLabelWidth = MeasureText(mouseLabel, 20);
+        DrawText(mouseLabel, GetScreenWidth() - mouseLabelWidth - 10, 10, 20, mouseColor);
         
         if (_inputState.IsMinimapEnabled)
         {
