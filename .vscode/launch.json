@@ -12,6 +12,17 @@
             "program": "${workspaceFolder}/bin/Debug/net10.0/Wolfrender.Blazor.Raylib.Console.dll",
             "args": [],
             "cwd": "${workspaceFolder}/wwwroot",
+            "console": "internalConsole",
+            "stopAtEntry": false
+        },
+        {
+            "name": "Editor",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build-editor",
+            "program": "${workspaceFolder}/bin/Debug/net10.0/Wolfrender.Blazor.Raylib.Console.Editor.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/wwwroot",
             "console": "integratedTerminal",
             "stopAtEntry": false
         },
