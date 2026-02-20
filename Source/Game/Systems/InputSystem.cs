@@ -23,7 +23,7 @@ public class InputState
 
 public class InputSystem
 {
-    private bool _isMouseFree = false;
+    private bool _isMouseFree = true;
     private bool _isGamePaused = true;
     private bool _isDebugEnabled = false;
     private bool _isMinimapEnabled = false;
@@ -46,8 +46,7 @@ public class InputSystem
         if (IsKeyPressed(KeyboardKey.P))
         {
             _isGamePaused = !_isGamePaused;
-            EnableCursor();
-            DisableCursor();
+            ToggleMouse();
         }
 
         if (IsKeyPressed(KeyboardKey.I))
@@ -57,10 +56,33 @@ public class InputSystem
 
         if (IsKeyPressed(KeyboardKey.M))
         {
-            EnableCursor();
-            DisableCursor();
-            // _isMinimapEnabled = !_isMinimapEnabled;
+            ToggleMouse();
         }
+    }
+
+    public void ToggleMouse()
+    {
+        _isMouseFree = !_isMouseFree;
+        if (_isMouseFree)
+        {
+            EnableCursor();
+        }
+        else
+        {
+            DisableCursor();
+        }
+    }
+
+    public void DisableMouse()
+    {
+        _isMouseFree = false;
+        DisableCursor();
+    }
+
+    public void EnableMouse()
+    {
+        _isMouseFree = true;
+        EnableCursor();
     }
 
     public void CenterMouse()

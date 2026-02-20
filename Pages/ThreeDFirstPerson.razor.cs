@@ -117,8 +117,6 @@ public partial class ThreeDFirstPerson : IDisposable
 
         InitWindow(ScreenWidth, ScreenHeight, "Wolfrender");
         InitAudioDevice();
-        // DisableCursor();
-
         OnResize((ScreenWidth, ScreenHeight));
 
         RenderData.Resolution = new Vector2(GetScreenWidth(), GetScreenHeight());
@@ -144,26 +142,16 @@ public partial class ThreeDFirstPerson : IDisposable
         {
             ShowOptionsUI = !ShowOptionsUI;
             var world = _gameScene as World;
-            if (ShowOptionsUI)
-            {
-                Log("Enabling cursor");
-                EnableCursor();
-                ShowCursor();
-                world?.TogggleCursor();
-            }
-            else
-            {
-                Log("Disabling cursor");
-                HideCursor();
-                DisableCursor();
-                world?.TogggleCursor();
-            }
+            var logString = ShowOptionsUI ? "Enabling cursor" : "Disabling cursor";
+            Log(logString);
+            world?.ToggleMouse();
             await InvokeAsync(StateHasChanged);
         }
 
         if (IsKeyPressed(KeyboardKey.I))
         {
             ShowDebugLogUI = !ShowDebugLogUI;
+            ScrollLogToBottom();
             await InvokeAsync(StateHasChanged);
         }
 
