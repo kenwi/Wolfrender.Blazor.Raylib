@@ -13,12 +13,10 @@ public class Application
 
     public Application()
     {
-        // Initialize Raylib window
         SetTargetFPS(120);
         InitWindow(0, 0, "");
         SetWindowState(ConfigFlags.FullscreenMode);
         InitAudioDevice();
-
 
         RenderData.Resolution = new Vector2(GetScreenWidth(), GetScreenHeight());
 
