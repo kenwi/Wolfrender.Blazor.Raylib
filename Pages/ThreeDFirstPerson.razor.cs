@@ -28,7 +28,14 @@ public partial class ThreeDFirstPerson : IDisposable
     public bool ShowOptionsUI = false;
 
     public float Volume { get; set; } = 0.5f;
+    public float MouseSensitivityX { get; set; } = 1f;
+    public float MouseSensitivityY { get; set; } = 1f;
+    public int ResolutionDownsampling { get; set; } = 1;
+
     public event Action<float>? VolumeChanged;
+    public event Action<float>? MouseSensitivityXChanged;
+    public event Action<float>? MouseSensitivityYChanged;
+    public event Action<int>? ResolutionDownsamplingChanged;
 
     public void Log(string message)
     {
@@ -43,6 +50,36 @@ public partial class ThreeDFirstPerson : IDisposable
             Volume = value;
             VolumeChanged?.Invoke(Volume);
             Log($"Volume changed to {Volume}");
+        }
+    }
+
+    private void OnMouseSensitivityXChanged(ChangeEventArgs e)
+    {
+        if (float.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value))
+        {
+            MouseSensitivityX = value;
+            MouseSensitivityXChanged?.Invoke(MouseSensitivityX);
+            Log($"Mouse sensitivity X changed to {MouseSensitivityX}");
+        }
+    }
+
+    private void OnMouseSensitivityYChanged(ChangeEventArgs e)
+    {
+        if (float.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value))
+        {
+            MouseSensitivityY = value;
+            MouseSensitivityYChanged?.Invoke(MouseSensitivityY);
+            Log($"Mouse sensitivity Y changed to {MouseSensitivityY}");
+        }
+    }
+
+    private void OnResolutionDownsamplingChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var value))
+        {
+            ResolutionDownsampling = Math.Clamp(value, 1, 6);
+            ResolutionDownsamplingChanged?.Invoke(ResolutionDownsampling);
+            Log($"Resolution downsampling changed to {ResolutionDownsampling}");
         }
     }
 
