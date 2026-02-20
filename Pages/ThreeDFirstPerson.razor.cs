@@ -143,15 +143,20 @@ public partial class ThreeDFirstPerson : IDisposable
         if (IsKeyPressed(KeyboardKey.Backspace))
         {
             ShowOptionsUI = !ShowOptionsUI;
+            var world = _gameScene as World;
             if (ShowOptionsUI)
             {
                 Log("Enabling cursor");
                 EnableCursor();
+                ShowCursor();
+                world?.TogggleCursor();
             }
             else
             {
                 Log("Disabling cursor");
+                HideCursor();
                 DisableCursor();
+                world?.TogggleCursor();
             }
             await InvokeAsync(StateHasChanged);
         }

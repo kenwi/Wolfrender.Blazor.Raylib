@@ -27,10 +27,12 @@ public class World : IScene
     private readonly AnimationSystem _animationSystem;
     private readonly MinimapSystem _minimapSystem;
 
+
     // Rendering
     private readonly RenderTexture2D _sceneRenderTexture;
     private InputState _inputState = new();
     private readonly EnemySystem _enemySystem;
+    private bool _cursorHidden = true;
 
     public Player Player => _player;
     public EnemySystem EnemySystem => _enemySystem;
@@ -89,6 +91,8 @@ public class World : IScene
         // Rebuild doors and enemies from current MapData (may have changed in the editor)
         _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
         _enemySystem.Rebuild(_mapData.Enemies, _mapData);
+        
+        EnableCursor();
         DisableCursor();
     }
 
@@ -98,12 +102,22 @@ public class World : IScene
         ShowCursor();
     }
 
+    public void TogggleCursor()
+    {
+        _cursorHidden = !_cursorHidden;
+    }
+
     public void Update(float deltaTime)
     {
         _soundSystem.Update();
         _inputState = _inputSystem.GetInputState();
         var mouseDelta = _inputState.MouseDelta;
         
+        if (!_cursorHidden)
+        {
+            mouseDelta = new Vector2(0, 0);
+        }
+
         // Center mouse AFTER getting input state (which calculates delta from center)
         // _inputSystem.CenterMouse();
         _inputSystem.Update();
