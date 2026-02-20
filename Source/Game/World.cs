@@ -122,8 +122,6 @@ public class World : IScene
             mouseDelta = new Vector2(0, 0);
         }
 
-        // Center mouse AFTER getting input state (which calculates delta from center)
-        // _inputSystem.CenterMouse();
         _inputSystem.Update();
 
         if (_inputState.IsGamePaused)
