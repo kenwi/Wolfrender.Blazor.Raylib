@@ -15,8 +15,6 @@ public class World : IScene
     private readonly MapData _mapData;
     private readonly LevelData _level;
     private readonly List<Texture2D> _textures;
-
-    // Systems
     private readonly InputSystem _inputSystem;
     private readonly MovementSystem _movementSystem;
     private readonly CollisionSystem _collisionSystem;
@@ -27,8 +25,6 @@ public class World : IScene
     private readonly AnimationSystem _animationSystem;
     private readonly MinimapSystem _minimapSystem;
 
-
-    // Rendering
     private readonly RenderTexture2D _sceneRenderTexture;
     private InputState _inputState = new();
     private readonly EnemySystem _enemySystem;
@@ -45,8 +41,6 @@ public class World : IScene
         _mapData = mapData;
         _level = new LevelData(mapData);
         _textures = mapData.Textures;
-
-        // Initialize player
         _player = new Player
         {
             Position = new Vector3(30.0f * 4, 2.0f, 28f * 4),
@@ -60,7 +54,6 @@ public class World : IScene
             }
         };
 
-        // Initialize systems (note: collision system is created first as camera system depends on it)
         _soundSystem = new SoundSystem("resources/03.mp3");
         _inputSystem = new InputSystem();
         _movementSystem = new MovementSystem();
@@ -70,12 +63,9 @@ public class World : IScene
         _renderSystem = new RenderSystem(_level, _textures);
         _hudSystem = new HudSystem(screenWidth, screenHeight);
         _minimapSystem = new MinimapSystem(_level, _renderSystem);
-        
         _enemySystem = new EnemySystem(_player, _inputSystem, _collisionSystem, _doorSystem);
         _animationSystem = new AnimationSystem(_textures[7], _player, _enemySystem);
         
-
-        // Initialize render textures
         _sceneRenderTexture = LoadRenderTexture(screenWidth, screenHeight);
         Debug.Setup(_doorSystem.Doors, _player, _animationSystem, _enemySystem);
     }
