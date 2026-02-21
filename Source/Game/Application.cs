@@ -20,15 +20,12 @@ public class Application
 
         RenderData.Resolution = new Vector2(GetScreenWidth(), GetScreenHeight());
 
-        // Load shared map data
         var mapData = LoadMapData();
 
-        // Create scenes with shared data
         _gameScene = new World(mapData);
         var world = (World)_gameScene;
         _editorScene = new Editor.LevelEditorScene(mapData, world.EnemySystem, world.DoorSystem, world.Player);
 
-        // // Start with the game scene
         _activeScene = _gameScene;
 #if EDITOR
         _activeScene = _editorScene;
