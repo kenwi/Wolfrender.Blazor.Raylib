@@ -54,7 +54,7 @@ public class World : IScene
             }
         };
 
-        _soundSystem = new SoundSystem("resources/03.mp3");
+        _soundSystem = new SoundSystem(Utilities.Res.Path("resources/03.mp3"));
         _inputSystem = new InputSystem();
         _movementSystem = new MovementSystem();
         _doorSystem = new DoorSystem(mapData.Doors, mapData.Width, _textures);

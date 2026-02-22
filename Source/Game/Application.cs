@@ -2,6 +2,7 @@ using System.Numerics;
 using Game.Utilities;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
+using static Game.Utilities.Res;
 
 namespace Game;
 
@@ -71,18 +72,18 @@ public class Application
     {
         var textures = new List<Texture2D>
         {
-            LoadTexture("resources/greystone.png"),
-            LoadTexture("resources/bluestone.png"),
-            LoadTexture("resources/colorstone.png"),
-            LoadTexture("resources/mossy.png"),
-            LoadTexture("resources/redbrick.png"),
-            LoadTexture("resources/wood.png"),
-            LoadTexture("resources/door.png"),
-            LoadTexture("resources/enemy_guard.png")
+            LoadTexture(Path("resources/greystone.png")),
+            LoadTexture(Path("resources/bluestone.png")),
+            LoadTexture(Path("resources/colorstone.png")),
+            LoadTexture(Path("resources/mossy.png")),
+            LoadTexture(Path("resources/redbrick.png")),
+            LoadTexture(Path("resources/wood.png")),
+            LoadTexture(Path("resources/door.png")),
+            LoadTexture(Path("resources/enemy_guard.png"))
         };
 
         var mapData = new MapData { Textures = textures };
-        Editor.LevelSerializer.LoadFromJson(mapData, "resources/level.json");
+        Editor.LevelSerializer.LoadFromJson(mapData, Path("resources/level.json"));
 
         return mapData;
     }
