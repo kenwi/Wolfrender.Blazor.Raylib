@@ -42,7 +42,6 @@ class Raylib {
             if (dotnetObject) {
                 Blazor.runtime.Module['canvasInstance'] = dotnetObject;
                 window.addEventListener("resize", this.resize, true);
-                this.resize({});
             }
         }
     }
@@ -61,6 +60,10 @@ class Raylib {
         exports.Wolfrender.Blazor.Raylib.Components.Raylib.ResizeCanvas(dotnetObject, width, height, dpr);
     }
     
+    syncCanvasSize() {
+        this.resize({});
+    }
+
     render(dotnetObject, id, fps) {
         if (dotnetObject) {
             const frameCap = 1000.0 / (fps + 16.0);
