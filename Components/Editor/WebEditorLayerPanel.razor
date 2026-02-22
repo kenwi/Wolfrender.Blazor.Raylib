@@ -1,0 +1,69 @@
+@using Game.Editor
+
+<div class="editor-panel editor-layers" @onpointerenter="OnPointerEnter" @onpointerleave="OnPointerLeave">
+    <h3>Layers</h3>
+    <div class="info-label">Render order (top = drawn first). Click name to select.</div>
+
+    @for (int idx = 0; idx < State.Layers.Count; idx++)
+    {
+        var i = idx;
+        var layer = State.Layers[i];
+        <div class="layer-row @(i == State.ActiveLayerIndex ? "active" : "")">
+            <input type="checkbox" class="editor-checkbox"
+                   checked="@layer.IsVisible"
+                   @onchange="e => ToggleVisibility(i, e)" />
+            <button class="editor-btn @(i == State.ActiveLayerIndex ? "selected" : "")"
+                    style="flex: 1; text-align: left;"
+                    @onclick="() => SetActiveLayer(i)">
+                @layer.Name
+            </button>
+            @if (i > 0)
+            {
+                <button class="editor-btn editor-btn-sm" @onclick="() => MoveUp(i)">Up</button>
+            }
+            @if (i < State.Layers.Count - 1)
+            {
+                <button class="editor-btn editor-btn-sm" @onclick="() => MoveDown(i)">Dn</button>
+            }
+        </div>
+    }
+
+    <div class="shortcut-hints">
+        RMB drag: Pan | LMB: Paint/Place<br/>
+        Scroll/+/-: Zoom | 1-9: Layer<br/>
+        Ctrl+1-9: Toggle vis | C: Cursor follow<br/>
+        Del: Delete enemy
+    </div>
+</div>
+
+@code {
+    [Parameter] public EditorState State { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private void SetActiveLayer(int index)
+    {
+        State.ActiveLayerIndex = index;
+        OnChanged.InvokeAsync();
+    }
+
+    private void ToggleVisibility(int index, ChangeEventArgs e)
+    {
+        State.Layers[index].IsVisible = (bool)(e.Value ?? false);
+        OnChanged.InvokeAsync();
+    }
+
+    private void MoveUp(int index)
+    {
+        State.SwapLayers(index, index - 1);
+        OnChanged.InvokeAsync();
+    }
+
+    private void MoveDown(int index)
+    {
+        State.SwapLayers(index, index + 1);
+        OnChanged.InvokeAsync();
+    }
+
+    private void OnPointerEnter() => State.IsMouseOverUI = true;
+    private void OnPointerLeave() => State.IsMouseOverUI = false;
+}

@@ -70,6 +70,21 @@ public static class LevelSerializer
 
     public static void SaveToJson(MapData mapData, string path)
     {
+        var json = SerializeToJson(mapData);
+        File.WriteAllText(path, json);
+    }
+
+    public static void LoadFromJson(MapData mapData, string path)
+    {
+        var json = File.ReadAllText(path);
+        DeserializeFromJson(mapData, json);
+    }
+
+    /// <summary>
+    /// Serialize MapData to a JSON string (no file system needed, suitable for WASM).
+    /// </summary>
+    public static string SerializeToJson(MapData mapData)
+    {
         var fileData = new LevelFileData
         {
             Width = mapData.Width,
@@ -92,15 +107,16 @@ public static class LevelSerializer
             }).ToList()
         };
 
-        var json = JsonSerializer.Serialize(fileData, JsonOptions);
-        File.WriteAllText(path, json);
+        return JsonSerializer.Serialize(fileData, JsonOptions);
     }
 
-    public static void LoadFromJson(MapData mapData, string path)
+    /// <summary>
+    /// Deserialize a JSON string into MapData (no file system needed, suitable for WASM).
+    /// </summary>
+    public static void DeserializeFromJson(MapData mapData, string json)
     {
-        var json = File.ReadAllText(path);
         var fileData = JsonSerializer.Deserialize<LevelFileData>(json)
-            ?? throw new InvalidOperationException($"Failed to deserialize level file: {path}");
+            ?? throw new InvalidOperationException("Failed to deserialize level JSON");
 
         mapData.Width = fileData.Width;
         mapData.Height = fileData.Height;

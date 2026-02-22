@@ -1,0 +1,14 @@
+@using Game.Editor
+
+<div class="editor-panel editor-debug-log" @onpointerenter="OnPointerEnter" @onpointerleave="OnPointerLeave">
+    <h3>Debug Log</h3>
+    <textarea class="debug-log-area" readonly>@LogText</textarea>
+</div>
+
+@code {
+    [Parameter] public EditorState State { get; set; } = default!;
+    [Parameter] public string LogText { get; set; } = "";
+
+    private void OnPointerEnter() => State.IsMouseOverUI = true;
+    private void OnPointerLeave() => State.IsMouseOverUI = false;
+}

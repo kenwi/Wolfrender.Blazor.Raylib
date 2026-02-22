@@ -1,0 +1,60 @@
+@using Game.Editor
+@using Game.Utilities
+
+<div class="editor-panel editor-cursor-info" @onpointerenter="OnPointerEnter" @onpointerleave="OnPointerLeave">
+    <h3>Cursor Info</h3>
+
+    @if (TileInBounds)
+    {
+        <div class="info-label">Tile Coordinate</div>
+        <div class="info-value">X: @TileX &nbsp; Y: @TileY</div>
+
+        <div class="info-label" style="margin-top: 6px;">World Coordinate</div>
+        <div class="info-value">X: @((WorldX * LevelData.QuadSize).ToString("F1")) &nbsp; Z: @((WorldY * LevelData.QuadSize).ToString("F1"))</div>
+
+        <div class="info-label" style="margin-top: 6px;">Tile Contents</div>
+        @foreach (var layer in State.Layers)
+        {
+            @if (layer.Name == EditorState.EnemiesLayerName)
+            {
+                var enemyHere = State.MapData.Enemies.FindIndex(e => e.TileX == TileX && e.TileY == TileY);
+                @if (enemyHere >= 0)
+                {
+                    <div class="tile-content-enemy">&nbsp; @layer.Name: @State.MapData.Enemies[enemyHere].EnemyType (#@enemyHere)</div>
+                }
+                else
+                {
+                    <div class="tile-content-empty">&nbsp; @layer.Name: empty</div>
+                }
+            }
+            else
+            {
+                uint tileId = State.MapData.GetTile(layer.Tiles, TileX, TileY);
+                @if (tileId > 0)
+                {
+                    <div class="tile-content-filled">&nbsp; @layer.Name: ID @tileId</div>
+                }
+                else
+                {
+                    <div class="tile-content-empty">&nbsp; @layer.Name: empty</div>
+                }
+            }
+        }
+    }
+    else
+    {
+        <div class="tile-content-empty">Outside map bounds</div>
+    }
+</div>
+
+@code {
+    [Parameter] public EditorState State { get; set; } = default!;
+    [Parameter] public int TileX { get; set; }
+    [Parameter] public int TileY { get; set; }
+    [Parameter] public float WorldX { get; set; }
+    [Parameter] public float WorldY { get; set; }
+    [Parameter] public bool TileInBounds { get; set; }
+
+    private void OnPointerEnter() => State.IsMouseOverUI = true;
+    private void OnPointerLeave() => State.IsMouseOverUI = false;
+}
