@@ -31,6 +31,13 @@ class Raylib {
         if (canvas) {
             Blazor.runtime.Module['canvas'] = canvas;
             canvas.addEventListener('contextmenu',(e) => e.preventDefault());
+
+            // Prevent browser default handling for keys that Raylib needs to capture
+            canvas.addEventListener('keydown', (e) => {
+                if (e.key === 'Tab') {
+                    e.preventDefault();
+                }
+            });
             
             if (dotnetObject) {
                 Blazor.runtime.Module['canvasInstance'] = dotnetObject;

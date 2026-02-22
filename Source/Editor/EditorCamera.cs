@@ -1,5 +1,4 @@
 using System.Numerics;
-using ImGuiNET;
 using static Raylib_cs.Raylib;
 
 namespace Game.Editor;
@@ -43,12 +42,10 @@ public class EditorCamera
     /// Handle panning (RMB drag + WASD) and zooming (scroll wheel + +/- keys).
     /// When disableKeyboardPan is true, WASD panning is skipped (e.g. during simulation).
     /// </summary>
-    public void HandleInput(float deltaTime, bool ctrlHeld, bool disableKeyboardPan = false)
+    public void HandleInput(float deltaTime, bool ctrlHeld, bool isMouseOverUI, bool isKeyboardCapturedByUI = false, bool disableKeyboardPan = false)
     {
-        bool imGuiWantsMouse = ImGui.GetIO().WantCaptureMouse;
-
         // Pan with right mouse button drag
-        if (!imGuiWantsMouse && IsMouseButtonDown(Raylib_cs.MouseButton.Right))
+        if (!isMouseOverUI && IsMouseButtonDown(Raylib_cs.MouseButton.Right))
         {
             var mousePos = GetMousePosition();
             if (_isDragging)
@@ -65,7 +62,7 @@ public class EditorCamera
         }
 
         // Pan with WASD keys (disabled during simulation — keys control the player instead)
-        if (!disableKeyboardPan && !ImGui.GetIO().WantCaptureKeyboard)
+        if (!disableKeyboardPan && !isKeyboardCapturedByUI)
         {
             float panSpeed = 500f * deltaTime;
             if (IsKeyDown(Raylib_cs.KeyboardKey.W)) Offset.Y += panSpeed;
@@ -78,7 +75,7 @@ public class EditorCamera
         float zoomDelta = 0f;
         Vector2 zoomAnchor = new Vector2(GetScreenWidth() / 2f, GetScreenHeight() / 2f);
 
-        if (!imGuiWantsMouse)
+        if (!isMouseOverUI)
         {
             float wheel = GetMouseWheelMove();
             if (Math.Abs(wheel) > 0.001f)

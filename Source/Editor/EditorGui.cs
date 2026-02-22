@@ -25,10 +25,10 @@ public class EditorGui
     private bool _showLoadJsonDialog;
     private bool _showLoadTmxDialog;
     private bool _showLoadBmpDialog;
-    private string _savePath = "resources/level.json";
-    private string _loadJsonPath = "resources/level.json";
-    private string _loadTmxPath = "resources/map1.tmx";
-    private string _loadBmpPath = "resources/level.bmp";
+    private string _savePath = Game.Utilities.Res.Path("resources/level.json");
+    private string _loadJsonPath = Game.Utilities.Res.Path("resources/level.json");
+    private string _loadTmxPath = Game.Utilities.Res.Path("resources/map1.tmx");
+    private string _loadBmpPath = Game.Utilities.Res.Path("resources/level.bmp");
     private string _statusMessage = "";
     private float _statusTimer;
 

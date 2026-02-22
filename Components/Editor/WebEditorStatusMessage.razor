@@ -1,0 +1,13 @@
+@using Game.Editor
+
+@if (State.StatusTimer > 0 && !string.IsNullOrEmpty(State.StatusMessage))
+{
+    var cssClass = State.StatusMessage.StartsWith("Error") ? "error" : "success";
+    <div class="editor-status-toast @cssClass">
+        @State.StatusMessage
+    </div>
+}
+
+@code {
+    [Parameter] public EditorState State { get; set; } = default!;
+}

@@ -26,7 +26,7 @@ public static class PrimitiveRenderer
  
         // Load shader (Raylib will use default vertex shader)
         // _colorKeyShader = LoadShaderFromMemory(null, fragmentShader);
-        _colorKeyShader = LoadShader(null, "resources/shaders/transparency.fs");
+        _colorKeyShader = LoadShader(null, Res.Path("resources/shaders/transparency.fs"));
         if (_colorKeyShader.HasValue)
         {
             _colorKeyShaderLoc = GetShaderLocation(_colorKeyShader.Value, "colorKey");
@@ -41,7 +41,7 @@ public static class PrimitiveRenderer
     {
         if (_lightingShader.HasValue) return;
 
-        _lightingShader = LoadShader("resources/shaders/lighting.vs", "resources/shaders/lighting.fs");
+        _lightingShader = LoadShader(Res.Path("resources/shaders/lighting.vs"), Res.Path("resources/shaders/lighting.fs"));
         // if (_lightingShader.HasValue)
         {
             _lightingShaderPlayerPosLoc = GetShaderLocation(_lightingShader.Value, "playerPosition");

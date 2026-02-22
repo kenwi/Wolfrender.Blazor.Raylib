@@ -1,0 +1,109 @@
+@using Game.Editor
+@inject IJSRuntime JS
+
+@if (ShowSaveDialog)
+{
+    <div class="editor-modal-backdrop" @onclick="CloseSave" @onpointerenter="OnPointerEnter" @onpointerleave="OnPointerLeave">
+        <div class="editor-modal" @onclick:stopPropagation="true">
+            <h3>Save Level JSON</h3>
+            <p style="color: #aaa; font-size: 13px;">Download level data as JSON file:</p>
+            <div class="info-label">Filename</div>
+            <input class="editor-input" @bind="SaveFilename" />
+            <div class="modal-actions">
+                <button class="editor-btn" @onclick="CloseSave">Cancel</button>
+                <button class="editor-btn selected" @onclick="DoSave">Save</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (ShowLoadDialog)
+{
+    <div class="editor-modal-backdrop" @onclick="CloseLoad" @onpointerenter="OnPointerEnter" @onpointerleave="OnPointerLeave">
+        <div class="editor-modal" @onclick:stopPropagation="true">
+            <h3>Load Level JSON</h3>
+            <p style="color: #aaa; font-size: 13px;">Select a JSON level file to load:</p>
+            <InputFile OnChange="OnFileSelected" accept=".json" style="color: #ccc;" />
+            <div class="modal-actions">
+                <button class="editor-btn" @onclick="CloseLoad">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public EditorState State { get; set; } = default!;
+    [Parameter] public bool ShowSaveDialog { get; set; }
+    [Parameter] public EventCallback<bool> ShowSaveDialogChanged { get; set; }
+    [Parameter] public bool ShowLoadDialog { get; set; }
+    [Parameter] public EventCallback<bool> ShowLoadDialogChanged { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private string SaveFilename = "level.json";
+
+    private async Task CloseSave()
+    {
+        await ShowSaveDialogChanged.InvokeAsync(false);
+    }
+
+    private async Task CloseLoad()
+    {
+        await ShowLoadDialogChanged.InvokeAsync(false);
+    }
+
+    private async Task DoSave()
+    {
+        try
+        {
+            var json = LevelSerializer.SerializeToJson(State.MapData);
+            await DownloadFile(SaveFilename, json);
+            State.SetStatus($"Saved {SaveFilename}");
+        }
+        catch (Exception ex)
+        {
+            State.SetStatus($"Error saving: {ex.Message}");
+        }
+        await ShowSaveDialogChanged.InvokeAsync(false);
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            var file = e.File;
+            using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            using var reader = new StreamReader(stream);
+            var json = await reader.ReadToEndAsync();
+            LevelSerializer.DeserializeFromJson(State.MapData, json);
+            State.RefreshLayerReferences();
+            State.SetStatus($"Loaded {file.Name}");
+        }
+        catch (Exception ex)
+        {
+            State.SetStatus($"Error loading: {ex.Message}");
+        }
+        await ShowLoadDialogChanged.InvokeAsync(false);
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task DownloadFile(string filename, string content)
+    {
+        await JS.InvokeVoidAsync("eval", $@"
+            (function() {{
+                var blob = new Blob([{System.Text.Json.JsonSerializer.Serialize(content)}], {{ type: 'application/json' }});
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = '{filename}';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }})();
+        ");
+    }
+
+    private void OnPointerEnter() => State.IsMouseOverUI = true;
+    private void OnPointerLeave() => State.IsMouseOverUI = false;
+}

@@ -2,6 +2,15 @@ using System.Numerics;
 
 namespace Game.Utilities;
 
+public static class Res
+{
+#if CONSOLE_APP
+    public static string Path(string relativePath) => "wwwroot/" + relativePath;
+#else
+    public static string Path(string relativePath) => relativePath;
+#endif
+}
+
 public static class RenderData
 {
     public static Vector2 Resolution = new Vector2(1025, 411);

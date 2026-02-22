@@ -1,0 +1,50 @@
+@using Game.Editor
+
+<div class="editor-panel editor-tile-palette" @onpointerenter="OnPointerEnter" @onpointerleave="OnPointerLeave">
+    <h3>Tile Palette</h3>
+    <div class="info-label">Active: @State.ActiveLayer.Name</div>
+
+    <button class="editor-btn eraser-btn @(State.SelectedTileId == 0 ? "selected" : "")"
+            @onclick="() => SelectTile(0)">
+        Eraser (Empty)
+    </button>
+
+    <div class="info-label" style="margin-top: 8px;">Tiles:</div>
+    <div class="tile-grid">
+        @for (int idx = 0; idx < TextureNames.Length; idx++)
+        {
+            var i = idx;
+            uint tileId = (uint)(i + 1);
+            <button class="tile-btn @(State.SelectedTileId == tileId ? "selected" : "")"
+                    title="Tile ID: @tileId"
+                    @onclick="() => SelectTile(tileId)">
+                <img src="resources/@(TextureNames[i])" alt="Tile @tileId" />
+            </button>
+        }
+    </div>
+
+    <div class="info-label" style="margin-top: 6px;">
+        Selected: @(State.SelectedTileId == 0 ? "Eraser" : $"ID {State.SelectedTileId}")
+    </div>
+</div>
+
+@code {
+    [Parameter] public EditorState State { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private static readonly string[] TextureNames =
+    {
+        "greystone.png", "bluestone.png", "colorstone.png",
+        "mossy.png", "redbrick.png", "wood.png",
+        "door.png", "enemy_guard.png"
+    };
+
+    private void SelectTile(uint tileId)
+    {
+        State.SelectedTileId = tileId;
+        OnChanged.InvokeAsync();
+    }
+
+    private void OnPointerEnter() => State.IsMouseOverUI = true;
+    private void OnPointerLeave() => State.IsMouseOverUI = false;
+}
