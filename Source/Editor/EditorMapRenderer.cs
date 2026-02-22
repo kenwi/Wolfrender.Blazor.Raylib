@@ -1,7 +1,6 @@
 using System.Numerics;
 using Game.Entities;
 using Game.Systems;
-using ImGuiNET;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 using Color = Raylib_cs.Color;
@@ -169,13 +168,12 @@ public class EditorMapRenderer
     }
 
     public void RenderEnemyLayer(
-        EditorCamera camera, EnemySystem enemySystem,
+        EditorCamera camera, EnemySystem enemySystem, bool isMouseOverUI,
         bool isSimulating, ref int hoveredEnemyIndex, int selectedEnemyIndex,
         bool isEditingPatrolPath, int patrolEditEnemyIndex, List<PatrolWaypoint> patrolPathInProgress)
     {
         float tileSize = camera.TileSize;
         var mouseScreen = GetMousePosition();
-        bool imGuiWantsMouse = ImGui.GetIO().WantCaptureMouse;
         hoveredEnemyIndex = -1;
 
         float radius = tileSize * 0.35f;
@@ -187,7 +185,7 @@ public class EditorMapRenderer
             float centerX = (enemy.TileX + 0.5f) * tileSize + camera.Offset.X;
             float centerY = (enemy.TileY + 0.5f) * tileSize + camera.Offset.Y;
 
-            if (!imGuiWantsMouse)
+            if (!isMouseOverUI)
             {
                 float dx = mouseScreen.X - centerX;
                 float dy = mouseScreen.Y - centerY;

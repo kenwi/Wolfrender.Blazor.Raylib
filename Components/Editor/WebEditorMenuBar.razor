@@ -1,0 +1,95 @@
+@using Game.Editor
+
+<div class="editor-menubar" @onpointerenter="OnPointerEnter" @onpointerleave="OnPointerLeave">
+    <div class="menu-item @FileMenuClass" @onclick="ToggleFileMenu">
+        File
+        @if (OpenMenu == MenuFile)
+        {
+            <div class="menu-dropdown" @onclick:stopPropagation="true">
+                <div class="menu-option" @onclick="OnNew">New</div>
+                <div class="menu-separator"></div>
+                <div class="menu-option" @onclick="OnSave">Save JSON</div>
+                <div class="menu-separator"></div>
+                <div class="menu-option" @onclick="OnLoad">Load JSON</div>
+            </div>
+        }
+    </div>
+
+    <div class="menu-item @WindowMenuClass" @onclick="ToggleWindowMenu">
+        Window
+        @if (OpenMenu == MenuWindow)
+        {
+            <div class="menu-dropdown" @onclick:stopPropagation="true">
+                <div class="menu-option @(ShowLayers ? "checked" : "")" @onclick="ToggleLayers">Layers</div>
+                <div class="menu-option @(ShowTilePalette ? "checked" : "")" @onclick="ToggleTilePalette">Tile Palette</div>
+                <div class="menu-option @(ShowCursorInfo ? "checked" : "")" @onclick="ToggleCursorInfo">Cursor Info</div>
+                <div class="menu-option @(ShowEnemyProperties ? "checked" : "")" @onclick="ToggleEnemyProps">Enemy Properties</div>
+                <div class="menu-option @(ShowDebugLog ? "checked" : "")" @onclick="ToggleDebugLog">Debug Log</div>
+            </div>
+        }
+    </div>
+
+    <div class="menu-item @SimMenuClass" @onclick="ToggleSimMenu">
+        Simulation
+        @if (OpenMenu == MenuSim)
+        {
+            <div class="menu-dropdown" @onclick:stopPropagation="true">
+                <div class="menu-option" @onclick="OnToggleSimulation">
+                    @(State.IsSimulating ? "Stop Simulation" : "Start Simulation")
+                    <span class="shortcut">P</span>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (State.IsSimulating)
+    {
+        <span class="menubar-status">SIMULATING</span>
+    }
+</div>
+
+@code {
+    [Parameter] public EditorState State { get; set; } = default!;
+    [Parameter] public EventCallback OnNewLevel { get; set; }
+    [Parameter] public EventCallback OnSaveLevel { get; set; }
+    [Parameter] public EventCallback OnLoadLevel { get; set; }
+
+    [Parameter] public bool ShowLayers { get; set; }
+    [Parameter] public EventCallback<bool> ShowLayersChanged { get; set; }
+    [Parameter] public bool ShowTilePalette { get; set; }
+    [Parameter] public EventCallback<bool> ShowTilePaletteChanged { get; set; }
+    [Parameter] public bool ShowCursorInfo { get; set; }
+    [Parameter] public EventCallback<bool> ShowCursorInfoChanged { get; set; }
+    [Parameter] public bool ShowEnemyProperties { get; set; }
+    [Parameter] public EventCallback<bool> ShowEnemyPropertiesChanged { get; set; }
+    [Parameter] public bool ShowDebugLog { get; set; }
+    [Parameter] public EventCallback<bool> ShowDebugLogChanged { get; set; }
+
+    private const string MenuFile = "file";
+    private const string MenuWindow = "window";
+    private const string MenuSim = "sim";
+    private string? OpenMenu;
+
+    private string FileMenuClass => OpenMenu == MenuFile ? "active" : "";
+    private string WindowMenuClass => OpenMenu == MenuWindow ? "active" : "";
+    private string SimMenuClass => OpenMenu == MenuSim ? "active" : "";
+
+    private void ToggleFileMenu() => OpenMenu = OpenMenu == MenuFile ? null : MenuFile;
+    private void ToggleWindowMenu() => OpenMenu = OpenMenu == MenuWindow ? null : MenuWindow;
+    private void ToggleSimMenu() => OpenMenu = OpenMenu == MenuSim ? null : MenuSim;
+
+    private async Task OnNew() { OpenMenu = null; await OnNewLevel.InvokeAsync(); }
+    private async Task OnSave() { OpenMenu = null; await OnSaveLevel.InvokeAsync(); }
+    private async Task OnLoad() { OpenMenu = null; await OnLoadLevel.InvokeAsync(); }
+
+    private void OnToggleSimulation() { OpenMenu = null; State.ToggleSimulation(); }
+
+    private void ToggleLayers() => ShowLayersChanged.InvokeAsync(!ShowLayers);
+    private void ToggleTilePalette() => ShowTilePaletteChanged.InvokeAsync(!ShowTilePalette);
+    private void ToggleCursorInfo() => ShowCursorInfoChanged.InvokeAsync(!ShowCursorInfo);
+    private void ToggleEnemyProps() => ShowEnemyPropertiesChanged.InvokeAsync(!ShowEnemyProperties);
+    private void ToggleDebugLog() => ShowDebugLogChanged.InvokeAsync(!ShowDebugLog);
+
+    private void OnPointerEnter() => State.IsMouseOverUI = true;
+    private void OnPointerLeave() => State.IsMouseOverUI = false;
+}
