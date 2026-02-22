@@ -1,0 +1,123 @@
+@using Game
+@using Game.Editor
+@using Game.Utilities
+
+@if (State.SelectedEnemyIndex >= 0 && State.SelectedEnemyIndex < State.MapData.Enemies.Count)
+{
+    var enemy = State.MapData.Enemies[State.SelectedEnemyIndex];
+
+    <div class="editor-panel editor-enemy-props" @onpointerenter="OnPointerEnter" @onpointerleave="OnPointerLeave">
+        <h3>Enemy Properties</h3>
+        <div class="info-value">Enemy #@State.SelectedEnemyIndex</div>
+
+        <div class="info-label" style="margin-top: 6px;">Tile X</div>
+        <input type="number" class="editor-input" value="@enemy.TileX" min="0" max="@(State.MapData.Width - 1)"
+               @onchange="e => SetTileX(enemy, e)" />
+
+        <div class="info-label" style="margin-top: 4px;">Tile Y</div>
+        <input type="number" class="editor-input" value="@enemy.TileY" min="0" max="@(State.MapData.Height - 1)"
+               @onchange="e => SetTileY(enemy, e)" />
+
+        <div class="info-label" style="margin-top: 6px;">World Position</div>
+        <div class="info-value">X: @((enemy.TileX * LevelData.QuadSize).ToString("F1")) &nbsp; Y: 2.0 &nbsp; Z: @((enemy.TileY * LevelData.QuadSize).ToString("F1"))</div>
+
+        <div class="info-label" style="margin-top: 6px;">Rotation: @RotationLabels[GetRotIndex(enemy)]</div>
+        <input type="range" class="editor-slider" min="0" max="7" step="1"
+               value="@GetRotIndex(enemy)"
+               @onchange="e => SetRotation(enemy, e)" />
+
+        <div class="info-label" style="margin-top: 6px;">Type: @enemy.EnemyType</div>
+        <button class="editor-btn" @onclick="() => SetGuardType(enemy)">Guard</button>
+
+        <h3 style="margin-top: 10px;">Patrol Path</h3>
+
+        @if (State.IsEditingPatrolPath && State.PatrolEditEnemyIndex == State.SelectedEnemyIndex)
+        {
+            <div style="color: #fc0; font-weight: 600;">Editing... (@State.PatrolPathInProgress.Count waypoints)</div>
+            <div class="info-label">LMB: Add waypoint | Enter: Confirm | Esc: Cancel</div>
+            <button class="editor-btn" style="margin-top: 4px;" @onclick="() => State.CancelPatrolPath()">Cancel Editing</button>
+        }
+        else
+        {
+            @if (enemy.PatrolPath.Count > 0)
+            {
+                <div class="info-label">@enemy.PatrolPath.Count waypoints</div>
+                <div class="waypoint-list">
+                    @for (int w = 0; w < enemy.PatrolPath.Count; w++)
+                    {
+                        var wp = enemy.PatrolPath[w];
+                        <div class="waypoint-item">@(w + 1): (@wp.TileX, @wp.TileY)</div>
+                    }
+                </div>
+                <button class="editor-btn" @onclick="() => ClearPath(enemy)">Clear Path</button>
+            }
+            <button class="editor-btn" style="margin-left: 4px;" @onclick="() => State.StartEditingPatrolPath()">Add Path</button>
+        }
+
+        <div style="margin-top: 10px;">
+            <button class="editor-btn danger" style="width: 100%;" @onclick="OnDelete">Delete Enemy</button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public EditorState State { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private static readonly string[] RotationLabels = { "0°", "45°", "90°", "135°", "180°", "225°", "270°", "315°" };
+
+    private int GetRotIndex(EnemyPlacement enemy)
+    {
+        const float step = MathF.PI / 4f;
+        return Math.Clamp((int)MathF.Round(enemy.Rotation / step), 0, 7);
+    }
+
+    private void SetRotation(EnemyPlacement enemy, ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var idx))
+        {
+            const float step = MathF.PI / 4f;
+            enemy.Rotation = Math.Clamp(idx, 0, 7) * step;
+            OnChanged.InvokeAsync();
+        }
+    }
+
+    private void SetTileX(EnemyPlacement enemy, ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var val))
+        {
+            enemy.TileX = Math.Clamp(val, 0, State.MapData.Width - 1);
+            OnChanged.InvokeAsync();
+        }
+    }
+
+    private void SetTileY(EnemyPlacement enemy, ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var val))
+        {
+            enemy.TileY = Math.Clamp(val, 0, State.MapData.Height - 1);
+            OnChanged.InvokeAsync();
+        }
+    }
+
+    private void ClearPath(EnemyPlacement enemy)
+    {
+        enemy.PatrolPath.Clear();
+        OnChanged.InvokeAsync();
+    }
+
+    private void OnDelete()
+    {
+        State.DeleteSelectedEnemy();
+        OnChanged.InvokeAsync();
+    }
+
+    private void SetGuardType(EnemyPlacement enemy)
+    {
+        enemy.EnemyType = "Guard";
+        OnChanged.InvokeAsync();
+    }
+
+    private void OnPointerEnter() => State.IsMouseOverUI = true;
+    private void OnPointerLeave() => State.IsMouseOverUI = false;
+}

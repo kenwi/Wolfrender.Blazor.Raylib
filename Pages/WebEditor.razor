@@ -1,0 +1,54 @@
+@page "/editor"
+@using Wolfrender.Blazor.Raylib.Components.Editor
+
+@if (_editorScene != null)
+{
+    <div class="editor-overlay">
+        <WebEditorMenuBar State="_editorScene.State"
+                          OnNewLevel="OnNewLevel"
+                          OnSaveLevel="() => _showSaveDialog = true"
+                          OnLoadLevel="() => _showLoadDialog = true"
+                          @bind-ShowLayers="_showLayers"
+                          @bind-ShowTilePalette="_showTilePalette"
+                          @bind-ShowCursorInfo="_showCursorInfo"
+                          @bind-ShowEnemyProperties="_showEnemyProperties"
+                          @bind-ShowDebugLog="_showDebugLog" />
+
+        @if (_showLayers)
+        {
+            <WebEditorLayerPanel State="_editorScene.State" OnChanged="Refresh" />
+        }
+
+        @if (_showTilePalette)
+        {
+            <WebEditorTilePalette State="_editorScene.State" OnChanged="Refresh" />
+        }
+
+        @if (_showCursorInfo)
+        {
+            <WebEditorCursorInfo State="_editorScene.State"
+                                 TileX="_cursorTileX" TileY="_cursorTileY"
+                                 WorldX="_cursorWorldX" WorldY="_cursorWorldY"
+                                 TileInBounds="_cursorInBounds" />
+        }
+
+        @if (_showEnemyProperties)
+        {
+            <WebEditorEnemyProperties State="_editorScene.State" OnChanged="Refresh" />
+        }
+
+        @if (_showDebugLog)
+        {
+            <WebEditorDebugLog State="_editorScene.State" LogText="@_logBuilder.ToString()" />
+        }
+
+        <WebEditorFileDialog State="_editorScene.State"
+                             @bind-ShowSaveDialog="_showSaveDialog"
+                             @bind-ShowLoadDialog="_showLoadDialog"
+                             OnChanged="Refresh" />
+
+        <WebEditorStatusMessage State="_editorScene.State" />
+    </div>
+}
+
+<Raylib OnInit="Init" OnResize="OnResize" OnRender="Render"></Raylib>

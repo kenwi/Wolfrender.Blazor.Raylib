@@ -10,59 +10,15 @@ namespace Game.Editor;
 
 public class LevelEditorScene : IScene
 {
-    private readonly MapData _mapData;
-    private readonly List<EditorLayer> _layers;
-
-    // Sub-systems
-    private readonly EditorCamera _camera;
+    private readonly EditorState _state;
     private readonly EditorMapRenderer _mapRenderer;
     private readonly EditorGui _gui;
 
-    // Cursor info panel
-    private bool _cursorInfoFollowsMouse;
-
-    // Tile painting
-    private int _activeLayerIndex;
-    private uint _selectedTileId = 1;
-
-    // Enemy editing
-    private const string EnemiesLayerName = "Enemies";
-    private int _hoveredEnemyIndex = -1;
-    private int _selectedEnemyIndex = -1;
-    private bool _isDraggingEnemy;
-
-    // Patrol path editing
-    private bool _isEditingPatrolPath;
-    private int _patrolEditEnemyIndex = -1;
-    private List<PatrolWaypoint> _patrolPathInProgress = new();
-
-    // Simulation
-    private readonly EnemySystem _enemySystem;
-    private readonly DoorSystem _doorSystem;
-    private readonly Entities.Player _player;
-    private bool _isSimulating;
-
     public LevelEditorScene(MapData mapData, EnemySystem enemySystem, DoorSystem doorSystem, Entities.Player player)
     {
-        _mapData = mapData;
-        _enemySystem = enemySystem;
-        _doorSystem = doorSystem;
-        _player = player;
-
-        _camera = new EditorCamera();
-        _camera.CenterOnMap(mapData.Width, mapData.Height);
-
+        _state = new EditorState(mapData, enemySystem, doorSystem, player);
         _mapRenderer = new EditorMapRenderer(mapData);
         _gui = new EditorGui(mapData);
-
-        _layers = new List<EditorLayer>
-        {
-            new() { Name = "Floor", Tiles = mapData.Floor },
-            new() { Name = "Walls", Tiles = mapData.Walls },
-            new() { Name = "Ceiling", Tiles = mapData.Ceiling, IsVisible = false },
-            new() { Name = "Doors", Tiles = mapData.Doors },
-            new() { Name = EnemiesLayerName, Tiles = Array.Empty<uint>() },
-        };
     }
 
     public void OnEnter()
@@ -72,7 +28,7 @@ public class LevelEditorScene : IScene
 
     public void OnExit()
     {
-        _isSimulating = false;
+        _state.IsSimulating = false;
     }
 
     public void Update(float deltaTime)
@@ -80,7 +36,7 @@ public class LevelEditorScene : IScene
         // Toggle cursor info follow mode
         if (IsKeyPressed(KeyboardKey.C))
         {
-            _cursorInfoFollowsMouse = !_cursorInfoFollowsMouse;
+            _state.CursorInfoFollowsMouse = !_state.CursorInfoFollowsMouse;
         }
 
         // Layer hotkeys: 1-9 to activate, Ctrl+1-9 to toggle visibility
@@ -90,42 +46,45 @@ public class LevelEditorScene : IScene
             KeyboardKey.Four, KeyboardKey.Five, KeyboardKey.Six,
             KeyboardKey.Seven, KeyboardKey.Eight, KeyboardKey.Nine
         };
-        for (int i = 0; i < numKeys.Length && i < _layers.Count; i++)
+        for (int i = 0; i < numKeys.Length && i < _state.Layers.Count; i++)
         {
             if (IsKeyPressed(numKeys[i]))
             {
                 if (ctrlHeld)
-                    _layers[i].IsVisible = !_layers[i].IsVisible;
+                    _state.Layers[i].IsVisible = !_state.Layers[i].IsVisible;
                 else
-                    _activeLayerIndex = i;
+                    _state.ActiveLayerIndex = i;
             }
         }
 
         // Status message and GUI scaling
-        _gui.UpdateStatusTimer(deltaTime);
+        _state.UpdateStatusTimer(deltaTime);
         _gui.HandleScalingInput();
 
         // Toggle simulation with P key
         if (IsKeyPressed(KeyboardKey.P))
         {
-            ToggleSimulation();
+            _state.ToggleSimulation();
         }
 
         // Tick game systems when simulating
-        if (_isSimulating)
+        if (_state.IsSimulating)
         {
             UpdatePlayerMovement(deltaTime);
-            _enemySystem.Update(deltaTime);
-            _doorSystem.Animate(deltaTime);
+            _state.EnemySystem.Update(deltaTime);
+            _state.DoorSystem.Animate(deltaTime);
         }
 
+        // Read ImGui IO state and propagate to EditorState
         bool imGuiWantsMouse = ImGui.GetIO().WantCaptureMouse;
+        bool imGuiWantsKeyboard = ImGui.GetIO().WantCaptureKeyboard;
+        _state.IsMouseOverUI = imGuiWantsMouse;
 
         // Camera input (pan + zoom) — disable WASD panning during simulation (player uses those keys)
-        _camera.HandleInput(deltaTime, ctrlHeld, disableKeyboardPan: _isSimulating);
+        _state.Camera.HandleInput(deltaTime, ctrlHeld, imGuiWantsMouse, imGuiWantsKeyboard, disableKeyboardPan: _state.IsSimulating);
 
         // Patrol path editing mode
-        if (_isEditingPatrolPath)
+        if (_state.IsEditingPatrolPath)
         {
             HandlePatrolPathInput(imGuiWantsMouse);
         }
@@ -141,62 +100,63 @@ public class LevelEditorScene : IScene
         ClearBackground(new Color(40, 40, 40, 255));
 
         // Draw grid background
-        _mapRenderer.DrawMapGrid(_camera);
+        _mapRenderer.DrawMapGrid(_state.Camera);
 
         // Render tile layers in order
-        for (int i = 0; i < _layers.Count; i++)
+        for (int i = 0; i < _state.Layers.Count; i++)
         {
-            var layer = _layers[i];
+            var layer = _state.Layers[i];
             if (!layer.IsVisible) continue;
 
-            if (layer.Name == EnemiesLayerName)
+            if (layer.Name == EditorState.EnemiesLayerName)
             {
                 _mapRenderer.RenderEnemyLayer(
-                    _camera, _enemySystem, _isSimulating,
-                    ref _hoveredEnemyIndex, _selectedEnemyIndex,
-                    _isEditingPatrolPath, _patrolEditEnemyIndex, _patrolPathInProgress);
+                    _state.Camera, _state.EnemySystem, _state.IsMouseOverUI,
+                    _state.IsSimulating,
+                    ref _state.HoveredEnemyIndex, _state.SelectedEnemyIndex,
+                    _state.IsEditingPatrolPath, _state.PatrolEditEnemyIndex, _state.PatrolPathInProgress);
             }
-            else if (_isSimulating && layer.Name == "Doors")
+            else if (_state.IsSimulating && layer.Name == "Doors")
             {
-                _mapRenderer.RenderLiveDoors(_doorSystem, _camera);
+                _mapRenderer.RenderLiveDoors(_state.DoorSystem, _state.Camera);
             }
             else
             {
-                _mapRenderer.RenderLayer(layer, _camera);
+                _mapRenderer.RenderLayer(layer, _state.Camera);
             }
         }
 
         // Draw player position indicator
-        _mapRenderer.RenderPlayerIndicator(_player, _camera);
+        _mapRenderer.RenderPlayerIndicator(_state.Player, _state.Camera);
 
         // Highlight hovered tile
         var mouseScreen = GetMousePosition();
-        var worldPos = _camera.ScreenToWorld(mouseScreen);
+        var worldPos = _state.Camera.ScreenToWorld(mouseScreen);
         int tileX = (int)MathF.Floor(worldPos.X);
         int tileY = (int)MathF.Floor(worldPos.Y);
-        bool tileInBounds = tileX >= 0 && tileX < _mapData.Width && tileY >= 0 && tileY < _mapData.Height;
+        bool tileInBounds = tileX >= 0 && tileX < _state.MapData.Width && tileY >= 0 && tileY < _state.MapData.Height;
 
         if (tileInBounds)
         {
-            _mapRenderer.DrawTileHighlight(tileX, tileY, _camera);
+            _mapRenderer.DrawTileHighlight(tileX, tileY, _state.Camera);
         }
 
         // ImGui panels
         rlImGui.Begin();
-        bool menuToggleSim = _gui.RenderMenuBar(_isSimulating, _enemySystem, _doorSystem, ClearLevel, RefreshLayerReferences);
-        if (menuToggleSim) ToggleSimulation();
-        _gui.RenderFileDialogs(RefreshLayerReferences);
-        _gui.RenderLayerPanel(_layers, ref _activeLayerIndex);
-        _gui.RenderTilePalette(_layers, _activeLayerIndex, ref _selectedTileId);
-        _gui.RenderInfoPanel(tileX, tileY, worldPos, tileInBounds, _cursorInfoFollowsMouse, _layers, EnemiesLayerName);
-        _gui.RenderEnemyPropertiesPanel(ref _selectedEnemyIndex, ref _isEditingPatrolPath, ref _patrolEditEnemyIndex, _patrolPathInProgress);
+        bool menuToggleSim = _gui.RenderMenuBar(_state.IsSimulating, _state.EnemySystem, _state.DoorSystem, _state.ClearLevel, _state.RefreshLayerReferences);
+        if (menuToggleSim) _state.ToggleSimulation();
+        _gui.RenderFileDialogs(_state.RefreshLayerReferences);
+        _gui.RenderLayerPanel(_state.Layers, ref _state.ActiveLayerIndex);
+        _gui.RenderTilePalette(_state.Layers, _state.ActiveLayerIndex, ref _state.SelectedTileId);
+        _gui.RenderInfoPanel(tileX, tileY, worldPos, tileInBounds, _state.CursorInfoFollowsMouse, _state.Layers, EditorState.EnemiesLayerName);
+        _gui.RenderEnemyPropertiesPanel(ref _state.SelectedEnemyIndex, ref _state.IsEditingPatrolPath, ref _state.PatrolEditEnemyIndex, _state.PatrolPathInProgress);
         _gui.RenderDebugLogPanel();
         rlImGui.End();
 
         DrawText("Level Editor - F1 to return to game", 10, GetScreenHeight() - 70, 20, Color.White);
-        DrawText($"Zoom: {_camera.Zoom:F2}x", 10, GetScreenHeight() - 45, 20, Color.LightGray);
+        DrawText($"Zoom: {_state.Camera.Zoom:F2}x", 10, GetScreenHeight() - 45, 20, Color.LightGray);
 
-        if (_isEditingPatrolPath)
+        if (_state.IsEditingPatrolPath)
         {
             const string msg = "EDITING PATROL PATH - LMB: Add waypoint | Enter: Confirm | Esc: Cancel";
             int msgW = MeasureText(msg, 24);
@@ -210,130 +170,89 @@ public class LevelEditorScene : IScene
 
     // ─── Input Helpers ───────────────────────────────────────────────────────────
 
-    private void HandlePatrolPathInput(bool imGuiWantsMouse)
+    private void HandlePatrolPathInput(bool mouseOverUI)
     {
-        if (!imGuiWantsMouse && IsMouseButtonPressed(MouseButton.Left))
+        if (!mouseOverUI && IsMouseButtonPressed(MouseButton.Left))
         {
-            var paintPos = _camera.ScreenToWorld(GetMousePosition());
+            var paintPos = _state.Camera.ScreenToWorld(GetMousePosition());
             int px = (int)MathF.Floor(paintPos.X);
             int py = (int)MathF.Floor(paintPos.Y);
-            if (px >= 0 && px < _mapData.Width && py >= 0 && py < _mapData.Height)
-            {
-                _patrolPathInProgress.Add(new PatrolWaypoint { TileX = px, TileY = py });
-            }
+            _state.AddPatrolWaypoint(px, py);
         }
 
         if (IsKeyPressed(KeyboardKey.Enter) || IsKeyPressed(KeyboardKey.KpEnter))
         {
-            if (_patrolEditEnemyIndex >= 0 && _patrolEditEnemyIndex < _mapData.Enemies.Count)
-            {
-                _mapData.Enemies[_patrolEditEnemyIndex].PatrolPath = new List<PatrolWaypoint>(_patrolPathInProgress);
-            }
-            _isEditingPatrolPath = false;
-            _patrolPathInProgress.Clear();
-            _patrolEditEnemyIndex = -1;
+            _state.ConfirmPatrolPath();
         }
 
         if (IsKeyPressed(KeyboardKey.Escape))
         {
-            _isEditingPatrolPath = false;
-            _patrolPathInProgress.Clear();
-            _patrolEditEnemyIndex = -1;
+            _state.CancelPatrolPath();
         }
     }
 
-    private void HandleTileAndEnemyInput(bool imGuiWantsMouse)
+    private void HandleTileAndEnemyInput(bool mouseOverUI)
     {
-        bool isEnemyLayer = _layers[_activeLayerIndex].Name == EnemiesLayerName;
+        bool isEnemyLayer = _state.IsOnEnemyLayer;
 
         // If clicking on a hovered enemy while another layer is active, auto-switch to enemy layer
-        if (!imGuiWantsMouse && !isEnemyLayer && _hoveredEnemyIndex >= 0 && IsMouseButtonPressed(MouseButton.Left))
+        if (!mouseOverUI && !isEnemyLayer && _state.HoveredEnemyIndex >= 0 && IsMouseButtonPressed(MouseButton.Left))
         {
-            for (int li = 0; li < _layers.Count; li++)
-            {
-                if (_layers[li].Name == EnemiesLayerName)
-                {
-                    _activeLayerIndex = li;
-                    break;
-                }
-            }
+            _state.SwitchToEnemyLayer();
             isEnemyLayer = true;
-            _selectedEnemyIndex = _hoveredEnemyIndex;
-            _isDraggingEnemy = true;
+            _state.SelectedEnemyIndex = _state.HoveredEnemyIndex;
+            _state.IsDraggingEnemy = true;
         }
 
-        if (!imGuiWantsMouse && isEnemyLayer)
+        if (!mouseOverUI && isEnemyLayer)
         {
-            HandleEnemyInput(imGuiWantsMouse);
+            HandleEnemyInput();
         }
-        else if (!imGuiWantsMouse && IsMouseButtonDown(MouseButton.Left) && !isEnemyLayer)
+        else if (!mouseOverUI && IsMouseButtonDown(MouseButton.Left) && !isEnemyLayer)
         {
-            // Tile layer: paint tiles (click or drag)
-            var paintPos = _camera.ScreenToWorld(GetMousePosition());
+            var paintPos = _state.Camera.ScreenToWorld(GetMousePosition());
             int px = (int)MathF.Floor(paintPos.X);
             int py = (int)MathF.Floor(paintPos.Y);
-            if (px >= 0 && px < _mapData.Width && py >= 0 && py < _mapData.Height)
-            {
-                var activeLayer = _layers[_activeLayerIndex];
-                int index = _mapData.Width * py + px;
-                activeLayer.Tiles[index] = _selectedTileId;
-            }
+            _state.PaintTile(px, py);
         }
 
         // Delete selected enemy with Delete key
-        if (isEnemyLayer && _selectedEnemyIndex >= 0 && _selectedEnemyIndex < _mapData.Enemies.Count
+        if (isEnemyLayer && _state.SelectedEnemyIndex >= 0 && _state.SelectedEnemyIndex < _state.MapData.Enemies.Count
             && IsKeyPressed(KeyboardKey.Delete))
         {
-            _mapData.Enemies.RemoveAt(_selectedEnemyIndex);
-            _selectedEnemyIndex = -1;
+            _state.DeleteSelectedEnemy();
         }
     }
 
-    private void HandleEnemyInput(bool imGuiWantsMouse)
+    private void HandleEnemyInput()
     {
         if (IsMouseButtonPressed(MouseButton.Left))
         {
-            if (_hoveredEnemyIndex >= 0)
+            if (_state.HoveredEnemyIndex >= 0)
             {
-                _selectedEnemyIndex = _hoveredEnemyIndex;
-                _isDraggingEnemy = true;
+                _state.SelectEnemy(_state.HoveredEnemyIndex);
             }
             else
             {
-                var paintPos = _camera.ScreenToWorld(GetMousePosition());
+                var paintPos = _state.Camera.ScreenToWorld(GetMousePosition());
                 int px = (int)MathF.Floor(paintPos.X);
                 int py = (int)MathF.Floor(paintPos.Y);
-                if (px >= 0 && px < _mapData.Width && py >= 0 && py < _mapData.Height)
-                {
-                    _mapData.Enemies.Add(new EnemyPlacement
-                    {
-                        TileX = px,
-                        TileY = py,
-                        Rotation = 0,
-                        EnemyType = "Guard"
-                    });
-                    _selectedEnemyIndex = _mapData.Enemies.Count - 1;
-                    _isDraggingEnemy = true;
-                }
+                _state.PlaceEnemy(px, py);
             }
         }
 
-        if (_isDraggingEnemy && IsMouseButtonDown(MouseButton.Left)
-            && _selectedEnemyIndex >= 0 && _selectedEnemyIndex < _mapData.Enemies.Count)
+        if (_state.IsDraggingEnemy && IsMouseButtonDown(MouseButton.Left)
+            && _state.SelectedEnemyIndex >= 0 && _state.SelectedEnemyIndex < _state.MapData.Enemies.Count)
         {
-            var dragPos = _camera.ScreenToWorld(GetMousePosition());
+            var dragPos = _state.Camera.ScreenToWorld(GetMousePosition());
             int dx = (int)MathF.Floor(dragPos.X);
             int dy = (int)MathF.Floor(dragPos.Y);
-            if (dx >= 0 && dx < _mapData.Width && dy >= 0 && dy < _mapData.Height)
-            {
-                _mapData.Enemies[_selectedEnemyIndex].TileX = dx;
-                _mapData.Enemies[_selectedEnemyIndex].TileY = dy;
-            }
+            _state.MoveEnemy(dx, dy);
         }
 
         if (IsMouseButtonReleased(MouseButton.Left))
         {
-            _isDraggingEnemy = false;
+            _state.IsDraggingEnemy = false;
         }
     }
 
@@ -341,12 +260,11 @@ public class LevelEditorScene : IScene
 
     private void UpdatePlayerMovement(float deltaTime)
     {
-        const float rotationSpeed = 2.5f; // radians per second
+        const float rotationSpeed = 2.5f;
 
-        var camera = _player.Camera;
+        var camera = _state.Player.Camera;
         Vector3 forward = Vector3.Normalize(camera.Target - camera.Position);
 
-        // Arrow Left / Right to rotate the player
         float yawDelta = 0;
         if (IsKeyDown(KeyboardKey.Left))  yawDelta += rotationSpeed * deltaTime;
         if (IsKeyDown(KeyboardKey.Right)) yawDelta -= rotationSpeed * deltaTime;
@@ -357,7 +275,6 @@ public class LevelEditorScene : IScene
             forward = Vector3.Transform(forward, rotMatrix);
         }
 
-        // Project forward onto the horizontal (XZ) plane for movement
         Vector3 forwardXZ = new Vector3(forward.X, 0, forward.Z);
         float forwardLen = forwardXZ.Length();
         if (forwardLen > 0.001f)
@@ -365,13 +282,11 @@ public class LevelEditorScene : IScene
         else
             forwardXZ = Vector3.UnitZ;
 
-        // Right vector (same convention as InputSystem.GetMoveDirection)
         Vector3 right = Vector3.Cross(forwardXZ, -Vector3.UnitY);
         float rightLen = right.Length();
         if (rightLen > 0.001f)
             right /= rightLen;
 
-        // WASD to move
         Vector3 moveDir = Vector3.Zero;
         if (IsKeyDown(KeyboardKey.W)) moveDir += forwardXZ;
         if (IsKeyDown(KeyboardKey.S)) moveDir -= forwardXZ;
@@ -382,56 +297,11 @@ public class LevelEditorScene : IScene
         if (moveDirLen > 0.001f)
         {
             moveDir /= moveDirLen;
-            _player.Position += moveDir * _player.MoveSpeed * deltaTime;
+            _state.Player.Position += moveDir * _state.Player.MoveSpeed * deltaTime;
         }
 
-        // Sync camera with updated position and look direction
-        camera.Position = _player.Position;
+        camera.Position = _state.Player.Position;
         camera.Target = camera.Position + forward;
-        _player.Camera = camera;
-    }
-
-    // ─── Level Management ────────────────────────────────────────────────────────
-
-    private void ToggleSimulation()
-    {
-        _isSimulating = !_isSimulating;
-        if (_isSimulating)
-        {
-            _enemySystem.Rebuild(_mapData.Enemies, _mapData);
-            _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
-        }
-    }
-
-    private void ClearLevel()
-    {
-        int tileCount = _mapData.Width * _mapData.Height;
-        _mapData.Floor = new uint[tileCount];
-        _mapData.Walls = new uint[tileCount];
-        _mapData.Ceiling = new uint[tileCount];
-        _mapData.Doors = new uint[tileCount];
-        _mapData.Enemies.Clear();
-        _selectedEnemyIndex = -1;
-        _hoveredEnemyIndex = -1;
-        RefreshLayerReferences();
-        _gui.SetStatus("New empty level created");
-    }
-
-    private void RefreshLayerReferences()
-    {
-        _selectedEnemyIndex = -1;
-        _hoveredEnemyIndex = -1;
-
-        foreach (var layer in _layers)
-        {
-            layer.Tiles = layer.Name switch
-            {
-                "Floor" => _mapData.Floor,
-                "Walls" => _mapData.Walls,
-                "Ceiling" => _mapData.Ceiling,
-                "Doors" => _mapData.Doors,
-                _ => layer.Tiles
-            };
-        }
+        _state.Player.Camera = camera;
     }
 }
