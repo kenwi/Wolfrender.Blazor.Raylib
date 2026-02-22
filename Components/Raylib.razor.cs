@@ -37,6 +37,7 @@ public partial class Raylib : IDisposable
         await JSHost.ImportAsync("Raylib", "../js/raylib.js");
         Init(this, _id);
         await InitRaylib();
+        SyncCanvasSize();
         ManageRenderLoop();
     }
 
@@ -66,6 +67,9 @@ public partial class Raylib : IDisposable
 
     [JSImport("raylib.render", "Raylib")]
     public static partial void Render([JSMarshalAs<JSType.Any>] object reference, string id, int fps);
+
+    [JSImport("raylib.syncCanvasSize", "Raylib")]
+    public static partial void SyncCanvasSize();
 
 
     [JSExport]
