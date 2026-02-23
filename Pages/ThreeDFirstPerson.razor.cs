@@ -41,6 +41,7 @@ public partial class ThreeDFirstPerson : IDisposable
     public void Log(string message)
     {
         _logBuilder.AppendLine(message);
+        InvokeAsync(ScrollLogToBottom);
     }
 
     private void OnVolumeChanged(ChangeEventArgs e)
@@ -97,7 +98,6 @@ public partial class ThreeDFirstPerson : IDisposable
         _screenWidth = await JS.InvokeAsync<int>("eval", "window.innerWidth");
         _screenHeight = await JS.InvokeAsync<int>("eval", "window.innerHeight");
         Log($"Browser resolution: {_screenWidth}x{_screenHeight}");
-        await ScrollLogToBottom();
         await InvokeAsync(StateHasChanged);
     }
 
@@ -156,14 +156,13 @@ public partial class ThreeDFirstPerson : IDisposable
             var logString = ShowOptionsUI ? "Enabling cursor" : "Disabling cursor";
             Log(logString);
             world?.ToggleMouse();
-            await ScrollLogToBottom();
             await InvokeAsync(StateHasChanged);
         }
 
         if (IsKeyPressed(KeyboardKey.I))
         {
             ShowDebugLogUI = !ShowDebugLogUI;
-            await ScrollLogToBottom();
+            await InvokeAsync(ScrollLogToBottom);
             await InvokeAsync(StateHasChanged);
         }
 
