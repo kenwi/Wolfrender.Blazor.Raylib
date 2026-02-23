@@ -7,6 +7,7 @@ using Color = Raylib_cs.Color;
 using Raylib_cs;
 using Game;
 using Game.Utilities;
+using System.Threading.Tasks;
 
 namespace Wolfrender.Blazor.Raylib.Pages;
 
@@ -14,8 +15,8 @@ public partial class ThreeDFirstPerson : IDisposable
 {
     [Inject] private IJSRuntime JS { get; set; } = default!;
 
-    private int ScreenWidth = 1920;
-    private int ScreenHeight = 1080;
+    private int _screenWidth;
+    private int _screenHeight;
 
     private IScene? _activeScene = null;
     private IScene? _gameScene = null;
@@ -40,7 +41,6 @@ public partial class ThreeDFirstPerson : IDisposable
     public void Log(string message)
     {
         _logBuilder.AppendLine(message);
-        ScrollLogToBottom();
     }
 
     private void OnVolumeChanged(ChangeEventArgs e)
@@ -92,8 +92,19 @@ public partial class ThreeDFirstPerson : IDisposable
         catch { }
     }
 
+    private async Task DetectBrowserResolution()
+    {
+        _screenWidth = await JS.InvokeAsync<int>("eval", "window.innerWidth");
+        _screenHeight = await JS.InvokeAsync<int>("eval", "window.innerHeight");
+        Log($"Browser resolution: {_screenWidth}x{_screenHeight}");
+        await ScrollLogToBottom();
+        await InvokeAsync(StateHasChanged);
+    }
+
     private async Task Init()
     {
+        await DetectBrowserResolution();
+
         // Preload all resources into the Emscripten VFS before Raylib/File APIs can use them
         var resourceFiles = new[]
         {
@@ -115,15 +126,15 @@ public partial class ThreeDFirstPerson : IDisposable
         await Task.WhenAll(resourceFiles.Select(
             Wolfrender.Blazor.Raylib.Components.Raylib.PreloadFile));
 
-        InitWindow(ScreenWidth, ScreenHeight, "Wolfrender");
+        InitWindow(_screenWidth, _screenHeight, "Wolfrender");
         InitAudioDevice();
-        OnResize((ScreenWidth, ScreenHeight));
+        await OnResize((_screenWidth, _screenHeight));
 
         RenderData.Resolution = new Vector2(GetScreenWidth(), GetScreenHeight());
         var mapData = Application.LoadMapData();
 
         // Create scenes with shared data
-        _gameScene = new World(mapData);
+        _gameScene = new World(mapData);    
         var world = (World)_gameScene;
         _editorScene = new Game.Editor.LevelEditorScene(mapData, world.EnemySystem, world.DoorSystem, world.Player);
 
@@ -145,13 +156,14 @@ public partial class ThreeDFirstPerson : IDisposable
             var logString = ShowOptionsUI ? "Enabling cursor" : "Disabling cursor";
             Log(logString);
             world?.ToggleMouse();
+            await ScrollLogToBottom();
             await InvokeAsync(StateHasChanged);
         }
 
         if (IsKeyPressed(KeyboardKey.I))
         {
             ShowDebugLogUI = !ShowDebugLogUI;
-            ScrollLogToBottom();
+            await ScrollLogToBottom();
             await InvokeAsync(StateHasChanged);
         }
 
@@ -160,9 +172,11 @@ public partial class ThreeDFirstPerson : IDisposable
         _activeScene.Render();
     }
 
-    private void OnResize((int width, int height) Size)
+    private async Task OnResize((int width, int height) Size)
     {
-        SetWindowSize(Size.width, Size.height);
+        await DetectBrowserResolution();
+        SetWindowSize(_screenWidth, _screenHeight);
+        RenderData.Resolution = new Vector2(_screenWidth, _screenHeight);
     }
 
     public void Dispose()
