@@ -167,8 +167,8 @@ public partial class ThreeDFirstPerson : IDisposable
         }
 
         var deltaTime = GetFrameTime();
-        _activeScene.Update(deltaTime);
-        _activeScene.Render();
+        _activeScene?.Update(deltaTime);
+        _activeScene?.Render();
     }
 
     private async Task OnResize((int width, int height) Size)
