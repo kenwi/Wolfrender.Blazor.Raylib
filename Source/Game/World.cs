@@ -75,6 +75,11 @@ public class World : IScene
         _soundSystem.SetVolume(volume);
     }
 
+    public void SetMouseSensitivity(float sensitivity)
+    {
+        _cameraSystem.SetMouseSensitivity(sensitivity);
+    }
+
     public void OnEnter()
     {
         // Rebuild doors and enemies from current MapData (may have changed in the editor)

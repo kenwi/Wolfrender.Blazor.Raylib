@@ -9,11 +9,18 @@ namespace Game.Systems;
 public class CameraSystem
 {
     private readonly CollisionSystem _collisionSystem;
-    private const float MouseSensitivity = 0.003f;
+    private readonly float _defaultMouseSensitivity = 0.003f;
+    private float _mouseSensitivity;
 
     public CameraSystem(CollisionSystem collisionSystem)
     {
         _collisionSystem = collisionSystem;
+        _mouseSensitivity = _defaultMouseSensitivity;
+    }
+
+    public void SetMouseSensitivity(float sensitivity)
+    {
+        _mouseSensitivity = _defaultMouseSensitivity * sensitivity;
     }
 
     public void Update(Player player, bool isMouseFree, Vector2 mouseDelta)
@@ -30,8 +37,8 @@ public class CameraSystem
         if (!isMouseFree && (Math.Abs(mouseDelta.X) > 0.001f || Math.Abs(mouseDelta.Y) > 0.001f))
         {
             // Calculate rotation angles from mouse delta
-            float yaw = -mouseDelta.X * MouseSensitivity;
-            float pitch = -mouseDelta.Y * MouseSensitivity;
+            float yaw = -mouseDelta.X * _mouseSensitivity;
+            float pitch = -mouseDelta.Y * _mouseSensitivity;
 
             // Apply yaw (horizontal rotation around up axis)
             Matrix4x4 yawMatrix = Matrix4x4.CreateFromAxisAngle(camera.Up, yaw);
