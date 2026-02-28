@@ -80,6 +80,16 @@ public class World : IScene
         _cameraSystem.SetMouseSensitivity(sensitivity);
     }
 
+    public void SetResolutionDownScaleMultiplier(int multiplier)
+    {
+        RenderData.ResolutionDownScaleMultiplier = multiplier;
+        int newScreenWidth = (int)RenderData.Resolution.X / RenderData.ResolutionDownScaleMultiplier;
+        int newScreenHeight = (int)RenderData.Resolution.Y / RenderData.ResolutionDownScaleMultiplier;
+            
+        UnloadRenderTexture(_sceneRenderTexture);
+        _sceneRenderTexture = LoadRenderTexture(newScreenWidth, newScreenHeight);
+    }
+
     public void OnEnter()
     {
         // Rebuild doors and enemies from current MapData (may have changed in the editor)
@@ -122,21 +132,13 @@ public class World : IScene
         if (IsKeyPressed(KeyboardKey.PageDown) && RenderData.ResolutionDownScaleMultiplier > 1)
         {
             RenderData.ResolutionDownScaleMultiplier /= 2;
-            int newScreenWidth = (int)RenderData.Resolution.X / RenderData.ResolutionDownScaleMultiplier;
-            int newScreenHeight = (int)RenderData.Resolution.Y / RenderData.ResolutionDownScaleMultiplier;
-            
-            UnloadRenderTexture(_sceneRenderTexture);
-            _sceneRenderTexture = LoadRenderTexture(newScreenWidth, newScreenHeight);
+            SetResolutionDownScaleMultiplier(RenderData.ResolutionDownScaleMultiplier);
         }
 
         if (IsKeyPressed(KeyboardKey.PageUp))
         {
             RenderData.ResolutionDownScaleMultiplier *= 2;
-            int newScreenWidth = (int)RenderData.Resolution.X / RenderData.ResolutionDownScaleMultiplier;
-            int newScreenHeight = (int)RenderData.Resolution.Y / RenderData.ResolutionDownScaleMultiplier;
-            
-            UnloadRenderTexture(_sceneRenderTexture);
-            _sceneRenderTexture = LoadRenderTexture(newScreenWidth, newScreenHeight);
+            SetResolutionDownScaleMultiplier(RenderData.ResolutionDownScaleMultiplier);
         }
         
         if (_inputState.IsGamePaused)
