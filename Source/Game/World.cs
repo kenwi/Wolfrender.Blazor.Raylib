@@ -25,7 +25,7 @@ public class World : IScene
     private readonly AnimationSystem _animationSystem;
     private readonly MinimapSystem _minimapSystem;
 
-    private readonly RenderTexture2D _sceneRenderTexture;
+    private  RenderTexture2D _sceneRenderTexture;
     private InputState _inputState = new();
     private readonly EnemySystem _enemySystem;
 
@@ -119,6 +119,26 @@ public class World : IScene
 
         _inputSystem.Update();
 
+        if (IsKeyPressed(KeyboardKey.PageDown) && RenderData.ResolutionDownScaleMultiplier > 1)
+        {
+            RenderData.ResolutionDownScaleMultiplier /= 2;
+            int newScreenWidth = (int)RenderData.Resolution.X / RenderData.ResolutionDownScaleMultiplier;
+            int newScreenHeight = (int)RenderData.Resolution.Y / RenderData.ResolutionDownScaleMultiplier;
+            
+            UnloadRenderTexture(_sceneRenderTexture);
+            _sceneRenderTexture = LoadRenderTexture(newScreenWidth, newScreenHeight);
+        }
+
+        if (IsKeyPressed(KeyboardKey.PageUp))
+        {
+            RenderData.ResolutionDownScaleMultiplier *= 2;
+            int newScreenWidth = (int)RenderData.Resolution.X / RenderData.ResolutionDownScaleMultiplier;
+            int newScreenHeight = (int)RenderData.Resolution.Y / RenderData.ResolutionDownScaleMultiplier;
+            
+            UnloadRenderTexture(_sceneRenderTexture);
+            _sceneRenderTexture = LoadRenderTexture(newScreenWidth, newScreenHeight);
+        }
+        
         if (_inputState.IsGamePaused)
         {
             _player.Velocity = _inputSystem.GetMoveDirection(_player) * _player.MoveSpeed;
