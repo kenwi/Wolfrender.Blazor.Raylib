@@ -27,14 +27,8 @@
                @oninput="OnMouseSensitivityChanged"
                style="width: 100%; accent-color: #0f0;" />
 
-        @* <label style="display: block; font-size: 13px; margin-bottom: 4px; margin-top: 12px;">Mouse Sensitivity Y: @MouseSensitivityY.ToString("F2")</label>
-        <input type="range" min="0" max="3" step="0.01"
-               value="@MouseSensitivityY"
-               @oninput="OnMouseSensitivityYChanged"
-               style="width: 100%; accent-color: #0f0;" /> *@
-
         <label style="display: block; font-size: 13px; margin-bottom: 4px; margin-top: 12px;">Resolution Downsampling: @ResolutionDownsampling</label>
-        <input type="range" min="1" max="6" step="1"
+        <input type="range" min="1" max="9" step="1"
                value="@ResolutionDownsampling"
                @oninput="OnResolutionDownsamplingChanged"
                style="width: 100%; accent-color: #0f0;" />

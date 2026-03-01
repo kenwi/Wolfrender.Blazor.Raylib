@@ -67,7 +67,7 @@ public partial class ThreeDFirstPerson : IDisposable
     {
         if (int.TryParse(e.Value?.ToString(), out var value))
         {
-            ResolutionDownsampling = Math.Clamp(value, 1, 6);
+            ResolutionDownsampling = value;
             ResolutionDownsamplingChanged?.Invoke(ResolutionDownsampling);
             Log($"Resolution downsampling changed to {ResolutionDownsampling}");
         }
@@ -132,6 +132,9 @@ public partial class ThreeDFirstPerson : IDisposable
 
         MouseSensitivityChanged += world.SetMouseSensitivity;
         MouseSensitivityChanged?.Invoke(MouseSensitivity);
+
+        ResolutionDownsamplingChanged += world.SetResolutionDownScaleMultiplier;
+        ResolutionDownsamplingChanged?.Invoke(ResolutionDownsampling);
 
         // Start with the game scene
         _activeScene = _gameScene;
