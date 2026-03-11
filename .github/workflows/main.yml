@@ -37,7 +37,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: raylib-extras/rlImGui-cs
-          path: rlImGui-cs
+          path: Wolfrender.Blazor.Raylib/Library/rlImGui-cs
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
