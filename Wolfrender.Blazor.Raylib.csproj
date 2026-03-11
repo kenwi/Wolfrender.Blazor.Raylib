@@ -24,7 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\rlImGui-cs\rlImGui\rlImGui.csproj" />
+    <ProjectReference Include="Library\rlImGui-cs\rlImGui\rlImGui.csproj" />
   </ItemGroup> 
 
 
