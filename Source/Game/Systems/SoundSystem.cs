@@ -6,11 +6,13 @@ namespace Game.Systems;
 public class SoundSystem
 {
     private Music _music;
+    private float _volume = 1f;
 
     public SoundSystem(string musicPath)
     {
         _music = LoadMusicStream(musicPath);
         PlayMusicStream(_music);
+        SetVolume(_volume);
     }
 
     public void Update()
@@ -20,6 +22,9 @@ public class SoundSystem
 
     public void SetVolume(float volume)
     {
-        SetMusicVolume(_music, Math.Clamp(volume, 0f, 1f));
+        _volume = Math.Clamp(volume, 0f, 1f);
+        SetMusicVolume(_music, _volume);
     }
+
+    public float GetVolume() => _volume;
 }
