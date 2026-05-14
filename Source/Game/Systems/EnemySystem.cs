@@ -11,6 +11,7 @@ public class EnemySystem
     private readonly InputSystem _inputSystem;
     private readonly CollisionSystem _collisionSystem;
     private readonly DoorSystem _doorSystem;
+    private readonly Random _rng = new();
     private MapData _mapData = null!;
 
     // Throttled LOS update
@@ -24,6 +25,10 @@ public class EnemySystem
     private const float TurnSpeed = 4f; // radians per second when facing player
     private const float NoticingDuration = 0.8f; // seconds before transitioning to ATTACKING
     private const float PathRefreshInterval = 0.5f; // seconds between A* recomputes
+
+    private const float EnemyFireInterval = 0.85f;
+    private const float EnemyFireAimTolerance = 0.42f; // radians (~24°)
+    private const float EnemyShotDamage = 9f;
 
     public List<Enemy> Enemies => _enemies;
 
@@ -87,6 +92,8 @@ public class EnemySystem
             UpdateSpriteFrame(enemy);
         }
 
+        RemoveDeadEnemies();
+
         // Debug: cycle enemy state
         if (_inputSystem.GetInputState().IsChangeStatePressed)
         {
@@ -94,7 +101,7 @@ public class EnemySystem
             {
                 enemy.EnemyState++;
                 var state = (int)enemy.EnemyState;
-                enemy.EnemyState = (EnemyState)(state % 6);
+                enemy.EnemyState = (EnemyState)(state % 9);
             }
         }
     }
@@ -114,12 +121,24 @@ public class EnemySystem
                 break;
 
             case EnemyState.NOTICING:
-                Debug.Log($"Noticing");
                 OnNoticing(enemy, deltaTime);
                 break;
 
             case EnemyState.ATTACKING:
                 OnAttacking(enemy, deltaTime);
+                break;
+
+            case EnemyState.HIT:
+                if (enemy.StateTimer >= enemy.HitReactionDurationSeconds)
+                    enemy.TransitionTo(SanitizeResumeStateAfterHit(enemy));
+                break;
+
+            case EnemyState.DYING:
+                if (enemy.DyingAnimationIndex >= 4)
+                    enemy.TransitionTo(EnemyState.CORPSE);
+                break;
+
+            case EnemyState.CORPSE:
                 break;
 
             case EnemyState.COLLIDING:
@@ -131,6 +150,16 @@ public class EnemySystem
             default:
                 break;
         }
+    }
+
+    private static EnemyState SanitizeResumeStateAfterHit(Enemy enemy)
+    {
+        return enemy.ResumeStateAfterHit switch
+        {
+            EnemyState.DYING or EnemyState.CORPSE or EnemyState.HIT => EnemyState.IDLE,
+            EnemyState.COLLIDING => enemy.HasPatrolPath ? EnemyState.WALKING : EnemyState.IDLE,
+            _ => enemy.ResumeStateAfterHit
+        };
     }
 
     private void OnIdle(Enemy enemy, float deltaTime)
@@ -172,6 +201,7 @@ public class EnemySystem
         if (enemy.StateTimer >= NoticingDuration)
         {
             enemy.TransitionTo(EnemyState.ATTACKING);
+            enemy.AttackCooldownRemaining = 0.35f;
         }
     }
 
@@ -191,7 +221,20 @@ public class EnemySystem
                 ComputeChasePath(enemy, _player.Position);
             }
 
-            // TODO: fire at player, play attack animation, etc.
+            enemy.AttackCooldownRemaining -= deltaTime;
+            if (_player.IsAlive && enemy.AttackCooldownRemaining <= 0f)
+            {
+                Vector3 toPlayer = _player.Position - enemy.Position;
+                float targetAngle = MathF.Atan2(toPlayer.X, -toPlayer.Z) - MathF.PI / 2f;
+                float aimDiff = MathF.Abs(NormalizeAngle(targetAngle - enemy.Rotation));
+                if (aimDiff <= EnemyFireAimTolerance)
+                {
+                    TryEnemyHitPlayer(enemy);
+                    enemy.AttackCooldownRemaining = EnemyFireInterval;
+                }
+                else
+                    enemy.AttackCooldownRemaining = 0.12f;
+            }
         }
         else if (enemy.LastSeenPlayerPosition.HasValue)
         {
@@ -202,6 +245,38 @@ public class EnemySystem
         {
             // No last seen position — return to normal behavior
             enemy.TransitionTo(enemy.HasPatrolPath ? EnemyState.WALKING : EnemyState.IDLE);
+        }
+    }
+
+    private void TryEnemyHitPlayer(Enemy enemy)
+    {
+        if (_mapData == null || !_player.IsAlive)
+            return;
+
+        float quadSize = LevelData.QuadSize;
+        var enemyTile = new Vector2(
+            enemy.Position.X / quadSize + 0.5f,
+            enemy.Position.Z / quadSize + 0.5f);
+        var playerTile = new Vector2(
+            _player.Position.X / quadSize + 0.5f,
+            _player.Position.Z / quadSize + 0.5f);
+
+        if (!LineOfSight.CanSee(_mapData, _doorSystem.Doors, enemyTile, playerTile))
+            return;
+
+        if (_rng.NextSingle() > 0.72f)
+            return;
+
+        _player.TakeDamage(EnemyShotDamage);
+    }
+
+    private void RemoveDeadEnemies()
+    {
+        for (int i = _enemies.Count - 1; i >= 0; i--)
+        {
+            var enemy = _enemies[i];
+            if (enemy.EnemyState == EnemyState.CORPSE && enemy.StateTimer >= enemy.CorpseLingerSeconds)
+                _enemies.RemoveAt(i);
         }
     }
 
@@ -260,10 +335,9 @@ public class EnemySystem
         if (distXZ > ArrivalThreshold)
         {
             MoveToward(enemy, toTarget, distXZ, deltaTime);
-            // MoveToward may set state to COLLIDING; override back to ATTACKING
-            // so we stay in the chase logic next frame
-            // if (enemy.EnemyState == EnemyState.WALKING)
-            //     enemy.EnemyState = EnemyState.ATTACKING;
+            if (enemy.LastSeenPlayerPosition.HasValue &&
+                (enemy.EnemyState == EnemyState.WALKING || enemy.EnemyState == EnemyState.COLLIDING))
+                enemy.EnemyState = EnemyState.ATTACKING;
         }
         else
         {
@@ -361,6 +435,9 @@ public class EnemySystem
     /// </summary>
     private void UpdateSpriteFrame(Enemy enemy)
     {
+        if (enemy.EnemyState is EnemyState.DYING or EnemyState.CORPSE or EnemyState.HIT)
+            return;
+
         Vector2 playerEnemyVector = new Vector2(
             enemy.Position.X - _player.Position.X,
             enemy.Position.Z - _player.Position.Z);
@@ -405,6 +482,9 @@ public class EnemySystem
 
         foreach (var enemy in _enemies)
         {
+            if (enemy.EnemyState is EnemyState.DYING or EnemyState.CORPSE)
+                continue;
+
             var enemyTile = new Vector2(
                 enemy.Position.X / quadSize + 0.5f,
                 enemy.Position.Z / quadSize + 0.5f);

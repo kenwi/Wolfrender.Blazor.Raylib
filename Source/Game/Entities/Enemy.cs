@@ -10,12 +10,19 @@ public enum EnemyState
     NOTICING,
     FLEEING,
     ATTACKING,
+    /// <summary>Non-lethal hit reaction; shows first death frame then resumes <see cref="Enemy.ResumeStateAfterHit"/>.</summary>
+    HIT,
     DYING,
-    COLLIDING
+    COLLIDING,
+    /// <summary>Death animation finished; body lies here until linger time elapses.</summary>
+    CORPSE
 }
 
 public class Enemy
 {
+    public float MaxHealth { get; set; } = 25f;
+    public float Health { get; set; } = 25f;
+
     public Vector3 Position { get; set; }
     public float Rotation { get; set; }
     public float MoveSpeed { get; set; }
@@ -35,6 +42,15 @@ public class Enemy
     /// </summary>
     public float StateTimer { get; set; }
 
+    /// <summary>How long the body stays visible in <see cref="EnemyState.CORPSE"/> before removal (seconds).</summary>
+    public float CorpseLingerSeconds { get; set; } = 30f;
+
+    /// <summary>State to restore after <see cref="EnemyState.HIT"/> (set when entering hit reaction).</summary>
+    public EnemyState ResumeStateAfterHit { get; set; } = EnemyState.IDLE;
+
+    /// <summary>How long <see cref="EnemyState.HIT"/> lasts before resuming <see cref="ResumeStateAfterHit"/>.</summary>
+    public float HitReactionDurationSeconds { get; set; } = 0.4f;
+
     /// <summary>
     /// Transition to a new state and reset the state timer.
     /// </summary>
@@ -43,6 +59,35 @@ public class Enemy
         if (EnemyState == newState) return;
         EnemyState = newState;
         StateTimer = 0f;
+    }
+
+    /// <summary>True while the enemy participates in combat and collision (not during death or corpse).</summary>
+    public bool IsCombatActive =>
+        EnemyState != EnemyState.DYING && EnemyState != EnemyState.CORPSE;
+
+    public void ApplyDamage(float amount)
+    {
+        if (!IsCombatActive || amount <= 0f)
+            return;
+
+        Health = MathF.Max(0f, Health - amount);
+        if (Health <= 0f)
+        {
+            DyingAnimationIndex = 0;
+            AnimationTimer = 0f;
+            TransitionTo(EnemyState.DYING);
+            return;
+        }
+
+        if (EnemyState == EnemyState.HIT)
+        {
+            StateTimer = 0f;
+            return;
+        }
+
+        ResumeStateAfterHit = EnemyState;
+        AnimationTimer = 0f;
+        TransitionTo(EnemyState.HIT);
     }
 
     /// <summary>
@@ -110,12 +155,18 @@ public class Enemy
     /// Accumulator used to throttle how often a new path is computed.
     /// </summary>
     public float PathRefreshTimer { get; set; }
+
+    /// <summary>Seconds until this enemy may fire another hitscan shot at the player.</summary>
+    public float AttackCooldownRemaining { get; set; }
 }
 
 public class EnemyGuard : Enemy
 {
     public EnemyGuard()
     {
-        
+        MaxHealth = 25f;
+        Health = MaxHealth;
+        CorpseLingerSeconds = 30f;
+        HitReactionDurationSeconds = 0.4f;
     }
 }

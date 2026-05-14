@@ -257,8 +257,10 @@ public static class Debug
                                 EnemyState.NOTICING => new System.Numerics.Vector4(1, 1, 0.3f, 1), // Yellow
                                 EnemyState.FLEEING => new System.Numerics.Vector4(0.3f, 0.3f, 1, 1), // Blue
                                 EnemyState.ATTACKING => new System.Numerics.Vector4(1, 0.3f, 0.3f, 1), // Red
+                                EnemyState.HIT => new System.Numerics.Vector4(1, 0.55f, 0.15f, 1), // Orange
                                 EnemyState.DYING => new System.Numerics.Vector4(0.7f, 0.3f, 0.7f, 1), // Purple
                                 EnemyState.COLLIDING => new System.Numerics.Vector4(1, 0, 0, 1), // Red
+                                EnemyState.CORPSE => new System.Numerics.Vector4(0.35f, 0.35f, 0.35f, 1), // Dark gray
                                 _ => new System.Numerics.Vector4(1, 1, 1, 1) // White
                             };
                             ImGui.TextColored(stateColor, enemy.EnemyState.ToString());

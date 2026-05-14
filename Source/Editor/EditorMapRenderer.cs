@@ -337,6 +337,10 @@ public class EditorMapRenderer
                 stateColor = new Color(255, 0, 0, 255);
             else if (liveEnemy.EnemyState == EnemyState.COLLIDING)
                 stateColor = new Color(255, 40, 40, 255);
+            else if (liveEnemy.EnemyState == EnemyState.CORPSE)
+                stateColor = new Color(120, 120, 120, 255);
+            else if (liveEnemy.EnemyState == EnemyState.HIT)
+                stateColor = new Color(255, 160, 40, 255);
             else
                 stateColor = new Color(40, 255, 40, 255);
             DrawText(stateText, (int)(liveCX - stateW / 2f), (int)(liveCY - liveRadius - 16), 14, stateColor);
