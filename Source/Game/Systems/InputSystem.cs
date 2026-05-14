@@ -19,6 +19,7 @@ public class InputState
     public bool IsChangeStatePressed { get; init; }
     public bool IsChangeAnimationPressed { get; set; }
     public bool IsMinimapEnabled { get; set; }
+    public bool IsPrimaryFire { get; init; }
 }
 
 public class InputSystem
@@ -117,6 +118,7 @@ public class InputSystem
             IsInteractPressed =  IsKeyPressed(KeyboardKey.E),
             IsChangeStatePressed = IsKeyPressed(KeyboardKey.C),
             IsChangeAnimationPressed = IsKeyPressed(KeyboardKey.V),
+            IsPrimaryFire = !_isMouseFree && IsMouseButtonPressed(MouseButton.Left),
         };
     }
 

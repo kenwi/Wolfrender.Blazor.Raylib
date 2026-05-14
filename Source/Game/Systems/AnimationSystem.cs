@@ -1,4 +1,3 @@
-using System.Data;
 using System.Numerics;
 using Game.Entities;
 using Game.Utilities;
@@ -66,13 +65,21 @@ public class AnimationSystem
                     currentRowPixel = 6 * (spriteSize + padding);
                     
                     break;
+                case EnemyState.HIT:
+                    currentColumnPixel = 0 * (spriteSize + padding);
+                    currentRowPixel = 5 * (spriteSize + padding);
+                    break;
                 case EnemyState.DYING:
-                    if (enemy.AnimationTimer >= 1)
+                    if (enemy.DyingAnimationIndex < 4 && enemy.AnimationTimer >= 1)
                     {
                         enemy.AnimationTimer = 0;
                         enemy.DyingAnimationIndex++;
                     }
-                    currentColumnPixel = (enemy.DyingAnimationIndex % 5) * (spriteSize + padding);
+                    currentColumnPixel = enemy.DyingAnimationIndex * (spriteSize + padding);
+                    currentRowPixel = 5 * (spriteSize + padding);
+                    break;
+                case EnemyState.CORPSE:
+                    currentColumnPixel = 4 * (spriteSize + padding);
                     currentRowPixel = 5 * (spriteSize + padding);
                     break;
             }

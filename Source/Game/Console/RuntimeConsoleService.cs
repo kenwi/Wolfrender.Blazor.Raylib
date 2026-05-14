@@ -9,7 +9,11 @@ public sealed class RuntimeConsoleService
     private readonly ConsoleCommandContext _context;
     private readonly IConsoleOutput _output;
 
-    public RuntimeConsoleService(IConsoleVariableAccessor variables, IConsoleOutput output, Func<string, ConsoleCommandResult> loadLevel)
+    public RuntimeConsoleService(
+        IConsoleVariableAccessor variables,
+        IConsoleOutput output,
+        Func<string, ConsoleCommandResult> loadLevel,
+        Func<ConsoleCommandResult> restartCurrentLevel)
     {
         _output = output;
 
@@ -19,7 +23,8 @@ public sealed class RuntimeConsoleService
             new ListVariablesCommand(),
             new GetCommand(),
             new SetCommand(),
-            new LoadCommand()
+            new LoadCommand(),
+            new RestartLevelCommand()
         };
 
         _dispatcher = new ConsoleCommandDispatcher(commands);
@@ -27,6 +32,7 @@ public sealed class RuntimeConsoleService
         {
             Variables = variables,
             LoadLevel = loadLevel,
+            RestartCurrentLevel = restartCurrentLevel,
             GetAllCommands = () => _dispatcher.Commands
         };
     }

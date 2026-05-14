@@ -28,7 +28,8 @@ public static class WorldConsoleBindings
         return new RuntimeConsoleService(
             variables,
             output,
-            level => ConsoleCommandResult.Ok($"Level loading is not wired yet. Requested: '{level}'."));
+            level => ConsoleCommandResult.Ok($"Level loading is not wired yet. Requested: '{level}'."),
+            world.RestartCurrentLevel);
     }
 
     private static IReadOnlyList<RootBinding> CreateRoots(World world, Player player, EnemySystem enemySystem)
@@ -71,7 +72,9 @@ public static class WorldConsoleBindings
                     "Enemy[index].MoveSpeed",
                     "Enemy[index].Position",
                     "Enemy[index].Rotation",
-                    "Enemy[index].EnemyState"
+                    "Enemy[index].EnemyState",
+                    "Enemy[index].CorpseLingerSeconds",
+                    "Enemy[index].HitReactionDurationSeconds"
                 },
                 DiscoveryFactory = () => DiscoverVariablesForType(typeof(Enemy), "Enemy[index]")
             },
@@ -114,6 +117,8 @@ public static class WorldConsoleBindings
             "Enemy[index].Position",
             "Enemy[index].Rotation",
             "Enemy[index].EnemyState",
+            "Enemy[index].CorpseLingerSeconds",
+            "Enemy[index].HitReactionDurationSeconds",
             "RenderData.ResolutionDownScaleMultiplier",
             "Audio.Volume"
         };

@@ -7,8 +7,8 @@ namespace Game.Utilities;
 
 public static class PrimitiveRenderer
 {
-    // Color key for transparency: #980088 (R:152, G:0, B:136)
-    private static readonly Color ColorKey = new Color(152, 0, 136, 255);
+    // Color key for transparency: #980088 (R:152, G:0, B:136) — public for hit-testing vs CPU sprite samples.
+    public static readonly Color SpriteTransparencyKey = new Color(152, 0, 136, 255);
     private static Shader? _colorKeyShader;
     private static int _colorKeyShaderLoc;
     
@@ -32,7 +32,7 @@ public static class PrimitiveRenderer
             _colorKeyShaderLoc = GetShaderLocation(_colorKeyShader.Value, "colorKey");
             
             // Set the color key (in 0-255 range for shader)
-            float[] colorKeyArray = { ColorKey.R, ColorKey.G, ColorKey.B };
+            float[] colorKeyArray = { SpriteTransparencyKey.R, SpriteTransparencyKey.G, SpriteTransparencyKey.B };
             SetShaderValue(_colorKeyShader.Value, _colorKeyShaderLoc, colorKeyArray, ShaderUniformDataType.Vec3);
         }
     }
