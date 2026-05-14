@@ -186,7 +186,8 @@ public class World : IScene
         _soundSystem.Update();
         bool toggledConsoleThisFrame = false;
 
-        if (IsKeyPressed(KeyboardKey.Grave))
+        if (IsKeyPressed(KeyboardKey.Grave) ||
+            (OperatingSystem.IsBrowser() && IsKeyPressed(KeyboardKey.Period)))
         {
             _consoleOverlay.Toggle();
             toggledConsoleThisFrame = true;
