@@ -5,7 +5,7 @@ namespace Game.Utilities;
 public static class Res
 {
 #if CONSOLE_APP
-    public static string Path(string relativePath) => "wwwroot/" + relativePath;
+    public static string Path(string relativePath) => relativePath;
 #else
     public static string Path(string relativePath) => relativePath;
 #endif

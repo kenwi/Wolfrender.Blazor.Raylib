@@ -1,4 +1,5 @@
 using System.Numerics;
+using Game.Console;
 using Game.Entities;
 using Game.Systems;
 using Game.Utilities;
@@ -24,6 +25,8 @@ public class World : IScene
     private readonly HudSystem _hudSystem;
     private readonly AnimationSystem _animationSystem;
     private readonly MinimapSystem _minimapSystem;
+    private readonly ConsoleOverlay _consoleOverlay;
+    private readonly RuntimeConsoleService _runtimeConsole;
 
     private  RenderTexture2D _sceneRenderTexture;
     private InputState _inputState = new();
@@ -65,14 +68,24 @@ public class World : IScene
         _minimapSystem = new MinimapSystem(_level, _renderSystem);
         _enemySystem = new EnemySystem(_player, _inputSystem, _collisionSystem, _doorSystem);
         _animationSystem = new AnimationSystem(_textures[7], _player, _enemySystem);
+        _consoleOverlay = new ConsoleOverlay();
+        _runtimeConsole = WorldConsoleBindings.CreateConsole(this, _player, _enemySystem, _consoleOverlay);
         
         _sceneRenderTexture = LoadRenderTexture(screenWidth, screenHeight);
         Debug.Setup(_doorSystem.Doors, _player, _animationSystem, _enemySystem);
+#if DEBUG
+        ConsoleSelfTests.RunOnce();
+#endif
     }
 
     public void SetVolume(float volume)
     {
         _soundSystem.SetVolume(volume);
+    }
+
+    public float GetVolume()
+    {
+        return _soundSystem.GetVolume();
     }
 
     public void SetMouseSensitivity(float sensitivity)
@@ -119,6 +132,27 @@ public class World : IScene
     public void Update(float deltaTime)
     {
         _soundSystem.Update();
+        bool toggledConsoleThisFrame = false;
+
+        if (IsKeyPressed(KeyboardKey.Grave))
+        {
+            _consoleOverlay.Toggle();
+            toggledConsoleThisFrame = true;
+            if (_consoleOverlay.IsOpen)
+                _inputSystem.EnableMouse();
+        }
+
+        if (_consoleOverlay.IsOpen)
+        {
+            // Consume char events on the same frame as the toggle key press,
+            // so keyboard layouts that emit symbols from Grave do not insert junk.
+            _consoleOverlay.UpdateInput(
+                line => ExecuteConsoleLine(line),
+                (line, cursor) => _runtimeConsole.GetCompletions(line, cursor),
+                toggledConsoleThisFrame);
+            return;
+        }
+
         _inputState = _inputSystem.GetInputState();
         var mouseDelta = _inputState.MouseDelta;
         
@@ -152,6 +186,11 @@ public class World : IScene
             _animationSystem.Update(deltaTime);
             _enemySystem.Update(deltaTime);
         }
+    }
+
+    public ConsoleCommandResult ExecuteConsoleLine(string line)
+    {
+        return _runtimeConsole.Execute(line);
     }
 
     public void Render()
@@ -222,6 +261,7 @@ public class World : IScene
         int renderH = (int)RenderData.Resolution.Y / RenderData.ResolutionDownScaleMultiplier;
         Debug.DrawWorldOverlays(_inputState.IsDebugEnabled, _player.Camera, renderW, renderH);
         Debug.Draw(_inputState.IsDebugEnabled);
+        _consoleOverlay.Render();
         
         EndDrawing();
     }
