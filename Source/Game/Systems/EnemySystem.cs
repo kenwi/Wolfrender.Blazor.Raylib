@@ -24,7 +24,6 @@ public class EnemySystem
     private const float EnemyCollisionRadius = 1.0f;
     private const float TurnSpeed = 4f; // radians per second when facing player
     private const float NoticingDuration = 0.8f; // seconds before transitioning to ATTACKING
-    private const float PathRefreshInterval = 0.5f; // seconds between A* recomputes
 
     private const float EnemyFireInterval = 0.85f;
     private const float EnemyFireAimTolerance = 0.42f; // radians (~24°)
@@ -183,6 +182,12 @@ public class EnemySystem
             return;
         }
 
+        if (enemy.LastSeenPlayerPosition.HasValue)
+        {
+            FollowChasePath(enemy, deltaTime);
+            return;
+        }
+
         if (enemy.HasPatrolPath)
             UpdatePatrol(enemy, deltaTime);
     }
@@ -213,14 +218,6 @@ public class EnemySystem
             enemy.LastSeenPlayerPosition = _player.Position;
             RotateTowardPlayer(enemy, deltaTime);
 
-            // Recompute chase path periodically so we always have a fresh route
-            enemy.PathRefreshTimer += deltaTime;
-            if (enemy.PathRefreshTimer >= PathRefreshInterval)
-            {
-                enemy.PathRefreshTimer = 0;
-                ComputeChasePath(enemy, _player.Position);
-            }
-
             enemy.AttackCooldownRemaining -= deltaTime;
             if (_player.IsAlive && enemy.AttackCooldownRemaining <= 0f)
             {
@@ -238,8 +235,10 @@ public class EnemySystem
         }
         else if (enemy.LastSeenPlayerPosition.HasValue)
         {
-            // Lost sight — follow the path to the last seen position
-            FollowChasePath(enemy, deltaTime);
+            // Lost sight — resume movement only as WALKING. ATTACKING stays rooted while LOS is true.
+            if (_mapData != null)
+                ComputeChasePath(enemy, enemy.LastSeenPlayerPosition.Value);
+            enemy.TransitionTo(EnemyState.WALKING);
         }
         else
         {
@@ -335,9 +334,6 @@ public class EnemySystem
         if (distXZ > ArrivalThreshold)
         {
             MoveToward(enemy, toTarget, distXZ, deltaTime);
-            if (enemy.LastSeenPlayerPosition.HasValue &&
-                (enemy.EnemyState == EnemyState.WALKING || enemy.EnemyState == EnemyState.COLLIDING))
-                enemy.EnemyState = EnemyState.ATTACKING;
         }
         else
         {
