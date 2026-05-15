@@ -65,7 +65,7 @@ public class AnimationSystem
                     }
                     currentColumnPixel = (1 + enemy.ShootingAnimationIndex % 2) * (spriteSize + padding);
                     currentRowPixel = 6 * (spriteSize + padding);
-                    
+                    currentAnimationSpeed = 1.5f;
                     break;
                 case EnemyState.HIT:
                     currentColumnPixel = 0 * (spriteSize + padding);
