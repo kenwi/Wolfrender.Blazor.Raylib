@@ -13,7 +13,8 @@ public sealed class RuntimeConsoleService
         IConsoleVariableAccessor variables,
         IConsoleOutput output,
         Func<string, ConsoleCommandResult> loadLevel,
-        Func<ConsoleCommandResult> restartCurrentLevel)
+        Func<ConsoleCommandResult> restartCurrentLevel,
+        Func<ConsoleCommandResult> clearConsoleScrollback)
     {
         _output = output;
 
@@ -24,7 +25,8 @@ public sealed class RuntimeConsoleService
             new GetCommand(),
             new SetCommand(),
             new LoadCommand(),
-            new RestartLevelCommand()
+            new RestartLevelCommand(),
+            new ClearCommand()
         };
 
         _dispatcher = new ConsoleCommandDispatcher(commands);
@@ -33,6 +35,7 @@ public sealed class RuntimeConsoleService
             Variables = variables,
             LoadLevel = loadLevel,
             RestartCurrentLevel = restartCurrentLevel,
+            ClearConsoleScrollback = clearConsoleScrollback,
             GetAllCommands = () => _dispatcher.Commands
         };
     }
