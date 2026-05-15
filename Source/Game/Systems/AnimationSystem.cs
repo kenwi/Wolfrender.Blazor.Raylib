@@ -32,7 +32,8 @@ public class AnimationSystem
             
             var currentColumnPixel = (frameColumnIndex % 8)  * (spriteSize + padding);
             var currentRowPixel = (frameRowIndex % 5) * (spriteSize + padding);
-            
+            var currentAnimationSpeed = 1f;
+
             // Animations have different number of frames and are located in different rows
             // so we need to adjust the indexes and calculate correct row and column pixel
             switch (enemy.EnemyState)
@@ -48,6 +49,7 @@ public class AnimationSystem
                         enemy.AnimationTimer = 0;
                     }
                     currentRowPixel = (1 + frameRowIndex % 4) * (spriteSize + padding);
+                    currentAnimationSpeed = 2f;
                     break;
                 case EnemyState.NOTICING:
                     currentColumnPixel = 0  * (spriteSize + padding);
@@ -77,6 +79,7 @@ public class AnimationSystem
                     }
                     currentColumnPixel = enemy.DyingAnimationIndex * (spriteSize + padding);
                     currentRowPixel = 5 * (spriteSize + padding);
+                    currentAnimationSpeed = 3f;
                     break;
                 case EnemyState.CORPSE:
                     currentColumnPixel = 4 * (spriteSize + padding);
@@ -86,7 +89,7 @@ public class AnimationSystem
             
             // Create the new animation frame and load it into the enemy
             enemy.FrameRect = new Rectangle(currentColumnPixel, currentRowPixel, spriteSize, spriteSize);
-            enemy.AnimationTimer += deltaTime * 2;
+            enemy.AnimationTimer += deltaTime * currentAnimationSpeed * 2;
         }
     }
 
