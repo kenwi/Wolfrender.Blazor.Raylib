@@ -15,6 +15,13 @@ public sealed class ConsoleOverlay
     private int _scrollbackOffsetLines;
     private CompletionSession? _completion;
 
+    private float _backspaceHoldSeconds;
+    private float _backspaceRepeatSeconds;
+    private bool _backspaceRepeatPhase;
+
+    private const float BackspaceRepeatInitialDelaySeconds = 0.5f;
+    private const float BackspaceRepeatIntervalSeconds = 0.05f;
+
     public bool IsOpen { get; private set; }
 
     public void Toggle()
@@ -32,7 +39,11 @@ public sealed class ConsoleOverlay
             _scrollback.RemoveAt(0);
     }
 
-    public void UpdateInput(Action<string> onSubmit, Func<string, int, IReadOnlyList<string>> getCompletions, bool consumeTypedCharsForThisFrame = false)
+    public void UpdateInput(
+        float deltaTime,
+        Action<string> onSubmit,
+        Func<string, int, IReadOnlyList<string>> getCompletions,
+        bool consumeTypedCharsForThisFrame = false)
     {
         float wheel = GetMouseWheelMove();
         if (MathF.Abs(wheel) > 0.01f)
@@ -43,6 +54,29 @@ public sealed class ConsoleOverlay
         if (IsKeyPressed(KeyboardKey.PageDown))
             _scrollbackOffsetLines -= 8;
 
+        bool ctrl = IsKeyDown(KeyboardKey.LeftControl) || IsKeyDown(KeyboardKey.RightControl);
+
+        if (ctrl && IsKeyPressed(KeyboardKey.Backspace))
+        {
+            DeleteWordLeft();
+            ResetBackspaceRepeatState();
+            ResetCompletionSession();
+        }
+        else if (ctrl && IsKeyPressed(KeyboardKey.W))
+        {
+            DeleteWordLeft();
+            ResetBackspaceRepeatState();
+            ResetCompletionSession();
+        }
+        else if (!ctrl && IsKeyDown(KeyboardKey.Backspace))
+        {
+            HandleBackspaceRepeat(deltaTime);
+        }
+        else if (!IsKeyDown(KeyboardKey.Backspace))
+        {
+            ResetBackspaceRepeatState();
+        }
+
         while (true)
         {
             int key = GetCharPressed();
@@ -50,19 +84,14 @@ public sealed class ConsoleOverlay
                 break;
 
             char ch = (char)key;
+            if (ctrl && (ch == 'w' || ch == 'W'))
+                continue;
             if (!consumeTypedCharsForThisFrame && !char.IsControl(ch))
             {
                 _inputBuffer.Insert(_cursor, ch);
                 _cursor++;
                 ResetCompletionSession();
             }
-        }
-
-        if (IsKeyPressed(KeyboardKey.Backspace) && _cursor > 0)
-        {
-            _inputBuffer.Remove(_cursor - 1, 1);
-            _cursor--;
-            ResetCompletionSession();
         }
 
         if (IsKeyPressed(KeyboardKey.Delete) && _cursor < _inputBuffer.Length)
@@ -238,6 +267,78 @@ public sealed class ConsoleOverlay
     private void ResetCompletionSession()
     {
         _completion = null;
+    }
+
+    private void ResetBackspaceRepeatState()
+    {
+        _backspaceHoldSeconds = 0f;
+        _backspaceRepeatSeconds = 0f;
+        _backspaceRepeatPhase = false;
+    }
+
+    private void HandleBackspaceRepeat(float deltaTime)
+    {
+        if (IsKeyPressed(KeyboardKey.Backspace))
+        {
+            DeleteCharLeft();
+            ResetCompletionSession();
+            _backspaceHoldSeconds = 0f;
+            _backspaceRepeatSeconds = 0f;
+            _backspaceRepeatPhase = false;
+            return;
+        }
+
+        _backspaceHoldSeconds += deltaTime;
+        if (!_backspaceRepeatPhase)
+        {
+            if (_backspaceHoldSeconds < BackspaceRepeatInitialDelaySeconds)
+                return;
+
+            _backspaceRepeatPhase = true;
+            _backspaceRepeatSeconds = 0f;
+            DeleteCharLeft();
+            ResetCompletionSession();
+            return;
+        }
+
+        _backspaceRepeatSeconds += deltaTime;
+        while (_backspaceRepeatSeconds >= BackspaceRepeatIntervalSeconds)
+        {
+            _backspaceRepeatSeconds -= BackspaceRepeatIntervalSeconds;
+            if (!DeleteCharLeft())
+                break;
+            ResetCompletionSession();
+        }
+    }
+
+    /// <summary>Deletes one character left of the cursor. Returns false if nothing was removed.</summary>
+    private bool DeleteCharLeft()
+    {
+        if (_cursor <= 0)
+            return false;
+        _inputBuffer.Remove(_cursor - 1, 1);
+        _cursor--;
+        return true;
+    }
+
+    /// <summary>Readline-style: skip spaces left of cursor, then remove the preceding word (non-whitespace run).</summary>
+    private void DeleteWordLeft()
+    {
+        if (_cursor <= 0)
+            return;
+
+        int i = _cursor;
+        while (i > 0 && char.IsWhiteSpace(_inputBuffer[i - 1]))
+            i--;
+        while (i > 0 && !char.IsWhiteSpace(_inputBuffer[i - 1]))
+            i--;
+
+        int removeLen = _cursor - i;
+        if (removeLen <= 0)
+            return;
+
+        _inputBuffer.Remove(i, removeLen);
+        _cursor = i;
     }
 
     private sealed class CompletionSession

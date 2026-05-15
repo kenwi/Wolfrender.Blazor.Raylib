@@ -202,6 +202,7 @@ public class World : IScene
             // Consume char events on the same frame as the toggle key press,
             // so keyboard layouts that emit symbols from Grave do not insert junk.
             _consoleOverlay.UpdateInput(
+                deltaTime,
                 line => ExecuteConsoleLine(line),
                 (line, cursor) => _runtimeConsole.GetCompletions(line, cursor),
                 toggledConsoleThisFrame);
