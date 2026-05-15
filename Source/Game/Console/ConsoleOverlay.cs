@@ -39,6 +39,13 @@ public sealed class ConsoleOverlay
             _scrollback.RemoveAt(0);
     }
 
+    /// <summary>Clears printed scrollback only; <see cref="_history"/> (↑/↓) is unchanged.</summary>
+    public void ClearScrollback()
+    {
+        _scrollback.Clear();
+        _scrollbackOffsetLines = 0;
+    }
+
     public void UpdateInput(
         float deltaTime,
         Action<string> onSubmit,
