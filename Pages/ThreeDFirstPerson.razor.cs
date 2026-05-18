@@ -111,6 +111,8 @@ public partial class ThreeDFirstPerson : IDisposable
             "resources/shaders/lighting.vs",
             "resources/shaders/lighting.fs",
             "resources/03.mp3",
+            "resources/PistolFire.ogg",
+            "resources/EnemyPistolFire.ogg",
         };
 
         await Task.WhenAll(resourceFiles.Select(
