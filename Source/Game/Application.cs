@@ -79,7 +79,8 @@ public class Application
             LoadTexture(Path("resources/redbrick.png")),
             LoadTexture(Path("resources/wood.png")),
             LoadTexture(Path("resources/door.png")),
-            LoadTexture(Path("resources/enemy_guard.png"))
+            LoadTexture(Path("resources/enemy_guard.png")),
+            LoadTexture(Path("resources/weapons2.png"))
         };
 
         var mapData = new MapData { Textures = textures };

@@ -71,6 +71,23 @@ public static class PrimitiveRenderer
         EnsureLightingShader();
         return _lightingShader;
     }
+
+    /// <summary>Draw a screen-space sprite region with the shared magenta color-key shader.</summary>
+    public static void DrawScreenSprite(
+        Texture2D texture,
+        Rectangle source,
+        Rectangle dest,
+        Color tint)
+    {
+        EnsureColorKeyShader();
+        if (_colorKeyShader.HasValue)
+            BeginShaderMode(_colorKeyShader.Value);
+
+        DrawTexturePro(texture, source, dest, Vector2.Zero, 0f, tint);
+
+        if (_colorKeyShader.HasValue)
+            EndShaderMode();
+    }
     public static void DrawCubeTexture(
         Texture2D texture,
         Vector3 position,

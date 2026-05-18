@@ -74,7 +74,11 @@ public class World : IScene
         _hudSystem = new HudSystem(screenWidth, screenHeight);
         _minimapSystem = new MinimapSystem(_level, _renderSystem);
         _enemySystem = new EnemySystem(_player, _inputSystem, _collisionSystem, _doorSystem, _combatFeedback);
-        _animationSystem = new AnimationSystem(_textures[7], _player, _enemySystem);
+        _animationSystem = new AnimationSystem(
+            _textures[GameTextureIndex.EnemyGuard],
+            _textures[GameTextureIndex.Weapons],
+            _player,
+            _enemySystem);
         _consoleOverlay = new ConsoleOverlay();
         _runtimeConsole = WorldConsoleBindings.CreateConsole(this, _player, _enemySystem, _consoleOverlay);
         
@@ -273,7 +277,7 @@ public class World : IScene
                 GetScreenWidth(),
                 GetScreenHeight(),
                 _enemySystem.Enemies,
-                _textures[7],
+                _textures[GameTextureIndex.EnemyGuard],
                 4f,
                 4f,
                 Hitscan.DefaultMaxRangeTiles,
@@ -284,6 +288,7 @@ public class World : IScene
 
         _player.WeaponCooldownRemaining = _player.PistolCooldownSeconds;
         _effectSystem.TriggerReticleFireFlash();
+        _animationSystem.PlayPistolFire();
     }
 
     public void Render()
@@ -345,6 +350,9 @@ public class World : IScene
 
         var healthLabel = $"HEALTH: {(int)_player.Health} / {(int)_player.MaxHealth}";
         DrawText(healthLabel, 10, 40, 20, _player.IsAlive ? Color.RayWhite : Color.Red);
+
+        if (_player.IsAlive && !_consoleOverlay.IsOpen)
+            _animationSystem.RenderWeaponOverlay(GetScreenWidth(), GetScreenHeight());
 
         _effectSystem.RenderScreenOverlay(GetScreenWidth(), GetScreenHeight());
 
