@@ -105,7 +105,7 @@ public class EditorGui
     /// Returns true if the simulation toggle was pressed in the menu.
     /// </summary>
     public bool RenderMenuBar(
-        bool isSimulating, EnemySystem enemySystem, DoorSystem doorSystem,
+        bool isSimulating, EditorState? editorState, EnemySystem enemySystem, DoorSystem doorSystem,
         Action clearLevel, Action refreshLayers)
     {
         bool toggleSimulation = false;
@@ -202,6 +202,20 @@ public class EditorGui
                 {
                     toggleSimulation = true;
                 }
+
+                if (editorState != null)
+                {
+                    ImGui.Separator();
+
+                    bool drawFov = editorState.DrawEnemyLineOfSight;
+                    if (ImGui.MenuItem("Enemy Line of Sight", null, drawFov))
+                        editorState.DrawEnemyLineOfSight = !drawFov;
+
+                    bool drawPaths = editorState.DrawEnemyPaths;
+                    if (ImGui.MenuItem("Enemy Paths", null, drawPaths))
+                        editorState.DrawEnemyPaths = !drawPaths;
+                }
+
                 ImGui.EndMenu();
             }
 
@@ -827,12 +841,16 @@ public class EditorGui
 
         ImGui.Separator();
 
+        ImGui.Text("While simulating");
+        ImGui.Separator();
+
         bool drawEnemyPaths = state.DrawEnemyPaths;
         if (ImGui.Checkbox("Draw paths for enemies", ref drawEnemyPaths))
             state.DrawEnemyPaths = drawEnemyPaths;
 
-        ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f),
-            "Shows live A* chase paths while simulating.");
+        bool drawEnemyFov = state.DrawEnemyLineOfSight;
+        if (ImGui.Checkbox("Draw enemy line of sight", ref drawEnemyFov))
+            state.DrawEnemyLineOfSight = drawEnemyFov;
 
         ImGui.End();
     }

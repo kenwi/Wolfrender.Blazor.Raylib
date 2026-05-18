@@ -98,7 +98,7 @@ public class WebEditorScene : IScene
             {
                 _mapRenderer.RenderEnemyLayer(
                     State.Camera, State.EnemySystem, State.IsMouseOverUI,
-                    State.IsSimulating,
+                    State.IsSimulating, State.DrawEnemyLineOfSight,
                     ref State.HoveredEnemyIndex, State.SelectedEnemyIndex,
                     State.IsEditingPatrolPath, State.PatrolEditEnemyIndex, State.PatrolPathInProgress);
             }

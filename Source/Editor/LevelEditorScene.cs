@@ -148,7 +148,7 @@ public class LevelEditorScene : IScene
             {
                 _mapRenderer.RenderEnemyLayer(
                     _state.Camera, _state.EnemySystem, _state.IsMouseOverUI,
-                    _state.IsSimulating,
+                    _state.IsSimulating, _state.DrawEnemyLineOfSight,
                     ref _state.HoveredEnemyIndex, _state.SelectedEnemyIndex,
                     _state.IsEditingPatrolPath, _state.PatrolEditEnemyIndex, _state.PatrolPathInProgress);
             }
@@ -185,7 +185,7 @@ public class LevelEditorScene : IScene
 
         // ImGui panels
         rlImGui.Begin();
-        bool menuToggleSim = _gui.RenderMenuBar(_state.IsSimulating, _state.EnemySystem, _state.DoorSystem, _state.ClearLevel, _state.RefreshLayerReferences);
+        bool menuToggleSim = _gui.RenderMenuBar(_state.IsSimulating, _state, _state.EnemySystem, _state.DoorSystem, _state.ClearLevel, _state.RefreshLayerReferences);
         if (menuToggleSim) _state.ToggleSimulation();
         _gui.RenderFileDialogs(_state.RefreshLayerReferences);
         _gui.RenderLayerPanel(_state.Layers, ref _state.ActiveLayerIndex);

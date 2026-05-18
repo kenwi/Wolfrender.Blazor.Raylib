@@ -49,6 +49,9 @@ public class EditorState
     /// <summary>When true, the editor draws each live enemy's current A* chase path during simulation.</summary>
     public bool DrawEnemyPaths;
 
+    /// <summary>When true, the editor draws live enemy FOV / line-of-sight cones during simulation.</summary>
+    public bool DrawEnemyLineOfSight = true;
+
     // Mouse-over-UI flag (set by the active UI layer each frame)
     public bool IsMouseOverUI;
 
