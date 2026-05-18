@@ -6,7 +6,9 @@ namespace Game.Systems;
 public class SoundSystem
 {
     private Music _music;
-    private float _volume = 1f;
+    private float _volume = 0.2f;
+    private Sound? _enemyFireSound;
+    private bool _enemyFireSoundReady;
 
     public SoundSystem(string musicPath)
     {
@@ -24,7 +26,22 @@ public class SoundSystem
     {
         _volume = Math.Clamp(volume, 0f, 1f);
         SetMusicVolume(_music, _volume);
+        if (_enemyFireSound.HasValue)
+            SetSoundVolume(_enemyFireSound.Value, _volume);
     }
 
     public float GetVolume() => _volume;
+
+    /// <summary>Short gunshot SFX when an enemy fires (<c>wwwroot/resources/enemy_fire.wav</c>).</summary>
+    public void PlayEnemyFire()
+    {
+        if (!_enemyFireSoundReady)
+        {
+            _enemyFireSound = LoadSound(Utilities.Res.Path("resources/EnemyPistolFire.ogg"));
+            SetSoundVolume(_enemyFireSound.Value, _volume);
+            _enemyFireSoundReady = true;
+        }
+
+        PlaySound(_enemyFireSound!.Value);
+    }
 }
