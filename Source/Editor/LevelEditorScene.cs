@@ -14,6 +14,12 @@ public class LevelEditorScene : IScene
     private readonly EditorMapRenderer _mapRenderer;
     private readonly EditorGui _gui;
 
+    /// <summary>
+    /// True while the left mouse button has been "consumed" by a non-map action
+    /// (e.g. a path-pick click) and must not paint tiles or drag enemies until released.
+    /// </summary>
+    private bool _suppressMapClickUntilRelease;
+
     public LevelEditorScene(MapData mapData, EnemySystem enemySystem, DoorSystem doorSystem, Entities.Player player)
     {
         _state = new EditorState(mapData, enemySystem, doorSystem, player);
@@ -67,31 +73,61 @@ public class LevelEditorScene : IScene
             _state.ToggleSimulation();
         }
 
+        // Read ImGui IO state before simulation tick (E must not fire while typing in a panel)
+        bool imGuiWantsMouse = ImGui.GetIO().WantCaptureMouse;
+        bool imGuiWantsKeyboard = ImGui.GetIO().WantCaptureKeyboard;
+
         // Tick game systems when simulating
         if (_state.IsSimulating)
         {
             UpdatePlayerMovement(deltaTime);
             _state.EnemySystem.Update(deltaTime);
-            _state.DoorSystem.Animate(deltaTime);
+            bool interactPressed = !imGuiWantsKeyboard && IsKeyPressed(KeyboardKey.E);
+            _state.UpdateDoorsDuringSimulation(deltaTime, interactPressed);
         }
-
-        // Read ImGui IO state and propagate to EditorState
-        bool imGuiWantsMouse = ImGui.GetIO().WantCaptureMouse;
-        bool imGuiWantsKeyboard = ImGui.GetIO().WantCaptureKeyboard;
         _state.IsMouseOverUI = imGuiWantsMouse;
 
         // Camera input (pan + zoom) - disable WASD panning during simulation (player uses those keys)
         _state.Camera.HandleInput(deltaTime, ctrlHeld, imGuiWantsMouse, imGuiWantsKeyboard, disableKeyboardPan: _state.IsSimulating);
+
+        // Drop the click-suppression latch as soon as the user lets go.
+        if (IsMouseButtonReleased(MouseButton.Left))
+            _suppressMapClickUntilRelease = false;
 
         // Patrol path editing mode
         if (_state.IsEditingPatrolPath)
         {
             HandlePatrolPathInput(imGuiWantsMouse);
         }
-        else
+        else if (_state.PathPickingMode != EditorState.PathPickMode.None)
+        {
+            HandlePathPickInput(imGuiWantsMouse);
+        }
+        else if (!_suppressMapClickUntilRelease)
         {
             HandleTileAndEnemyInput(imGuiWantsMouse);
         }
+    }
+
+    private void HandlePathPickInput(bool mouseOverUI)
+    {
+        if (IsKeyPressed(KeyboardKey.Escape))
+        {
+            _state.CancelPathPicking();
+            return;
+        }
+
+        if (mouseOverUI || !IsMouseButtonPressed(MouseButton.Left)) return;
+
+        var worldPos = _state.Camera.ScreenToWorld(GetMousePosition());
+        int tx = (int)MathF.Floor(worldPos.X);
+        int ty = (int)MathF.Floor(worldPos.Y);
+        _state.SetPathPickPoint(tx, ty);
+
+        // Keep painting/enemy drag suppressed for the rest of this press —
+        // otherwise a long-held click would paint a tile on the very next frame
+        // since the picker has already switched mode back to None.
+        _suppressMapClickUntilRelease = true;
     }
 
     public void Render()
@@ -129,6 +165,12 @@ public class LevelEditorScene : IScene
         // Draw player position indicator
         _mapRenderer.RenderPlayerIndicator(_state.Player, _state.Camera);
 
+        // Pathfinding visualizer overlay
+        _mapRenderer.DrawPathPreview(_state.PathStart, _state.PathEnd, _state.PathResult, _state.Camera);
+
+        if (_state.IsSimulating && _state.DrawEnemyPaths)
+            _mapRenderer.DrawEnemyChasePaths(_state.EnemySystem, _state.Camera);
+
         // Highlight hovered tile
         var mouseScreen = GetMousePosition();
         var worldPos = _state.Camera.ScreenToWorld(mouseScreen);
@@ -151,6 +193,7 @@ public class LevelEditorScene : IScene
         _gui.RenderInfoPanel(tileX, tileY, worldPos, tileInBounds, _state.CursorInfoFollowsMouse, _state.Layers, EditorState.EnemiesLayerName);
         _gui.RenderEnemyPropertiesPanel(ref _state.SelectedEnemyIndex, ref _state.IsEditingPatrolPath, ref _state.PatrolEditEnemyIndex, _state.PatrolPathInProgress);
         _gui.RenderDebugLogPanel();
+        _gui.RenderPathfindingPanel(_state);
         rlImGui.End();
 
         DrawText("Level Editor - F1 to return to game", 10, GetScreenHeight() - 70, 20, Color.White);
@@ -159,6 +202,14 @@ public class LevelEditorScene : IScene
         if (_state.IsEditingPatrolPath)
         {
             const string msg = "EDITING PATROL PATH - LMB: Add waypoint | Enter: Confirm | Esc: Cancel";
+            int msgW = MeasureText(msg, 24);
+            DrawText(msg, (GetScreenWidth() - msgW) / 2, GetScreenHeight() - 100, 24, Color.Yellow);
+        }
+        else if (_state.PathPickingMode != EditorState.PathPickMode.None)
+        {
+            string msg = _state.PathPickingMode == EditorState.PathPickMode.Start
+                ? "PICKING PATHFINDING START - LMB: Set tile | Esc: Cancel"
+                : "PICKING PATHFINDING END - LMB: Set tile | Esc: Cancel";
             int msgW = MeasureText(msg, 24);
             DrawText(msg, (GetScreenWidth() - msgW) / 2, GetScreenHeight() - 100, 24, Color.Yellow);
         }

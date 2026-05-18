@@ -50,6 +50,13 @@ public class Enemy
     /// </summary>
     public float StateTimer { get; set; }
 
+    /// <summary>
+    /// Time spent unable to move (slide fully blocked).
+    /// Reset on any successful slide; <see cref="TransitionTo"/> does NOT reset it
+    /// because COLLIDING enters by direct assignment, not a transition.
+    /// </summary>
+    public float StuckTimer { get; set; }
+
     /// <summary>How long the body stays visible in <see cref="EnemyState.CORPSE"/> before removal (seconds).</summary>
     public float CorpseLingerSeconds { get; set; } = 30f;
 
@@ -169,6 +176,12 @@ public class Enemy
     /// Index of the current waypoint the enemy is walking toward in <see cref="ChasePath"/>.
     /// </summary>
     public int ChasePathIndex { get; set; }
+
+    /// <summary>
+    /// True while <see cref="ChasePath"/> is routing the enemy back to a patrol waypoint
+    /// after search/chase (doors ignored during A* planning).
+    /// </summary>
+    public bool IsPatrolReturnPath { get; set; }
 
     /// <summary>
     /// Accumulator used to throttle how often a new path is computed.

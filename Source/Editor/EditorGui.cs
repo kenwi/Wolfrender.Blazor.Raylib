@@ -41,6 +41,7 @@ public class EditorGui
     private bool _showCursorInfo = true;
     private bool _showEnemyProperties = true;
     private bool _showDebugLog = true;
+    private bool _showPathfinding;
 
     public float GuiScale => _guiScale;
     public string StatusMessage => _statusMessage;
@@ -188,6 +189,9 @@ public class EditorGui
 
                 if (ImGui.MenuItem("Debug Log", null, _showDebugLog))
                     _showDebugLog = !_showDebugLog;
+
+                if (ImGui.MenuItem("Pathfinding Visualizer", null, _showPathfinding))
+                    _showPathfinding = !_showPathfinding;
 
                 ImGui.EndMenu();
             }
@@ -447,6 +451,8 @@ public class EditorGui
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Ctrl+1-9: Toggle visibility");
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "C: Toggle cursor follow");
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Del: Delete selected enemy");
+        ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "P: Toggle simulation");
+        ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "E: Open door (while simulating)");
 
         ImGui.End();
     }
@@ -747,6 +753,106 @@ public class EditorGui
     {
         if (!_showDebugLog) return;
         Utilities.Debug.RenderLogWindow(_guiScale);
+    }
+
+    // ─── Pathfinding Visualizer Panel ───────────────────────────────────────────
+
+    /// <summary>
+    /// Tool window for visualizing A* paths in the editor: pick a start and end tile,
+    /// and the path is recomputed and drawn over the map.
+    /// </summary>
+    public void RenderPathfindingPanel(EditorState state)
+    {
+        if (!_showPathfinding) return;
+
+        ImGui.SetNextWindowPos(new Vector2(10, GetScreenHeight() - 280), ImGuiCond.FirstUseEver);
+        ImGui.Begin("Pathfinding Visualizer", ref _showPathfinding, ImGuiWindowFlags.AlwaysAutoResize);
+        ImGui.SetWindowFontScale(_guiScale);
+
+        switch (state.PathPickingMode)
+        {
+            case EditorState.PathPickMode.Start:
+                ImGui.TextColored(new Vector4(1f, 0.85f, 0.2f, 1f),
+                    "Click a tile to set START  (Esc: cancel)");
+                break;
+            case EditorState.PathPickMode.End:
+                ImGui.TextColored(new Vector4(1f, 0.85f, 0.2f, 1f),
+                    "Click a tile to set END  (Esc: cancel)");
+                break;
+            default:
+                ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Ready");
+                break;
+        }
+
+        ImGui.Separator();
+
+        DrawEndpointRow(
+            label: "Start",
+            point: state.PathStart,
+            assignedColor: new Vector4(0.3f, 1f, 0.4f, 1f),
+            buttonLabel: "Pick Start",
+            onClick: state.StartPickingPathStart);
+
+        DrawEndpointRow(
+            label: "End",
+            point: state.PathEnd,
+            assignedColor: new Vector4(1f, 0.4f, 0.4f, 1f),
+            buttonLabel: "Pick End",
+            onClick: state.StartPickingPathEnd);
+
+        ImGui.Separator();
+
+        if (state.PathResult != null && state.PathResult.Count > 0)
+        {
+            ImGui.TextColored(new Vector4(0.3f, 0.8f, 1f, 1f),
+                $"Path: {state.PathResult.Count} tiles");
+        }
+        else if (state.PathStart.HasValue && state.PathEnd.HasValue)
+        {
+            ImGui.TextColored(new Vector4(1f, 0.3f, 0.3f, 1f), "No path found");
+        }
+        else
+        {
+            ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1f),
+                "Pick both endpoints to compute a path");
+        }
+
+        ImGui.Spacing();
+
+        if (ImGui.Button("Recompute", new Vector2(120, 0)))
+            state.RecomputePath();
+        ImGui.SameLine();
+        if (ImGui.Button("Clear", new Vector2(120, 0)))
+            state.ClearPath();
+
+        ImGui.Separator();
+
+        bool drawEnemyPaths = state.DrawEnemyPaths;
+        if (ImGui.Checkbox("Draw paths for enemies", ref drawEnemyPaths))
+            state.DrawEnemyPaths = drawEnemyPaths;
+
+        ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f),
+            "Shows live A* chase paths while simulating.");
+
+        ImGui.End();
+    }
+
+    private static void DrawEndpointRow(
+        string label, Vector2? point, Vector4 assignedColor,
+        string buttonLabel, Action onClick)
+    {
+        if (point.HasValue)
+        {
+            ImGui.TextColored(assignedColor,
+                $"{label}: ({(int)point.Value.X}, {(int)point.Value.Y})");
+        }
+        else
+        {
+            ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1f), $"{label}: not set");
+        }
+
+        if (ImGui.Button(buttonLabel, new Vector2(120, 0)))
+            onClick();
     }
 
     /// <summary>

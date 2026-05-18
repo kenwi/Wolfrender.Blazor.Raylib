@@ -67,7 +67,7 @@ public class WebEditorScene : IScene
         {
             UpdatePlayerMovement(deltaTime);
             State.EnemySystem.Update(deltaTime);
-            State.DoorSystem.Animate(deltaTime);
+            State.UpdateDoorsDuringSimulation(deltaTime, IsKeyPressed(KeyboardKey.E));
         }
 
         State.Camera.HandleInput(deltaTime, ctrlHeld, State.IsMouseOverUI, disableKeyboardPan: State.IsSimulating);
