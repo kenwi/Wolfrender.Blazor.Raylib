@@ -1,4 +1,6 @@
+using System.Numerics;
 using Game.Systems;
+using Game.Utilities;
 
 namespace Game.Editor;
 
@@ -36,6 +38,16 @@ public class EditorState
 
     // Simulation
     public bool IsSimulating;
+
+    // Pathfinding visualizer
+    public enum PathPickMode { None, Start, End }
+    public PathPickMode PathPickingMode;
+    public Vector2? PathStart;
+    public Vector2? PathEnd;
+    public List<Vector2>? PathResult;
+
+    /// <summary>When true, the editor draws each live enemy's current A* chase path during simulation.</summary>
+    public bool DrawEnemyPaths;
 
     // Mouse-over-UI flag (set by the active UI layer each frame)
     public bool IsMouseOverUI;
@@ -160,6 +172,15 @@ public class EditorState
         NotifyStateChanged();
     }
 
+    /// <summary>
+    /// Door interaction + animation during editor simulation (same as in-game <see cref="DoorSystem.Update"/>).
+    /// </summary>
+    public void UpdateDoorsDuringSimulation(float deltaTime, bool interactPressed)
+    {
+        var input = new InputState { IsInteractPressed = interactPressed };
+        DoorSystem.Update(deltaTime, input, Player.Position, EnemySystem.Enemies);
+    }
+
     public void ClearLevel()
     {
         int tileCount = MapData.Width * MapData.Height;
@@ -215,6 +236,73 @@ public class EditorState
                 break;
             }
         }
+    }
+
+    // ─── Pathfinding visualizer ──────────────────────────────────────────────────
+
+    public void StartPickingPathStart()
+    {
+        PathPickingMode = PathPickMode.Start;
+        NotifyStateChanged();
+    }
+
+    public void StartPickingPathEnd()
+    {
+        PathPickingMode = PathPickMode.End;
+        NotifyStateChanged();
+    }
+
+    public void CancelPathPicking()
+    {
+        if (PathPickingMode == PathPickMode.None) return;
+        PathPickingMode = PathPickMode.None;
+        NotifyStateChanged();
+    }
+
+    /// <summary>
+    /// Set whichever endpoint is being picked, then recompute the path. Out-of-bounds clicks are ignored.
+    /// </summary>
+    public void SetPathPickPoint(int tileX, int tileY)
+    {
+        if (tileX < 0 || tileX >= MapData.Width || tileY < 0 || tileY >= MapData.Height) return;
+
+        var point = new Vector2(tileX, tileY);
+        switch (PathPickingMode)
+        {
+            case PathPickMode.Start: PathStart = point; break;
+            case PathPickMode.End: PathEnd = point; break;
+            default: return;
+        }
+
+        PathPickingMode = PathPickMode.None;
+        RecomputePath();
+        NotifyStateChanged();
+    }
+
+    public void ClearPath()
+    {
+        PathStart = null;
+        PathEnd = null;
+        PathResult = null;
+        PathPickingMode = PathPickMode.None;
+        NotifyStateChanged();
+    }
+
+    /// <summary>
+    /// Recompute <see cref="PathResult"/> from the current start/end using the same A*
+    /// the EnemySystem uses (so the visualizer shows exactly what the AI sees).
+    /// </summary>
+    public void RecomputePath()
+    {
+        PathResult = null;
+        if (!PathStart.HasValue || !PathEnd.HasValue) return;
+
+        var startTile = PathStart.Value;
+        var endTile = PathEnd.Value;
+        var (sx, sy, sw, sh) = Pathfinding.ComputeSliceBounds(
+            startTile, endTile, MapData.Width, MapData.Height);
+        PathResult = Pathfinding.FindPath(
+            MapData, DoorSystem.Doors, sx, sy, sw, sh, startTile, endTile);
     }
 
     public void SwapLayers(int from, int to)

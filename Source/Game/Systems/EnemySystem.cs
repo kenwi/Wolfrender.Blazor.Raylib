@@ -32,6 +32,9 @@ public class EnemySystem
     private const float SearchSweepHalfAngle = 0.65f;
     private const float SearchSweepHoldSeconds = 0.85f;
 
+    /// <summary>How long a fully-blocked slide must persist before the AI picks a different target.</summary>
+    private const float StuckRecoverSeconds = 0.5f;
+
     public List<Enemy> Enemies => _enemies;
 
     public EnemySystem(
@@ -154,8 +157,16 @@ public class EnemySystem
                 break;
 
             case EnemyState.COLLIDING:
+                enemy.StuckTimer += deltaTime;
+                if (enemy.StuckTimer >= StuckRecoverSeconds)
+                {
+                    enemy.StuckTimer = 0f;
+                    TryRecoverFromStuck(enemy);
+                }
                 if (enemy.LastSeenPlayerPosition.HasValue)
                     FollowChasePath(enemy, deltaTime);
+                else if (enemy.IsPatrolReturnPath)
+                    FollowPatrolReturnPath(enemy, deltaTime);
                 else if (enemy.HasPatrolPath)
                     UpdatePatrol(enemy, deltaTime);
                 break;
@@ -192,6 +203,7 @@ public class EnemySystem
     {
         if (enemy.CanSeePlayer && _player.IsAlive)
         {
+            enemy.IsPatrolReturnPath = false;
             enemy.TransitionTo(EnemyState.NOTICING);
             return;
         }
@@ -199,6 +211,12 @@ public class EnemySystem
         if (enemy.LastSeenPlayerPosition.HasValue)
         {
             FollowChasePath(enemy, deltaTime);
+            return;
+        }
+
+        if (enemy.IsPatrolReturnPath)
+        {
+            FollowPatrolReturnPath(enemy, deltaTime);
             return;
         }
 
@@ -294,9 +312,10 @@ public class EnemySystem
         }
 
         enemy.ResetShootingState();
+        enemy.IsPatrolReturnPath = false;
 
         if (_mapData != null)
-            ComputeChasePath(enemy, enemy.LastSeenPlayerPosition.Value);
+            ComputePathToTarget(enemy, enemy.LastSeenPlayerPosition.Value, ignoreDoors: false);
 
         if (IsNearLastSeenPosition(enemy))
             BeginSearchAtLastKnown(enemy);
@@ -309,7 +328,12 @@ public class EnemySystem
         if (enemy.LastSeenPlayerPosition.HasValue)
         {
             var lastSeen = enemy.LastSeenPlayerPosition.Value;
-            enemy.Position = new Vector3(lastSeen.X, enemy.Position.Y, lastSeen.Z);
+            var snapPos = new Vector3(lastSeen.X, enemy.Position.Y, lastSeen.Z);
+            // Only snap if the destination is collision-free for the enemy. The player
+            // has a smaller radius (0.8) than the enemy (1.0), so the exact last-seen
+            // position can be valid for the player but force the enemy into a wall.
+            if (!_collisionSystem.CheckCollisionAtPosition(snapPos, EnemyCollisionRadius))
+                enemy.Position = snapPos;
         }
 
         enemy.ChasePath.Clear();
@@ -324,9 +348,65 @@ public class EnemySystem
         enemy.LastSeenPlayerPosition = null;
         enemy.ChasePath.Clear();
         enemy.ChasePathIndex = 0;
+        enemy.IsPatrolReturnPath = false;
         enemy.SearchSweepStep = 0;
         enemy.ResetShootingState();
+
+        if (enemy.HasPatrolPath && _mapData != null)
+        {
+            AlignPatrolWaypointToNearest(enemy);
+            Vector3 patrolTarget = GetPatrolWaypointWorld(enemy);
+
+            if (!IsNearWorldPosition(enemy.Position, patrolTarget))
+                ComputePathToTarget(enemy, patrolTarget, ignoreDoors: true);
+
+            enemy.IsPatrolReturnPath = enemy.ChasePath.Count > 0;
+        }
+
         enemy.TransitionTo(enemy.HasPatrolPath ? EnemyState.WALKING : EnemyState.IDLE);
+    }
+
+    private static void AlignPatrolWaypointToNearest(Enemy enemy)
+    {
+        if (!enemy.HasPatrolPath) return;
+
+        int totalStops = enemy.PatrolPath.Count + 1;
+        int bestIndex = 0;
+        float bestDistSq = float.MaxValue;
+
+        for (int i = 0; i < totalStops; i++)
+        {
+            Vector3 waypoint = GetPatrolWaypointWorld(enemy, i);
+            float dx = waypoint.X - enemy.Position.X;
+            float dz = waypoint.Z - enemy.Position.Z;
+            float distSq = dx * dx + dz * dz;
+            if (distSq < bestDistSq)
+            {
+                bestDistSq = distSq;
+                bestIndex = i;
+            }
+        }
+
+        enemy.CurrentWaypointIndex = bestIndex;
+    }
+
+    private static Vector3 GetPatrolWaypointWorld(Enemy enemy, int index)
+    {
+        int totalStops = enemy.PatrolPath.Count + 1;
+        int idx = index % totalStops;
+        return idx < enemy.PatrolPath.Count
+            ? enemy.PatrolPath[idx]
+            : enemy.PatrolOrigin;
+    }
+
+    private Vector3 GetPatrolWaypointWorld(Enemy enemy) =>
+        GetPatrolWaypointWorld(enemy, enemy.CurrentWaypointIndex);
+
+    private static bool IsNearWorldPosition(Vector3 position, Vector3 target)
+    {
+        float dx = position.X - target.X;
+        float dz = position.Z - target.Z;
+        return MathF.Sqrt(dx * dx + dz * dz) <= ArrivalThreshold;
     }
 
     private bool IsNearLastSeenPosition(Enemy enemy)
@@ -378,7 +458,7 @@ public class EnemySystem
     /// <summary>
     /// Compute an A* path from the enemy's current position to a world-space target.
     /// </summary>
-    private void ComputeChasePath(Enemy enemy, Vector3 targetWorldPos)
+    private void ComputePathToTarget(Enemy enemy, Vector3 targetWorldPos, bool ignoreDoors)
     {
         if (_mapData == null) return;
 
@@ -394,18 +474,23 @@ public class EnemySystem
             enemyTile, targetTile, _mapData.Width, _mapData.Height);
 
         var tilePath = Pathfinding.FindPath(
-            _mapData, _doorSystem.Doors, sx, sy, sw, sh, enemyTile, targetTile);
+            _mapData, _doorSystem.Doors, sx, sy, sw, sh, enemyTile, targetTile, ignoreDoors);
+
+        enemy.ChasePath.Clear();
+        enemy.ChasePathIndex = 0;
 
         if (tilePath != null && tilePath.Count > 1)
         {
-            // Convert tile path to world-space waypoints centered on each tile (skip the first point - that's where we are)
+            // Convert tile path to world-space waypoints (skip the first point — that's where we are)
             enemy.ChasePath = tilePath.Skip(1).Select(t => new Vector3(
                 t.X * quadSize,
                 enemy.Position.Y,
                 t.Y * quadSize)).ToList();
-            enemy.ChasePathIndex = 0;
         }
     }
+
+    private void ComputeChasePath(Enemy enemy, Vector3 targetWorldPos) =>
+        ComputePathToTarget(enemy, targetWorldPos, ignoreDoors: false);
 
     /// <summary>
     /// Walk along the chase path using MoveToward.
@@ -421,20 +506,20 @@ public class EnemySystem
                 return;
             }
 
-            if (enemy.LastSeenPlayerPosition.HasValue)
+            // No (or exhausted) chase path but we're still not at the last-seen tile.
+            // Re-run A* to that tile instead of straight-lining through walls.
+            if (enemy.LastSeenPlayerPosition.HasValue && _mapData != null)
+                ComputeChasePath(enemy, enemy.LastSeenPlayerPosition.Value);
+
+            // If A* couldn't produce a usable path (target blocked, unreachable, etc.),
+            // give up the chase and search from here.
+            if (enemy.ChasePath.Count == 0 || enemy.ChasePathIndex >= enemy.ChasePath.Count)
             {
-                Vector3 lastSeen = enemy.LastSeenPlayerPosition.Value;
-                Vector3 toLastSeen = lastSeen - enemy.Position;
-                float distToLastSeen = MathF.Sqrt(toLastSeen.X * toLastSeen.X + toLastSeen.Z * toLastSeen.Z);
-                if (distToLastSeen > ArrivalThreshold)
-                {
-                    MoveToward(enemy, toLastSeen, distToLastSeen, deltaTime);
-                    return;
-                }
+                BeginSearchAtLastKnown(enemy);
+                return;
             }
 
-            BeginSearchAtLastKnown(enemy);
-            return;
+            // Otherwise fall through and follow the freshly-computed path this frame.
         }
 
         Vector3 target = enemy.ChasePath[enemy.ChasePathIndex];
@@ -452,6 +537,50 @@ public class EnemySystem
 
             if (enemy.ChasePathIndex >= enemy.ChasePath.Count && IsNearLastSeenPosition(enemy))
                 BeginSearchAtLastKnown(enemy);
+        }
+    }
+
+    /// <summary>
+    /// Follow the A* route back to the nearest patrol waypoint after search/chase ends.
+    /// </summary>
+    private void FollowPatrolReturnPath(Enemy enemy, float deltaTime)
+    {
+        if (enemy.ChasePath.Count == 0 || enemy.ChasePathIndex >= enemy.ChasePath.Count)
+        {
+            Vector3 patrolTarget = GetPatrolWaypointWorld(enemy);
+
+            if (!IsNearWorldPosition(enemy.Position, patrolTarget) && _mapData != null)
+                ComputePathToTarget(enemy, patrolTarget, ignoreDoors: true);
+
+            if (enemy.ChasePath.Count == 0 || enemy.ChasePathIndex >= enemy.ChasePath.Count)
+            {
+                enemy.IsPatrolReturnPath = false;
+                enemy.ChasePath.Clear();
+                enemy.ChasePathIndex = 0;
+                UpdatePatrol(enemy, deltaTime);
+                return;
+            }
+        }
+
+        Vector3 target = enemy.ChasePath[enemy.ChasePathIndex];
+        Vector3 toTarget = target - enemy.Position;
+        float distXZ = MathF.Sqrt(toTarget.X * toTarget.X + toTarget.Z * toTarget.Z);
+
+        if (distXZ > ArrivalThreshold)
+        {
+            MoveToward(enemy, toTarget, distXZ, deltaTime);
+        }
+        else
+        {
+            enemy.Position = new Vector3(target.X, enemy.Position.Y, target.Z);
+            enemy.ChasePathIndex++;
+
+            if (enemy.ChasePathIndex >= enemy.ChasePath.Count)
+            {
+                enemy.IsPatrolReturnPath = false;
+                enemy.ChasePath.Clear();
+                enemy.ChasePathIndex = 0;
+            }
         }
     }
 
@@ -508,18 +637,53 @@ public class EnemySystem
     {
         Vector3 direction = new Vector3(toTarget.X / distXZ, 0, toTarget.Z / distXZ);
         float step = MathF.Min(enemy.MoveSpeed * deltaTime, distXZ);
-        Vector3 nextPosition = enemy.Position + direction * step;
+        Vector3 from = enemy.Position;
+        Vector3 desired = from + direction * step;
 
-        if (_collisionSystem.CheckCollisionAtPosition(nextPosition, EnemyCollisionRadius))
+        // Always face the intent direction so a sliding/blocked enemy keeps looking where it wants to go.
+        enemy.Rotation = MathF.Atan2(direction.X, -direction.Z) - MathF.PI / 2f;
+
+        // Open any closed door directly between us and the desired position so the slide
+        // doesn't simply route around it without ever opening it.
+        if (_doorSystem.IsDoorBlocking(desired, EnemyCollisionRadius))
+            TryOpenBlockingDoor(desired);
+
+        Vector3 resolved = _collisionSystem.ResolveMovement(from, desired, EnemyCollisionRadius);
+
+        if ((resolved - from).LengthSquared() < 0.0001f)
         {
             enemy.EnemyState = EnemyState.COLLIDING;
-            TryOpenBlockingDoor(nextPosition);
+            return;
         }
-        else
+
+        enemy.Position = resolved;
+        enemy.StuckTimer = 0f;
+        enemy.EnemyState = EnemyState.WALKING;
+    }
+
+    /// <summary>
+    /// Break a stuck-on-wall deadlock by giving the AI a fresh target so the slide
+    /// direction changes. For chase: re-run A* from the current position. For patrol:
+    /// advance to the next waypoint (the current one may be unreachable in a straight line).
+    /// </summary>
+    private void TryRecoverFromStuck(Enemy enemy)
+    {
+        if (enemy.LastSeenPlayerPosition.HasValue && _mapData != null)
         {
-            enemy.Position = nextPosition;
-            enemy.Rotation = MathF.Atan2(direction.X, -direction.Z) - MathF.PI / 2f;
-            enemy.EnemyState = EnemyState.WALKING;
+            ComputeChasePath(enemy, enemy.LastSeenPlayerPosition.Value);
+            return;
+        }
+
+        if (enemy.IsPatrolReturnPath && _mapData != null)
+        {
+            ComputePathToTarget(enemy, GetPatrolWaypointWorld(enemy), ignoreDoors: true);
+            return;
+        }
+
+        if (enemy.HasPatrolPath)
+        {
+            int totalStops = enemy.PatrolPath.Count + 1;
+            enemy.CurrentWaypointIndex = (enemy.CurrentWaypointIndex + 1) % totalStops;
         }
     }
 
@@ -638,7 +802,13 @@ public class EnemySystem
             else if (couldSeeBefore && enemy.LastSeenPlayerPosition.HasValue)
             {
                 // Pre-compute chase path when LOS breaks (behavior uses it on next tick).
-                if (enemy.EnemyState is EnemyState.ATTACKING or EnemyState.NOTICING or EnemyState.WALKING or EnemyState.SEARCHING)
+                // Include COLLIDING so an enemy that was wedged against a wall when the
+                // player slipped out of sight still gets a fresh path.
+                if (enemy.EnemyState is EnemyState.ATTACKING
+                    or EnemyState.NOTICING
+                    or EnemyState.WALKING
+                    or EnemyState.SEARCHING
+                    or EnemyState.COLLIDING)
                     ComputeChasePath(enemy, enemy.LastSeenPlayerPosition.Value);
             }
         }

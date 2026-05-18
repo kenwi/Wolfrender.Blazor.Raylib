@@ -367,6 +367,98 @@ public class EditorMapRenderer
     }
 
     /// <summary>
+    /// Draw each live enemy's current A* chase path (orange polyline from the enemy's
+    /// position through its remaining waypoints). Used by the Pathfinding Visualizer's
+    /// "Draw paths for enemies" toggle while simulating.
+    /// </summary>
+    public void DrawEnemyChasePaths(EnemySystem enemySystem, EditorCamera camera)
+    {
+        float tileSize = camera.TileSize;
+        float quadSize = Utilities.LevelData.QuadSize;
+        var pathColor = new Color(255, 140, 0, 220);
+        var fallbackColor = new Color(255, 80, 0, 150);
+
+        foreach (var enemy in enemySystem.Enemies)
+        {
+            float prevX = (enemy.Position.X / quadSize + 0.5f) * tileSize + camera.Offset.X;
+            float prevY = (enemy.Position.Z / quadSize + 0.5f) * tileSize + camera.Offset.Y;
+
+            bool hasChasePath =
+                enemy.ChasePath.Count > 0 && enemy.ChasePathIndex < enemy.ChasePath.Count;
+
+            if (hasChasePath)
+            {
+                for (int i = enemy.ChasePathIndex; i < enemy.ChasePath.Count; i++)
+                {
+                    var wp = enemy.ChasePath[i];
+                    float wpX = (wp.X / quadSize + 0.5f) * tileSize + camera.Offset.X;
+                    float wpY = (wp.Z / quadSize + 0.5f) * tileSize + camera.Offset.Y;
+                    DrawLineEx(new Vector2(prevX, prevY), new Vector2(wpX, wpY), 2.5f, pathColor);
+                    DrawCircle((int)wpX, (int)wpY, tileSize * 0.1f, pathColor);
+                    prevX = wpX;
+                    prevY = wpY;
+                }
+            }
+            else if (enemy.LastSeenPlayerPosition.HasValue)
+            {
+                // No (or exhausted) A* path but the enemy is still steering toward the
+                // player's last known position — draw a thin fallback line so this case
+                // is visible in the debug overlay.
+                var ls = enemy.LastSeenPlayerPosition.Value;
+                float lx = (ls.X / quadSize + 0.5f) * tileSize + camera.Offset.X;
+                float ly = (ls.Z / quadSize + 0.5f) * tileSize + camera.Offset.Y;
+                DrawLineEx(new Vector2(prevX, prevY), new Vector2(lx, ly), 1.5f, fallbackColor);
+                DrawCircleLines((int)lx, (int)ly, tileSize * 0.18f, fallbackColor);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Draw the pathfinding visualizer overlay: start/end tile highlights and the
+    /// computed A* path as a polyline through tile centers.
+    /// </summary>
+    public void DrawPathPreview(
+        Vector2? start, Vector2? end, List<Vector2>? path, EditorCamera camera)
+    {
+        float tileSize = camera.TileSize;
+
+        if (start.HasValue)
+            FillTile(start.Value, tileSize, camera.Offset,
+                fill: new Color(60, 220, 60, 110), border: Color.Green);
+
+        if (end.HasValue)
+            FillTile(end.Value, tileSize, camera.Offset,
+                fill: new Color(220, 60, 60, 110), border: Color.Red);
+
+        if (path == null || path.Count < 2) return;
+
+        var pathColor = new Color(0, 200, 255, 230);
+        for (int i = 0; i < path.Count - 1; i++)
+        {
+            var a = TileCenter(path[i], tileSize, camera.Offset);
+            var b = TileCenter(path[i + 1], tileSize, camera.Offset);
+            DrawLineEx(a, b, 3f, pathColor);
+        }
+
+        foreach (var p in path)
+        {
+            var c = TileCenter(p, tileSize, camera.Offset);
+            DrawCircle((int)c.X, (int)c.Y, tileSize * 0.1f, pathColor);
+        }
+    }
+
+    private static void FillTile(Vector2 tile, float tileSize, Vector2 offset, Color fill, Color border)
+    {
+        float x = tile.X * tileSize + offset.X;
+        float y = tile.Y * tileSize + offset.Y;
+        DrawRectangle((int)x, (int)y, (int)tileSize, (int)tileSize, fill);
+        DrawRectangleLinesEx(new Rectangle(x, y, tileSize, tileSize), 2f, border);
+    }
+
+    private static Vector2 TileCenter(Vector2 tile, float tileSize, Vector2 offset) =>
+        new((tile.X + 0.5f) * tileSize + offset.X, (tile.Y + 0.5f) * tileSize + offset.Y);
+
+    /// <summary>
     /// Draw a yellow highlight rectangle around the hovered tile.
     /// </summary>
     public void DrawTileHighlight(int tileX, int tileY, EditorCamera camera)

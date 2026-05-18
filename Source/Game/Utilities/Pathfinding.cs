@@ -48,12 +48,17 @@ public static class Pathfinding
     /// All coordinates are in absolute tile space.
     /// Returns a list of tile positions forming the path (including start and end), or null if no path exists.
     /// </summary>
+    /// <param name="ignoreDoors">
+    /// When true, closed doors are treated as walkable tiles so A* can plan a full route
+    /// (e.g. returning to patrol). Runtime movement still opens doors via collision.
+    /// </param>
     public static List<Vector2>? FindPath(
         MapData mapData,
         List<Door> doors,
         int sliceX, int sliceY,
         int sliceWidth, int sliceHeight,
-        Vector2 startTile, Vector2 endTile)
+        Vector2 startTile, Vector2 endTile,
+        bool ignoreDoors = false)
     {
         int startX = (int)MathF.Floor(startTile.X);
         int startY = (int)MathF.Floor(startTile.Y);
@@ -67,8 +72,8 @@ public static class Pathfinding
         endY = Math.Clamp(endY, sliceY, sliceY + sliceHeight - 1);
 
         // If start or end is inside a wall, bail out
-        if (IsTileBlocked(mapData, doors, startX, startY) ||
-            IsTileBlocked(mapData, doors, endX, endY))
+        if (IsTileBlocked(mapData, doors, startX, startY, ignoreDoors) ||
+            IsTileBlocked(mapData, doors, endX, endY, ignoreDoors))
             return null;
 
         // Already at the destination
@@ -100,8 +105,19 @@ public static class Pathfinding
             int cx = sliceX + currentIdx % sliceWidth;
             int cy = sliceY + currentIdx / sliceWidth;
 
+            // When the current tile has any wall/door in its 8-neighborhood, suppress diagonal
+            // moves from here. Cardinal-only paths stay on tile-center axes, which keeps the
+            // enemy's collision radius cleanly inside the corridor instead of grazing walls as
+            // it crosses tile boundaries at 45°.
+            bool nearWall = HasBlockedNeighbor(mapData, doors, cx, cy, ignoreDoors);
+
             for (int i = 0; i < Neighbors.Length; i++)
             {
+                bool isDiagonal = Neighbors[i].dx != 0 && Neighbors[i].dy != 0;
+
+                if (nearWall && isDiagonal)
+                    continue;
+
                 int nx = cx + Neighbors[i].dx;
                 int ny = cy + Neighbors[i].dy;
 
@@ -111,14 +127,14 @@ public static class Pathfinding
                     continue;
 
                 // Wall / door check
-                if (IsTileBlocked(mapData, doors, nx, ny))
+                if (IsTileBlocked(mapData, doors, nx, ny, ignoreDoors))
                     continue;
 
                 // Diagonal: prevent corner cutting
-                if (Neighbors[i].dx != 0 && Neighbors[i].dy != 0)
+                if (isDiagonal)
                 {
-                    if (IsTileBlocked(mapData, doors, cx + Neighbors[i].dx, cy) ||
-                        IsTileBlocked(mapData, doors, cx, cy + Neighbors[i].dy))
+                    if (IsTileBlocked(mapData, doors, cx + Neighbors[i].dx, cy, ignoreDoors) ||
+                        IsTileBlocked(mapData, doors, cx, cy + Neighbors[i].dy, ignoreDoors))
                         continue;
                 }
 
@@ -140,12 +156,33 @@ public static class Pathfinding
     }
 
     /// <summary>
-    /// Check if a tile is impassable (wall or closed/closing door).
+    /// True if any of the 8 tiles surrounding (x, y) is impassable. Used to suppress
+    /// diagonal expansion near walls so enemies stay on tile-center axes through corridors.
     /// </summary>
-    private static bool IsTileBlocked(MapData mapData, List<Door> doors, int tileX, int tileY)
+    private static bool HasBlockedNeighbor(MapData mapData, List<Door> doors, int x, int y, bool ignoreDoors)
+    {
+        for (int dy = -1; dy <= 1; dy++)
+        {
+            for (int dx = -1; dx <= 1; dx++)
+            {
+                if (dx == 0 && dy == 0) continue;
+                if (IsTileBlocked(mapData, doors, x + dx, y + dy, ignoreDoors))
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Check if a tile is impassable (wall, or closed door unless <paramref name="ignoreDoors"/>).
+    /// </summary>
+    private static bool IsTileBlocked(MapData mapData, List<Door> doors, int tileX, int tileY, bool ignoreDoors)
     {
         if (mapData.GetTile(mapData.Walls, tileX, tileY) > 0)
             return true;
+
+        if (ignoreDoors)
+            return false;
 
         foreach (var door in doors)
         {

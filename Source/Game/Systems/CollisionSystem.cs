@@ -78,46 +78,35 @@ public class CollisionSystem
         return false;
     }
 
+    /// <summary>
+    /// Move from <paramref name="from"/> toward <paramref name="desired"/> with axis-aligned wall sliding.
+    /// Returns the resolved position: <paramref name="desired"/> if clear, an X- or Z-only slide if one axis is clear,
+    /// or <paramref name="from"/> when both slides are blocked.
+    /// </summary>
+    public Vector3 ResolveMovement(Vector3 from, Vector3 desired, float radius)
+    {
+        if (!CheckCollisionAtPosition(desired, radius))
+            return desired;
+
+        Vector3 slideX = new Vector3(desired.X, from.Y, from.Z);
+        if (!CheckCollisionAtPosition(slideX, radius))
+            return slideX;
+
+        Vector3 slideZ = new Vector3(from.X, from.Y, desired.Z);
+        if (!CheckCollisionAtPosition(slideZ, radius))
+            return slideZ;
+
+        return from;
+    }
+
     public void Update(Player player, float deltaTime)
     {
         if (player.Velocity.Length() <= 0)
             return;
-            
+
         // MovementSystem has already set player.Position to the desired position
         // (player.Position = oldPosition + player.Velocity * deltaTime)
-        var desiredPosition = player.Position;
-        var oldPosition = player.OldPosition;
-
-        // Check if desired position collides using the collision radius
-        if (!CheckCollisionAtPosition(desiredPosition, player.CollisionRadius))
-        {
-            // No collision, safe to move to desired position
-            // Position is already set by MovementSystem, so we're done
-            return;
-        }
-
-
-        // Collision detected - try sliding
-        // First, try sliding on X axis only (keep Z from old position)
-        Vector3 slideXPosition = new Vector3(desiredPosition.X, oldPosition.Y, oldPosition.Z);
-        if (!CheckCollisionAtPosition(slideXPosition, player.CollisionRadius))
-        {
-            // X-axis slide works
-            player.Position = slideXPosition;
-            return;
-        }
-
-        // Try sliding on Z axis only (keep X from old position)
-        Vector3 slideZPosition = new Vector3(oldPosition.X, oldPosition.Y, desiredPosition.Z);
-        if (!CheckCollisionAtPosition(slideZPosition, player.CollisionRadius))
-        {
-            // Z-axis slide works
-            player.Position = slideZPosition;
-            return;
-        }
-
-        // Both slides failed - stay at old position (completely blocked)
-        player.Position = oldPosition;
+        player.Position = ResolveMovement(player.OldPosition, player.Position, player.CollisionRadius);
     }
 }
 
