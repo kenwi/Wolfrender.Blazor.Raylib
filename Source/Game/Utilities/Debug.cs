@@ -255,7 +255,7 @@ public static class Debug
                                 EnemyState.IDLE => new System.Numerics.Vector4(0.5f, 0.5f, 0.5f, 1), // Gray
                                 EnemyState.WALKING => new System.Numerics.Vector4(0.3f, 1, 0.3f, 1), // Green
                                 EnemyState.NOTICING => new System.Numerics.Vector4(1, 1, 0.3f, 1), // Yellow
-                                EnemyState.FLEEING => new System.Numerics.Vector4(0.3f, 0.3f, 1, 1), // Blue
+                                EnemyState.SEARCHING => new System.Numerics.Vector4(0.3f, 0.3f, 1, 1), // Blue
                                 EnemyState.ATTACKING => new System.Numerics.Vector4(1, 0.3f, 0.3f, 1), // Red
                                 EnemyState.HIT => new System.Numerics.Vector4(1, 0.55f, 0.15f, 1), // Orange
                                 EnemyState.DYING => new System.Numerics.Vector4(0.7f, 0.3f, 0.7f, 1), // Purple
