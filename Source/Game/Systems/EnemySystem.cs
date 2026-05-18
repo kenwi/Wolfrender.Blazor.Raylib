@@ -11,6 +11,7 @@ public class EnemySystem
     private readonly InputSystem _inputSystem;
     private readonly CollisionSystem _collisionSystem;
     private readonly DoorSystem _doorSystem;
+    private readonly ICombatFeedback _combatFeedback;
     private readonly Random _rng = new();
     private MapData _mapData = null!;
 
@@ -31,12 +32,18 @@ public class EnemySystem
 
     public List<Enemy> Enemies => _enemies;
 
-    public EnemySystem(Player player, InputSystem inputSystem, CollisionSystem collisionSystem, DoorSystem doorSystem)
+    public EnemySystem(
+        Player player,
+        InputSystem inputSystem,
+        CollisionSystem collisionSystem,
+        DoorSystem doorSystem,
+        ICombatFeedback combatFeedback)
     {
         _inputSystem = inputSystem;
         _player = player;
         _collisionSystem = collisionSystem;
         _doorSystem = doorSystem;
+        _combatFeedback = combatFeedback;
         _enemies = new List<Enemy>();
     }
 
@@ -225,7 +232,10 @@ public class EnemySystem
                 float targetAngle = MathF.Atan2(toPlayer.X, -toPlayer.Z) - MathF.PI / 2f;
                 float aimDiff = MathF.Abs(NormalizeAngle(targetAngle - enemy.Rotation));
                 if (aimDiff <= EnemyFireAimTolerance)
+                {
+                    _combatFeedback.OnEnemyFired();
                     TryEnemyHitPlayer(enemy);
+                }
             }
 
             enemy.WasShooting = enemy.IsShooting;
@@ -263,7 +273,8 @@ public class EnemySystem
         // if (_rng.NextSingle() > 0.72f)
         //     return;
 
-        _player.TakeDamage(EnemyShotDamage);
+        if (_player.TakeDamage(EnemyShotDamage))
+            _combatFeedback.OnPlayerDamaged(EnemyShotDamage);
     }
 
     private void RemoveDeadEnemies()

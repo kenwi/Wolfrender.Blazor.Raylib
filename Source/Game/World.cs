@@ -26,6 +26,8 @@ public class World : IScene
 
     private readonly Player _player;
     private readonly SoundSystem _soundSystem;
+    private readonly EffectSystem _effectSystem;
+    private readonly CombatFeedback _combatFeedback;
     private readonly MapData _mapData;
     private readonly LevelData _level;
     private readonly List<Texture2D> _textures;
@@ -44,9 +46,6 @@ public class World : IScene
     private  RenderTexture2D _sceneRenderTexture;
     private InputState _inputState = new();
     private readonly EnemySystem _enemySystem;
-    /// <summary>Seconds remaining to draw the reticle in red after a shot (muzzle-style pulse).</summary>
-    private float _reticleFireFlashRemaining;
-    private const float ReticleFireFlashDuration = 0.09f;
 
     public Player Player => _player;
     public EnemySystem EnemySystem => _enemySystem;
@@ -64,6 +63,8 @@ public class World : IScene
         ResetPlayerToInitialSpawn();
 
         _soundSystem = new SoundSystem(Utilities.Res.Path("resources/03.mp3"));
+        _effectSystem = new EffectSystem();
+        _combatFeedback = new CombatFeedback(_soundSystem, _effectSystem);
         _inputSystem = new InputSystem();
         _movementSystem = new MovementSystem();
         _doorSystem = new DoorSystem(mapData.Doors, mapData.Width, _textures);
@@ -72,7 +73,7 @@ public class World : IScene
         _renderSystem = new RenderSystem(_level, _textures);
         _hudSystem = new HudSystem(screenWidth, screenHeight);
         _minimapSystem = new MinimapSystem(_level, _renderSystem);
-        _enemySystem = new EnemySystem(_player, _inputSystem, _collisionSystem, _doorSystem);
+        _enemySystem = new EnemySystem(_player, _inputSystem, _collisionSystem, _doorSystem, _combatFeedback);
         _animationSystem = new AnimationSystem(_textures[7], _player, _enemySystem);
         _consoleOverlay = new ConsoleOverlay();
         _runtimeConsole = WorldConsoleBindings.CreateConsole(this, _player, _enemySystem, _consoleOverlay);
@@ -135,7 +136,7 @@ public class World : IScene
             ResetPlayerToInitialSpawn();
             _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
             _enemySystem.Rebuild(_mapData.Enemies, _mapData);
-            _reticleFireFlashRemaining = 0f;
+            _effectSystem.Clear();
             return ConsoleCommandResult.Ok($"Restarted from '{LevelJsonResourcePath}'.");
         }
         catch (Exception ex)
@@ -233,7 +234,7 @@ public class World : IScene
         
         if (_inputState.IsGamePaused)
         {
-            _reticleFireFlashRemaining = MathF.Max(0f, _reticleFireFlashRemaining - deltaTime);
+            _effectSystem.Update(deltaTime);
             _player.WeaponCooldownRemaining = MathF.Max(0f, _player.WeaponCooldownRemaining - deltaTime);
 
             if (_player.IsAlive)
@@ -282,7 +283,7 @@ public class World : IScene
         }
 
         _player.WeaponCooldownRemaining = _player.PistolCooldownSeconds;
-        _reticleFireFlashRemaining = ReticleFireFlashDuration;
+        _effectSystem.TriggerReticleFireFlash();
     }
 
     public void Render()
@@ -345,6 +346,8 @@ public class World : IScene
         var healthLabel = $"HEALTH: {(int)_player.Health} / {(int)_player.MaxHealth}";
         DrawText(healthLabel, 10, 40, 20, _player.IsAlive ? Color.RayWhite : Color.Red);
 
+        _effectSystem.RenderScreenOverlay(GetScreenWidth(), GetScreenHeight());
+
         if (!_consoleOverlay.IsOpen && !_inputState.IsMouseFree && _player.IsAlive)
             DrawReticle();
         
@@ -373,9 +376,7 @@ public class World : IScene
         const float gap = 5f;
         const float thick = 2f;
         var outline = new Color(0, 0, 0, 220);
-        var fill = _reticleFireFlashRemaining > 0f
-            ? new Color(255, 55, 55, 255)
-            : new Color(235, 235, 210, 255);
+        var fill = _effectSystem.GetReticleColor();
 
         void Stroke(float x1, float y1, float x2, float y2)
         {
