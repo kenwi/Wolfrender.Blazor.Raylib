@@ -460,6 +460,9 @@ public class EnemySystem
     /// </summary>
     private void ComputePathToTarget(Enemy enemy, Vector3 targetWorldPos, bool ignoreDoors)
     {
+        // TODO: remove this once we have decided if we should care about doors or not
+        ignoreDoors = true;
+
         if (_mapData == null) return;
 
         float quadSize = LevelData.QuadSize;
