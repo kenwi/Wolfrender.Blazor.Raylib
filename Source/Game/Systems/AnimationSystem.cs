@@ -94,10 +94,9 @@ public class AnimationSystem
                     currentAnimationSpeed = 2f;
                     break;
                 case EnemyState.NOTICING:
+                case EnemyState.SEARCHING:
                     currentColumnPixel = 0 * (spriteSize + padding);
                     currentRowPixel = 6 * (spriteSize + padding);
-                    break;
-                case EnemyState.FLEEING:
                     break;
                 case EnemyState.ATTACKING:
                     if (enemy.AnimationTimer >= 1)

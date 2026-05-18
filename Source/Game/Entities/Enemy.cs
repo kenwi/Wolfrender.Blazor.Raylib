@@ -8,7 +8,8 @@ public enum EnemyState
     IDLE,
     WALKING,
     NOTICING,
-    FLEEING,
+    /// <summary>At last known player position, sweeping left/right before resuming patrol.</summary>
+    SEARCHING,
     ATTACKING,
     /// <summary>Non-lethal hit reaction; shows first death frame then resumes <see cref="Enemy.ResumeStateAfterHit"/>.</summary>
     HIT,
@@ -176,6 +177,12 @@ public class Enemy
 
     /// <summary>Seconds until this enemy may fire another hitscan shot at the player.</summary>
     public float AttackCooldownRemaining { get; set; }
+
+    /// <summary>Facing when <see cref="EnemyState.SEARCHING"/> began (center of the sweep).</summary>
+    public float SearchBaseRotation { get; set; }
+
+    /// <summary>0 = sweep left, 1 = sweep right, 2 = return to center and finish.</summary>
+    public int SearchSweepStep { get; set; }
 }
 
 public class EnemyGuard : Enemy

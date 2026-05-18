@@ -29,6 +29,8 @@ public class EnemySystem
     private const float EnemyFireInterval = 0.85f;
     private const float EnemyFireAimTolerance = 0.42f; // radians (~24°)
     private const float EnemyShotDamage = 9f;
+    private const float SearchSweepHalfAngle = 0.65f;
+    private const float SearchSweepHoldSeconds = 0.85f;
 
     public List<Enemy> Enemies => _enemies;
 
@@ -134,6 +136,10 @@ public class EnemySystem
                 OnAttacking(enemy, deltaTime);
                 break;
 
+            case EnemyState.SEARCHING:
+                OnSearching(enemy, deltaTime);
+                break;
+
             case EnemyState.HIT:
                 if (enemy.StateTimer >= enemy.HitReactionDurationSeconds)
                     enemy.TransitionTo(SanitizeResumeStateAfterHit(enemy));
@@ -148,8 +154,9 @@ public class EnemySystem
                 break;
 
             case EnemyState.COLLIDING:
-                // Colliding is transient - patrol will overwrite it next frame
-                if (enemy.HasPatrolPath)
+                if (enemy.LastSeenPlayerPosition.HasValue)
+                    FollowChasePath(enemy, deltaTime);
+                else if (enemy.HasPatrolPath)
                     UpdatePatrol(enemy, deltaTime);
                 break;
 
@@ -162,7 +169,7 @@ public class EnemySystem
     {
         return enemy.ResumeStateAfterHit switch
         {
-            EnemyState.DYING or EnemyState.CORPSE or EnemyState.HIT => EnemyState.IDLE,
+            EnemyState.DYING or EnemyState.CORPSE or EnemyState.HIT or EnemyState.SEARCHING => EnemyState.IDLE,
             EnemyState.COLLIDING => enemy.HasPatrolPath ? EnemyState.WALKING : EnemyState.IDLE,
             _ => enemy.ResumeStateAfterHit
         };
@@ -205,8 +212,8 @@ public class EnemySystem
 
         if (!enemy.CanSeePlayer)
         {
-            // Lost sight - return to normal behavior
-            enemy.TransitionTo(enemy.HasPatrolPath ? EnemyState.WALKING : EnemyState.IDLE);
+            enemy.LastSeenPlayerPosition ??= _player.Position;
+            TryStartChaseToLastKnown(enemy);
             return;
         }
 
@@ -247,17 +254,90 @@ public class EnemySystem
             enemy.WasShooting = enemy.IsShooting;
         }
         else if (enemy.LastSeenPlayerPosition.HasValue)
-        {
-            // Lost sight - resume movement only as WALKING. ATTACKING stays rooted while LOS is true.
-            if (_mapData != null)
-                ComputeChasePath(enemy, enemy.LastSeenPlayerPosition.Value);
-            enemy.TransitionTo(EnemyState.WALKING);
-        }
+            TryStartChaseToLastKnown(enemy);
         else
+            ReturnToPatrol(enemy);
+    }
+
+    private void OnSearching(Enemy enemy, float deltaTime)
+    {
+        if (enemy.CanSeePlayer && _player.IsAlive)
         {
-            // No last seen position - return to normal behavior
-            enemy.TransitionTo(enemy.HasPatrolPath ? EnemyState.WALKING : EnemyState.IDLE);
+            enemy.TransitionTo(EnemyState.NOTICING);
+            return;
         }
+
+        float targetAngle = enemy.SearchSweepStep switch
+        {
+            0 => enemy.SearchBaseRotation - SearchSweepHalfAngle,
+            1 => enemy.SearchBaseRotation + SearchSweepHalfAngle,
+            _ => enemy.SearchBaseRotation
+        };
+
+        RotateTowardAngle(enemy, targetAngle, deltaTime);
+
+        if (enemy.StateTimer < SearchSweepHoldSeconds)
+            return;
+
+        enemy.SearchSweepStep++;
+        enemy.StateTimer = 0f;
+        if (enemy.SearchSweepStep > 2)
+            ReturnToPatrol(enemy);
+    }
+
+    private void TryStartChaseToLastKnown(Enemy enemy)
+    {
+        if (!enemy.LastSeenPlayerPosition.HasValue)
+        {
+            ReturnToPatrol(enemy);
+            return;
+        }
+
+        enemy.ResetShootingState();
+
+        if (_mapData != null)
+            ComputeChasePath(enemy, enemy.LastSeenPlayerPosition.Value);
+
+        if (IsNearLastSeenPosition(enemy))
+            BeginSearchAtLastKnown(enemy);
+        else
+            enemy.TransitionTo(EnemyState.WALKING);
+    }
+
+    private void BeginSearchAtLastKnown(Enemy enemy)
+    {
+        if (enemy.LastSeenPlayerPosition.HasValue)
+        {
+            var lastSeen = enemy.LastSeenPlayerPosition.Value;
+            enemy.Position = new Vector3(lastSeen.X, enemy.Position.Y, lastSeen.Z);
+        }
+
+        enemy.ChasePath.Clear();
+        enemy.ChasePathIndex = 0;
+        enemy.SearchBaseRotation = enemy.Rotation;
+        enemy.SearchSweepStep = 0;
+        enemy.TransitionTo(EnemyState.SEARCHING);
+    }
+
+    private void ReturnToPatrol(Enemy enemy)
+    {
+        enemy.LastSeenPlayerPosition = null;
+        enemy.ChasePath.Clear();
+        enemy.ChasePathIndex = 0;
+        enemy.SearchSweepStep = 0;
+        enemy.ResetShootingState();
+        enemy.TransitionTo(enemy.HasPatrolPath ? EnemyState.WALKING : EnemyState.IDLE);
+    }
+
+    private bool IsNearLastSeenPosition(Enemy enemy)
+    {
+        if (!enemy.LastSeenPlayerPosition.HasValue)
+            return false;
+
+        var lastSeen = enemy.LastSeenPlayerPosition.Value;
+        float dx = enemy.Position.X - lastSeen.X;
+        float dz = enemy.Position.Z - lastSeen.Z;
+        return MathF.Sqrt(dx * dx + dz * dz) <= ArrivalThreshold;
     }
 
     private void TryEnemyHitPlayer(Enemy enemy)
@@ -335,11 +415,25 @@ public class EnemySystem
     {
         if (enemy.ChasePath.Count == 0 || enemy.ChasePathIndex >= enemy.ChasePath.Count)
         {
-            // Arrived at last seen position - clear chase state and go back to patrolling/idle
-            enemy.LastSeenPlayerPosition = null;
-            enemy.ChasePath.Clear();
-            enemy.ChasePathIndex = 0;
-            enemy.TransitionTo(enemy.HasPatrolPath ? EnemyState.WALKING : EnemyState.IDLE);
+            if (IsNearLastSeenPosition(enemy))
+            {
+                BeginSearchAtLastKnown(enemy);
+                return;
+            }
+
+            if (enemy.LastSeenPlayerPosition.HasValue)
+            {
+                Vector3 lastSeen = enemy.LastSeenPlayerPosition.Value;
+                Vector3 toLastSeen = lastSeen - enemy.Position;
+                float distToLastSeen = MathF.Sqrt(toLastSeen.X * toLastSeen.X + toLastSeen.Z * toLastSeen.Z);
+                if (distToLastSeen > ArrivalThreshold)
+                {
+                    MoveToward(enemy, toLastSeen, distToLastSeen, deltaTime);
+                    return;
+                }
+            }
+
+            BeginSearchAtLastKnown(enemy);
             return;
         }
 
@@ -353,9 +447,11 @@ public class EnemySystem
         }
         else
         {
-            // Snap and advance to next waypoint
             enemy.Position = new Vector3(target.X, enemy.Position.Y, target.Z);
             enemy.ChasePathIndex++;
+
+            if (enemy.ChasePathIndex >= enemy.ChasePath.Count && IsNearLastSeenPosition(enemy))
+                BeginSearchAtLastKnown(enemy);
         }
     }
 
@@ -366,7 +462,11 @@ public class EnemySystem
     {
         Vector3 toPlayer = _player.Position - enemy.Position;
         float targetAngle = MathF.Atan2(toPlayer.X, -toPlayer.Z) - MathF.PI / 2f;
+        RotateTowardAngle(enemy, targetAngle, deltaTime);
+    }
 
+    private static void RotateTowardAngle(Enemy enemy, float targetAngle, float deltaTime)
+    {
         float diff = NormalizeAngle(targetAngle - enemy.Rotation);
         float maxStep = TurnSpeed * deltaTime;
 
@@ -535,10 +635,10 @@ public class EnemySystem
                 // Continuously track the player's position while visible
                 enemy.LastSeenPlayerPosition = _player.Position;
             }
-            else if (couldSeeBefore)
+            else if (couldSeeBefore && enemy.LastSeenPlayerPosition.HasValue)
             {
-                // Just lost sight - compute a path to the last known position immediately
-                if (enemy.LastSeenPlayerPosition.HasValue)
+                // Pre-compute chase path when LOS breaks (behavior uses it on next tick).
+                if (enemy.EnemyState is EnemyState.ATTACKING or EnemyState.NOTICING or EnemyState.WALKING or EnemyState.SEARCHING)
                     ComputeChasePath(enemy, enemy.LastSeenPlayerPosition.Value);
             }
         }
