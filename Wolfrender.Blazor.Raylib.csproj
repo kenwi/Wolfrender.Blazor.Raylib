@@ -25,8 +25,15 @@
 
   <ItemGroup>
     <ProjectReference Include="Library\rlImGui-cs\rlImGui\rlImGui.csproj" />
-  </ItemGroup> 
+  </ItemGroup>
 
+  <!-- Repo-root Blazor project must not compile nested Library build outputs (obj/bin). -->
+  <ItemGroup>
+    <Compile Remove="Library/**" />
+    <Content Remove="Library/**" />
+    <EmbeddedResource Remove="Library/**" />
+    <None Remove="Library/**" />
+  </ItemGroup>
 
   <Import Project="Raylib.props" />
 

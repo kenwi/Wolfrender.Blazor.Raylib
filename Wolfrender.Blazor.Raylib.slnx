@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/Library/" />
+  <Folder Name="/Library/rlImGui-cs/">
+    <Project Path="Library/rlImGui-cs/rlImGui/rlImGui.csproj" />
+  </Folder>
+  <Project Path="Wolfrender.Blazor.Raylib.Console.csproj" />
+  <Project Path="Wolfrender.Blazor.Raylib.Console.Editor.csproj" />
+  <Project Path="Wolfrender.Blazor.Raylib.csproj" />
+</Solution>
