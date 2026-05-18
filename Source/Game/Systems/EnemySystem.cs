@@ -205,6 +205,7 @@ public class EnemySystem
 
         if (enemy.StateTimer >= NoticingDuration)
         {
+            enemy.ResetShootingState();
             enemy.TransitionTo(EnemyState.ATTACKING);
             enemy.AttackCooldownRemaining = 0.35f;
         }
@@ -217,21 +218,17 @@ public class EnemySystem
             // While we can see the player, keep updating the last known position
             enemy.LastSeenPlayerPosition = _player.Position;
             RotateTowardPlayer(enemy, deltaTime);
-            
-            enemy.AttackCooldownRemaining -= deltaTime;
-            if (_player.IsAlive && enemy.AttackCooldownRemaining <= 0f)
+
+            if (enemy.IsShooting && !enemy.WasShooting)
             {
                 Vector3 toPlayer = _player.Position - enemy.Position;
                 float targetAngle = MathF.Atan2(toPlayer.X, -toPlayer.Z) - MathF.PI / 2f;
                 float aimDiff = MathF.Abs(NormalizeAngle(targetAngle - enemy.Rotation));
                 if (aimDiff <= EnemyFireAimTolerance)
-                {
                     TryEnemyHitPlayer(enemy);
-                    enemy.AttackCooldownRemaining = EnemyFireInterval;
-                }
-                else
-                    enemy.AttackCooldownRemaining = 0.12f;
             }
+
+            enemy.WasShooting = enemy.IsShooting;
         }
         else if (enemy.LastSeenPlayerPosition.HasValue)
         {
@@ -263,8 +260,8 @@ public class EnemySystem
         if (!LineOfSight.CanSee(_mapData, _doorSystem.Doors, enemyTile, playerTile))
             return;
 
-        if (_rng.NextSingle() > 0.72f)
-            return;
+        // if (_rng.NextSingle() > 0.72f)
+        //     return;
 
         _player.TakeDamage(EnemyShotDamage);
     }

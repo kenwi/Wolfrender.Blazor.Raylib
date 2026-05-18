@@ -35,6 +35,13 @@ public class Enemy
     public float AngleToPlayer  { get; set; }
     public float DistanceFromPlayer { get; set; }
     public EnemyState EnemyState { get; set; }
+    public bool IsShooting { get; set; } = false;
+
+    /// <summary>Attack animation frame column from the previous tick (per-enemy shoot detection).</summary>
+    public int PreviousAttackFrameColumn { get; set; } = -1;
+
+    /// <summary>Whether <see cref="IsShooting"/> was true last tick (per-enemy damage edge detection).</summary>
+    public bool WasShooting { get; set; }
 
     /// <summary>
     /// Time the enemy has spent in the current state (seconds).
@@ -57,8 +64,19 @@ public class Enemy
     public void TransitionTo(EnemyState newState)
     {
         if (EnemyState == newState) return;
+
+        if (EnemyState == EnemyState.ATTACKING && newState != EnemyState.ATTACKING)
+            ResetShootingState();
+
         EnemyState = newState;
         StateTimer = 0f;
+    }
+
+    public void ResetShootingState()
+    {
+        IsShooting = false;
+        WasShooting = false;
+        PreviousAttackFrameColumn = -1;
     }
 
     /// <summary>True while the enemy participates in combat and collision (not during death or corpse).</summary>

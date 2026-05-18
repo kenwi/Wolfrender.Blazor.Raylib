@@ -65,7 +65,15 @@ public class AnimationSystem
                     }
                     currentColumnPixel = (1 + enemy.ShootingAnimationIndex % 2) * (spriteSize + padding);
                     currentRowPixel = 6 * (spriteSize + padding);
-                    currentAnimationSpeed = 1.5f;
+                    currentAnimationSpeed = 0.5f;
+
+                    // Fire frame is column 2 in the attack row; track per-enemy so multiple attackers don't cross-talk.
+                    var currentFrameColumn = 1 + enemy.ShootingAnimationIndex % 2;
+                    if (currentFrameColumn != enemy.PreviousAttackFrameColumn)
+                    {
+                        enemy.IsShooting = currentFrameColumn == 2;
+                        enemy.PreviousAttackFrameColumn = currentFrameColumn;
+                    }
                     break;
                 case EnemyState.HIT:
                     currentColumnPixel = 0 * (spriteSize + padding);
