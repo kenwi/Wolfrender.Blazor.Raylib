@@ -169,7 +169,7 @@ public class EditorMapRenderer
 
     public void RenderEnemyLayer(
         EditorCamera camera, EnemySystem enemySystem, bool isMouseOverUI,
-        bool isSimulating, ref int hoveredEnemyIndex, int selectedEnemyIndex,
+        bool isSimulating, bool drawEnemyLineOfSight, ref int hoveredEnemyIndex, int selectedEnemyIndex,
         bool isEditingPatrolPath, int patrolEditEnemyIndex, List<PatrolWaypoint> patrolPathInProgress)
     {
         float tileSize = camera.TileSize;
@@ -231,14 +231,14 @@ public class EditorMapRenderer
             }
         }
 
-        // When simulating, draw live enemy positions with FOV
+        // When simulating, draw live enemy positions (optional FOV overlay)
         if (isSimulating && enemySystem.Enemies != null)
         {
-            RenderLiveEnemies(enemySystem, camera);
+            RenderLiveEnemies(enemySystem, camera, drawEnemyLineOfSight);
         }
     }
 
-    private void RenderLiveEnemies(EnemySystem enemySystem, EditorCamera camera)
+    private void RenderLiveEnemies(EnemySystem enemySystem, EditorCamera camera, bool drawLineOfSight)
     {
         float tileSize = camera.TileSize;
         float liveRadius = tileSize * 0.3f;
@@ -253,7 +253,7 @@ public class EditorMapRenderer
             float liveCY = (tilePosZ + 0.5f) * tileSize + camera.Offset.Y;
 
             // Draw FOV polygon
-            if (liveEnemy.FovPolygon.Count >= 3)
+            if (drawLineOfSight && liveEnemy.FovPolygon.Count >= 3)
             {
                 var origin = liveEnemy.FovPolygon[0];
                 float originScreenX = origin.X * tileSize + camera.Offset.X;
