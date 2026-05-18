@@ -384,7 +384,7 @@ public static class Debug
     }
 
     /// <summary>
-    /// Shared log content renderer — used by both the in-game debug panel and the editor log window.
+    /// Shared log content renderer - used by both the in-game debug panel and the editor log window.
     /// Must be called inside an active ImGui window.
     /// </summary>
     private static void RenderLogContents()

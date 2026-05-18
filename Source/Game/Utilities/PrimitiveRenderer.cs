@@ -7,7 +7,7 @@ namespace Game.Utilities;
 
 public static class PrimitiveRenderer
 {
-    // Color key for transparency: #980088 (R:152, G:0, B:136) — public for hit-testing vs CPU sprite samples.
+    // Color key for transparency: #980088 (R:152, G:0, B:136) - public for hit-testing vs CPU sprite samples.
     public static readonly Color SpriteTransparencyKey = new Color(152, 0, 136, 255);
     private static Shader? _colorKeyShader;
     private static int _colorKeyShaderLoc;

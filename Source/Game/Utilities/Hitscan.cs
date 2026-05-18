@@ -208,7 +208,7 @@ public static class Hitscan
     }
 
     /// <summary>
-    /// CPU sample of the sprite sheet at the ray hit — matches <see cref="PrimitiveRenderer.DrawSpriteTexture"/> UV layout.
+    /// CPU sample of the sprite sheet at the ray hit - matches <see cref="PrimitiveRenderer.DrawSpriteTexture"/> UV layout.
     /// Returns false when the texel matches <see cref="PrimitiveRenderer.SpriteTransparencyKey"/> (treated as empty / miss).
     /// </summary>
     private static bool IsBillboardHitOnOpaqueSpriteTexel(

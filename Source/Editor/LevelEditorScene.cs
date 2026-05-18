@@ -80,7 +80,7 @@ public class LevelEditorScene : IScene
         bool imGuiWantsKeyboard = ImGui.GetIO().WantCaptureKeyboard;
         _state.IsMouseOverUI = imGuiWantsMouse;
 
-        // Camera input (pan + zoom) — disable WASD panning during simulation (player uses those keys)
+        // Camera input (pan + zoom) - disable WASD panning during simulation (player uses those keys)
         _state.Camera.HandleInput(deltaTime, ctrlHeld, imGuiWantsMouse, imGuiWantsKeyboard, disableKeyboardPan: _state.IsSimulating);
 
         // Patrol path editing mode

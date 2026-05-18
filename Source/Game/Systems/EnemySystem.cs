@@ -141,7 +141,7 @@ public class EnemySystem
                 break;
 
             case EnemyState.COLLIDING:
-                // Colliding is transient — patrol will overwrite it next frame
+                // Colliding is transient - patrol will overwrite it next frame
                 if (enemy.HasPatrolPath)
                     UpdatePatrol(enemy, deltaTime);
                 break;
@@ -198,7 +198,7 @@ public class EnemySystem
 
         if (!enemy.CanSeePlayer)
         {
-            // Lost sight — return to normal behavior
+            // Lost sight - return to normal behavior
             enemy.TransitionTo(enemy.HasPatrolPath ? EnemyState.WALKING : EnemyState.IDLE);
             return;
         }
@@ -217,7 +217,7 @@ public class EnemySystem
             // While we can see the player, keep updating the last known position
             enemy.LastSeenPlayerPosition = _player.Position;
             RotateTowardPlayer(enemy, deltaTime);
-
+            
             enemy.AttackCooldownRemaining -= deltaTime;
             if (_player.IsAlive && enemy.AttackCooldownRemaining <= 0f)
             {
@@ -235,14 +235,14 @@ public class EnemySystem
         }
         else if (enemy.LastSeenPlayerPosition.HasValue)
         {
-            // Lost sight — resume movement only as WALKING. ATTACKING stays rooted while LOS is true.
+            // Lost sight - resume movement only as WALKING. ATTACKING stays rooted while LOS is true.
             if (_mapData != null)
                 ComputeChasePath(enemy, enemy.LastSeenPlayerPosition.Value);
             enemy.TransitionTo(EnemyState.WALKING);
         }
         else
         {
-            // No last seen position — return to normal behavior
+            // No last seen position - return to normal behavior
             enemy.TransitionTo(enemy.HasPatrolPath ? EnemyState.WALKING : EnemyState.IDLE);
         }
     }
@@ -302,7 +302,7 @@ public class EnemySystem
 
         if (tilePath != null && tilePath.Count > 1)
         {
-            // Convert tile path to world-space waypoints centered on each tile (skip the first point — that's where we are)
+            // Convert tile path to world-space waypoints centered on each tile (skip the first point - that's where we are)
             enemy.ChasePath = tilePath.Skip(1).Select(t => new Vector3(
                 t.X * quadSize,
                 enemy.Position.Y,
@@ -319,7 +319,7 @@ public class EnemySystem
     {
         if (enemy.ChasePath.Count == 0 || enemy.ChasePathIndex >= enemy.ChasePath.Count)
         {
-            // Arrived at last seen position — clear chase state and go back to patrolling/idle
+            // Arrived at last seen position - clear chase state and go back to patrolling/idle
             enemy.LastSeenPlayerPosition = null;
             enemy.ChasePath.Clear();
             enemy.ChasePathIndex = 0;
@@ -521,7 +521,7 @@ public class EnemySystem
             }
             else if (couldSeeBefore)
             {
-                // Just lost sight — compute a path to the last known position immediately
+                // Just lost sight - compute a path to the last known position immediately
                 if (enemy.LastSeenPlayerPosition.HasValue)
                     ComputeChasePath(enemy, enemy.LastSeenPlayerPosition.Value);
             }

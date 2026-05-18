@@ -154,7 +154,7 @@ public class World : IScene
 
         // CameraSystem forces camera.Position = player.Position every frame. If we leave
         // camera at a different point (old ctor did), the first frame after the console
-        // closes snaps the view — looks like restart "moved" the player when toggling UI.
+        // closes snaps the view - looks like restart "moved" the player when toggling UI.
         Vector3 heading = LegacyCameraTargetForHeading - LegacyCameraEyeForHeading;
         float lookDistance = heading.Length();
         Vector3 forward = lookDistance > 0.0001f

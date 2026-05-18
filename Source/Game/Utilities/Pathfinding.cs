@@ -160,7 +160,7 @@ public static class Pathfinding
     }
 
     /// <summary>
-    /// Chebyshev distance — admissible heuristic for 8-directional movement.
+    /// Chebyshev distance - admissible heuristic for 8-directional movement.
     /// </summary>
     private static float Heuristic(int ax, int ay, int bx, int by)
     {

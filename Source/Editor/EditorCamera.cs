@@ -61,7 +61,7 @@ public class EditorCamera
             _isDragging = false;
         }
 
-        // Pan with WASD keys (disabled during simulation — keys control the player instead)
+        // Pan with WASD keys (disabled during simulation - keys control the player instead)
         if (!disableKeyboardPan && !isKeyboardCapturedByUI)
         {
             float panSpeed = 500f * deltaTime;
