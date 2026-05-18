@@ -25,5 +25,6 @@ public class Player
         if (!IsAlive || amount <= 0f)
             return;
         Health = MathF.Max(0f, Health - amount);
+        System.Console.WriteLine($"{DateTime.Now.ToString("HH:mm:ss")} Player health: {Health}, Took damage: {amount}");
     }
 }
