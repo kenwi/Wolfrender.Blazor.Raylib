@@ -273,7 +273,9 @@ public class EnemySystem
         // if (_rng.NextSingle() > 0.72f)
         //     return;
 
-        if (_player.TakeDamage(EnemyShotDamage))
+        float healthBefore = _player.Health;
+        _player.TakeDamage(EnemyShotDamage);
+        if (_player.Health < healthBefore)
             _combatFeedback.OnPlayerDamaged(EnemyShotDamage);
     }
 
