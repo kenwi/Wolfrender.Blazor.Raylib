@@ -289,6 +289,7 @@ public class World : IScene
         _player.WeaponCooldownRemaining = _player.PistolCooldownSeconds;
         _effectSystem.TriggerReticleFireFlash();
         _animationSystem.PlayPistolFire();
+        _soundSystem.PlayPistolFire();
     }
 
     public void Render()
