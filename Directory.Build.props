@@ -1,0 +1,6 @@
+<Project>
+  <!-- Only the repo-root .csproj files share one folder; give each its own obj/ subtree. -->
+  <PropertyGroup Condition="'$(MSBuildProjectDirectory)' == '$(MSBuildThisFileDirectory)'">
+    <BaseIntermediateOutputPath>obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+  </PropertyGroup>
+</Project>
