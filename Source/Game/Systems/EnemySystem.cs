@@ -183,7 +183,7 @@ public class EnemySystem
 
     private void OnWalking(Enemy enemy, float deltaTime)
     {
-        if (enemy.CanSeePlayer)
+        if (enemy.CanSeePlayer && _player.IsAlive)
         {
             enemy.TransitionTo(EnemyState.NOTICING);
             return;
@@ -222,6 +222,12 @@ public class EnemySystem
     {
         if (enemy.CanSeePlayer)
         {
+            if (!_player.IsAlive)
+            {
+                enemy.TransitionTo(EnemyState.WALKING);
+                return;
+            }
+
             // While we can see the player, keep updating the last known position
             enemy.LastSeenPlayerPosition = _player.Position;
             RotateTowardPlayer(enemy, deltaTime);
