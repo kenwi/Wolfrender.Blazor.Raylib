@@ -10,12 +10,16 @@ namespace Game.Systems;
 /// </summary>
 public class PickupSystem
 {
+    private Texture2D _objectsTexture;
+
     private readonly List<Pickup> _activePickups = new();
     private Pickup?[] _pickupByTile = Array.Empty<Pickup?>();
     private int _mapWidth;
     private int _mapHeight;
 
     public IReadOnlyList<Pickup> ActivePickups => _activePickups;
+
+    public void SetObjectsTexture(Texture2D texture) => _objectsTexture = texture;
 
     public void Rebuild(IReadOnlyList<PickupPlacement> placements, MapData mapData)
     {
@@ -65,10 +69,22 @@ public class PickupSystem
     {
         foreach (var pickup in _activePickups)
         {
-            PrimitiveRenderer.DrawColoredBillboard(
-                pickup.Position,
-                cameraPosition,
-                PickupVisuals.GetColor(pickup.Type));
+            if (_objectsTexture.Id > 0)
+            {
+                PrimitiveRenderer.DrawTexturedBillboard(
+                    pickup.Position,
+                    cameraPosition,
+                    _objectsTexture,
+                    PickupSprites.GetFrameRect(pickup.Type),
+                    Color.White);
+            }
+            else
+            {
+                PrimitiveRenderer.DrawColoredBillboard(
+                    pickup.Position,
+                    cameraPosition,
+                    PickupVisuals.GetColor(pickup.Type));
+            }
         }
     }
 

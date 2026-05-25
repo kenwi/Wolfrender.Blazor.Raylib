@@ -608,6 +608,41 @@ public static class PrimitiveRenderer
         float angle = 0f,
         bool quantizeToEightDirections = false)
     {
+        DrawColoredBillboard(position, cameraPosition, color, null, null, width, height, angle, quantizeToEightDirections);
+    }
+
+    /// <summary>
+    /// Camera-facing textured billboard from an atlas sub-rectangle (no magenta color-key shader).
+    /// </summary>
+    public static void DrawTexturedBillboard(
+        Vector3 position,
+        Vector3 cameraPosition,
+        Texture2D texture,
+        Rectangle frameRect,
+        Color color,
+        float width = 4f,
+        float height = 4f,
+        float angle = 0f,
+        bool quantizeToEightDirections = false)
+    {
+        DrawColoredBillboard(position, cameraPosition, color, texture, frameRect, width, height, angle, quantizeToEightDirections);
+    }
+
+    /// <summary>
+    /// Camera-facing billboard at tile-center placement. When <paramref name="texture"/> and
+    /// <paramref name="frameRect"/> are set, draws a sub-rectangle from the atlas without the magenta color-key shader.
+    /// </summary>
+    public static void DrawColoredBillboard(
+        Vector3 position,
+        Vector3 cameraPosition,
+        Color color,
+        Texture2D? texture,
+        Rectangle? frameRect,
+        float width = 4f,
+        float height = 4f,
+        float angle = 0f,
+        bool quantizeToEightDirections = false)
+    {
         float halfTile = LevelData.QuadSize * 0.5f;
         var billboardPosition = new Vector3(
             position.X + halfTile,
@@ -641,17 +676,45 @@ public static class PrimitiveRenderer
         var bottomRight = billboardPosition + halfWidth - halfHeight;
         var bottomLeft = billboardPosition - halfWidth - halfHeight;
 
-        Rlgl.Begin(DrawMode.Quads);
-        Rlgl.Color4ub(color.R, color.G, color.B, color.A);
+        if (texture is { Id: > 0 } tex && frameRect.HasValue)
+        {
+            var frame = frameRect.Value;
+            float texLeft = frame.X / tex.Width;
+            float texRight = (frame.X + frame.Width) / tex.Width;
+            float texTop = frame.Y / tex.Height;
+            float texBottom = (frame.Y + frame.Height) / tex.Height;
 
-        Rlgl.Normal3f(directionToCamera.X, directionToCamera.Y, directionToCamera.Z);
+            Rlgl.SetTexture(tex.Id);
+            Rlgl.Begin(DrawMode.Quads);
+            Rlgl.Color4ub(color.R, color.G, color.B, color.A);
+            Rlgl.Normal3f(directionToCamera.X, directionToCamera.Y, directionToCamera.Z);
 
-        Rlgl.Vertex3f(topLeft.X, topLeft.Y, topLeft.Z);
-        Rlgl.Vertex3f(topRight.X, topRight.Y, topRight.Z);
-        Rlgl.Vertex3f(bottomRight.X, bottomRight.Y, bottomRight.Z);
-        Rlgl.Vertex3f(bottomLeft.X, bottomLeft.Y, bottomLeft.Z);
+            Rlgl.TexCoord2f(texRight, texTop);
+            Rlgl.Vertex3f(topLeft.X, topLeft.Y, topLeft.Z);
+            Rlgl.TexCoord2f(texLeft, texTop);
+            Rlgl.Vertex3f(topRight.X, topRight.Y, topRight.Z);
+            Rlgl.TexCoord2f(texLeft, texBottom);
+            Rlgl.Vertex3f(bottomRight.X, bottomRight.Y, bottomRight.Z);
+            Rlgl.TexCoord2f(texRight, texBottom);
+            Rlgl.Vertex3f(bottomLeft.X, bottomLeft.Y, bottomLeft.Z);
 
-        Rlgl.End();
+            Rlgl.End();
+            Rlgl.SetTexture(0);
+        }
+        else
+        {
+            Rlgl.Begin(DrawMode.Quads);
+            Rlgl.Color4ub(color.R, color.G, color.B, color.A);
+            Rlgl.Normal3f(directionToCamera.X, directionToCamera.Y, directionToCamera.Z);
+
+            Rlgl.Vertex3f(topLeft.X, topLeft.Y, topLeft.Z);
+            Rlgl.Vertex3f(topRight.X, topRight.Y, topRight.Z);
+            Rlgl.Vertex3f(bottomRight.X, bottomRight.Y, bottomRight.Z);
+            Rlgl.Vertex3f(bottomLeft.X, bottomLeft.Y, bottomLeft.Z);
+
+            Rlgl.End();
+        }
+
         LevelData.DrawedQuads += 1;
     }
 }

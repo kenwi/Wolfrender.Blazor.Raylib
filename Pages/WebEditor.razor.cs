@@ -59,6 +59,7 @@ public partial class WebEditor : IDisposable
             "resources/wood.png",
             "resources/door.png",
             "resources/enemy_guard.png",
+            "resources/Objects.png",
             "resources/level.json",
             "resources/test.json",
             "resources/shaders/transparency.fs",
