@@ -595,10 +595,7 @@ public static class PrimitiveRenderer
     /// Untextured semi-transparent billboard using the same layout as <see cref="DrawSpriteTexture"/>.
     /// Draw after the lighting shader ends so colors are not attenuated.
     /// </summary>
-    /// <param name="position">
-    /// Tile-center world position from placement (editor tile 32,28 → 32.5×quad in world X/Z).
-    /// Offset by +halfTile on X/Z before building the quad so it aligns with wall/enemy anchors.
-    /// </param>
+    /// <param name="position">World position at the center of the billboard quad (same anchor as <see cref="DrawSpriteTexture"/>).</param>
     public static void DrawColoredBillboard(
         Vector3 position,
         Vector3 cameraPosition,
@@ -629,7 +626,7 @@ public static class PrimitiveRenderer
     }
 
     /// <summary>
-    /// Camera-facing billboard at tile-center placement. When <paramref name="texture"/> and
+    /// Camera-facing billboard at <paramref name="position"/> (quad center). When <paramref name="texture"/> and
     /// <paramref name="frameRect"/> are set, draws a sub-rectangle from the atlas without the magenta color-key shader.
     /// </summary>
     public static void DrawColoredBillboard(
@@ -643,14 +640,8 @@ public static class PrimitiveRenderer
         float angle = 0f,
         bool quantizeToEightDirections = false)
     {
-        float halfTile = LevelData.QuadSize * 0.5f;
-        var billboardPosition = new Vector3(
-            position.X + halfTile,
-            position.Y,
-            position.Z + halfTile);
-
         var directionToCamera = SpriteBillboardGeometry.ComputeBillboardFacingDirection(
-            billboardPosition, cameraPosition, quantizeToEightDirections);
+            position, cameraPosition, quantizeToEightDirections);
 
         var right = Vector3.Cross(directionToCamera, Vector3.UnitY);
         var rightLength = right.Length();
@@ -671,10 +662,10 @@ public static class PrimitiveRenderer
         var halfWidth = rotatedRight * (width / 2f);
         var halfHeight = up * (height / 2f);
 
-        var topLeft = billboardPosition - halfWidth + halfHeight;
-        var topRight = billboardPosition + halfWidth + halfHeight;
-        var bottomRight = billboardPosition + halfWidth - halfHeight;
-        var bottomLeft = billboardPosition - halfWidth - halfHeight;
+        var topLeft = position - halfWidth + halfHeight;
+        var topRight = position + halfWidth + halfHeight;
+        var bottomRight = position + halfWidth - halfHeight;
+        var bottomLeft = position - halfWidth - halfHeight;
 
         if (texture is { Id: > 0 } tex && frameRect.HasValue)
         {

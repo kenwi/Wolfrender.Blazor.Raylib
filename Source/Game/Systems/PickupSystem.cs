@@ -47,10 +47,7 @@ public class PickupSystem
         if (!player.IsAlive || _pickupByTile.Length == 0)
             return;
 
-        // Match DrawSpriteTexture anchor (pickup position is the tile corner on X/Z).
-        float invQuad = 1f / LevelData.QuadSize;
-        int tileX = (int)(player.Position.X * invQuad);
-        int tileY = (int)(player.Position.Z * invQuad);
+        var (tileX, tileY) = LevelData.GetTileFromWorld(player.Position.X, player.Position.Z);
         if (tileX < 0 || tileX >= _mapWidth || tileY < 0 || tileY >= _mapHeight)
             return;
 
@@ -90,17 +87,13 @@ public class PickupSystem
 
     private Pickup CreatePickup(PickupPlacement placement)
     {
-        float quad = LevelData.QuadSize;
         return new Pickup
         {
             Type = placement.Type,
             TileX = placement.TileX,
             TileY = placement.TileY,
             Amount = PickupDefaults.GetAmount(placement.Type, placement.Amount),
-            Position = new Vector3(
-                placement.TileX * quad,
-                1.5f,
-                placement.TileY * quad)
+            Position = LevelData.GetTileAnchorWorld(placement.TileX, placement.TileY, 1.5f)
         };
     }
 
@@ -141,9 +134,7 @@ public class PickupSystem
     {
         var p = player.Position;
         var m = pickup.Position;
-        float invQuad = 1f / LevelData.QuadSize;
-        int playerTileX = (int)(p.X * invQuad);
-        int playerTileY = (int)(p.Z * invQuad);
+        var (playerTileX, playerTileY) = LevelData.GetTileFromWorld(p.X, p.Z);
         return $"pickup tile ({pickup.TileX}, {pickup.TileY}), player tile ({playerTileX}, {playerTileY}), pickup world ({m.X:F1}, {m.Y:F1}, {m.Z:F1}), player ({p.X:F1}, {p.Y:F1}, {p.Z:F1})";
     }
 }
