@@ -84,7 +84,7 @@ public class Application
         };
 
         var mapData = new MapData { Textures = textures };
-        Editor.LevelSerializer.LoadFromJson(mapData, Path("resources/level.json"));
+        Editor.LevelSerializer.LoadFromJson(mapData, Path(LevelCatalog.DefaultLevelPath));
 
         return mapData;
     }
