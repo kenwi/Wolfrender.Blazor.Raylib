@@ -47,7 +47,7 @@ public class PickupSystem
         if (!player.IsAlive || _pickupByTile.Length == 0)
             return;
 
-        // Match DrawColoredBillboard anchor (stored tile-center position + halfTile on X/Z).
+        // Match DrawSpriteTexture anchor (stored tile-center position + halfTile on X/Z).
         float halfTile = LevelData.QuadSize * 0.5f;
         float invQuad = 1f / LevelData.QuadSize;
         int tileX = (int)((player.Position.X - halfTile) * invQuad);
@@ -67,16 +67,24 @@ public class PickupSystem
 
     public void Render(Vector3 cameraPosition)
     {
+        float halfTile = LevelData.QuadSize * 0.5f;
+
         foreach (var pickup in _activePickups)
         {
             if (_objectsTexture.Id > 0)
             {
-                PrimitiveRenderer.DrawTexturedBillboard(
-                    pickup.Position,
-                    cameraPosition,
+                var billboardPosition = new Vector3(
+                    pickup.Position.X + halfTile,
+                    pickup.Position.Y,
+                    pickup.Position.Z + halfTile);
+
+                PrimitiveRenderer.DrawSpriteTexture(
                     _objectsTexture,
-                    PickupSprites.GetFrameRect(pickup.Type),
-                    Color.White);
+                    billboardPosition,
+                    cameraPosition,
+                    Color.White,
+                    frameRect: PickupSprites.GetFrameRect(pickup.Type),
+                    quantizeToEightDirections: false);
             }
             else
             {

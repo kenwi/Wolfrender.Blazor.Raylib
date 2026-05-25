@@ -11,8 +11,8 @@ public static class PickupSprites
     public const int PlaceholderX = 2;
     public const int PlaceholderY = 35;
 
-    public const int HealthX = 67;
-    public const int HealthY = 749;
+    public const int HealthX = 66;
+    public const int HealthY = 756;
 
     public static Rectangle GetFrameRect(PickupType type) => type switch
     {
