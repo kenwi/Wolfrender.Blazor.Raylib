@@ -592,35 +592,49 @@ public static class PrimitiveRenderer
     }
 
     /// <summary>
-    /// Untextured semi-transparent billboard (faces the camera; optional 8-dir snap).
+    /// Untextured semi-transparent billboard using the same layout as <see cref="DrawSpriteTexture"/>.
     /// Draw after the lighting shader ends so colors are not attenuated.
     /// </summary>
     public static void DrawColoredBillboard(
         Vector3 position,
         Vector3 cameraPosition,
         Color color,
-        float width = 1.5f,
-        float height = 1.5f,
+        float width = 4f,
+        float height = 4f,
+        float angle = 0f,
         bool quantizeToEightDirections = false)
     {
-        SpriteBillboardGeometry.ComputeBillboardQuad(
-            position,
-            cameraPosition,
-            width,
-            height,
-            yAxisAngleRadians: 0f,
-            out var topLeft,
-            out var topRight,
-            out var bottomRight,
-            out var bottomLeft,
-            quantizeToEightDirections);
+        var directionToCamera = SpriteBillboardGeometry.ComputeBillboardFacingDirection(
+            position, cameraPosition, quantizeToEightDirections);
+
+        var right = Vector3.Cross(directionToCamera, Vector3.UnitY);
+        var rightLength = right.Length();
+        if (rightLength > 0.001f)
+            right /= rightLength;
+        else
+            right = Vector3.UnitX;
+
+        var up = Vector3.UnitY;
+
+        var cosAngle = MathF.Cos(angle);
+        var sinAngle = MathF.Sin(angle);
+        var rotatedRight = new Vector3(
+            right.X * cosAngle - right.Z * sinAngle,
+            right.Y,
+            right.X * sinAngle + right.Z * cosAngle);
+
+        var halfWidth = rotatedRight * (width / 2f);
+        var halfHeight = up * (height / 2f);
+
+        var topLeft = position - halfWidth + halfHeight;
+        var topRight = position + halfWidth + halfHeight;
+        var bottomRight = position + halfWidth - halfHeight;
+        var bottomLeft = position - halfWidth - halfHeight;
 
         Rlgl.Begin(DrawMode.Quads);
         Rlgl.Color4ub(color.R, color.G, color.B, color.A);
 
-        var normal = SpriteBillboardGeometry.ComputeBillboardFacingDirection(
-            position, cameraPosition, quantizeToEightDirections);
-        Rlgl.Normal3f(normal.X, normal.Y, normal.Z);
+        Rlgl.Normal3f(directionToCamera.X, directionToCamera.Y, directionToCamera.Z);
 
         Rlgl.Vertex3f(topLeft.X, topLeft.Y, topLeft.Z);
         Rlgl.Vertex3f(topRight.X, topRight.Y, topRight.Z);

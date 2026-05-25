@@ -65,9 +65,7 @@ public class PickupSystem
             PrimitiveRenderer.DrawColoredBillboard(
                 pickup.Position,
                 cameraPosition,
-                PickupVisuals.GetColor(pickup.Type),
-                width: 1.5f,
-                height: 1.5f);
+                PickupVisuals.GetColor(pickup.Type));
         }
     }
 

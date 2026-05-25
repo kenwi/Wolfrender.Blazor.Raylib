@@ -84,7 +84,7 @@ public class EditorState
             new() { Name = "Floor", Tiles = mapData.Floor },
             new() { Name = "Walls", Tiles = mapData.Walls },
             new() { Name = "Ceiling", Tiles = mapData.Ceiling, IsVisible = false },
-            new() { Name = "Doors", Tiles = mapData.Doors },
+            new() { Name = DoorsLayerName, Tiles = mapData.Doors },
             new() { Name = EnemiesLayerName, Tiles = Array.Empty<uint>() },
             new() { Name = PickupsLayerName, Tiles = Array.Empty<uint>() },
         };
@@ -93,6 +93,9 @@ public class EditorState
     public EditorLayer ActiveLayer => Layers[ActiveLayerIndex];
     public bool IsOnEnemyLayer => Layers[ActiveLayerIndex].Name == EnemiesLayerName;
     public bool IsOnPickupLayer => Layers[ActiveLayerIndex].Name == PickupsLayerName;
+    public bool IsOnDoorLayer => Layers[ActiveLayerIndex].Name == DoorsLayerName;
+
+    public const string DoorsLayerName = "Doors";
 
     public void NotifyStateChanged() => StateChanged?.Invoke();
 
@@ -250,7 +253,7 @@ public class EditorState
     public void UpdateDoorsDuringSimulation(float deltaTime, bool interactPressed)
     {
         var input = new InputState { IsInteractPressed = interactPressed };
-        DoorSystem.Update(deltaTime, input, Player.Position, EnemySystem.Enemies);
+        DoorSystem.Update(deltaTime, input, Player, EnemySystem.Enemies);
     }
 
     public void ClearLevel()

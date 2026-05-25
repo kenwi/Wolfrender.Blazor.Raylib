@@ -158,7 +158,7 @@ public class LevelEditorScene : IScene
                     _state.Camera, _state.IsMouseOverUI,
                     ref _state.HoveredPickupIndex, _state.SelectedPickupIndex);
             }
-            else if (_state.IsSimulating && layer.Name == "Doors")
+            else if (_state.IsSimulating && layer.Name == EditorState.DoorsLayerName)
             {
                 _mapRenderer.RenderLiveDoors(_state.DoorSystem, _state.Camera);
             }

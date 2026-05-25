@@ -23,7 +23,14 @@
 
         @if (_showTilePalette)
         {
-            <WebEditorTilePalette State="_editorScene.State" OnChanged="Refresh" />
+            @if (_editorScene.State.IsOnDoorLayer)
+            {
+                <WebEditorDoorPalette State="_editorScene.State" OnChanged="Refresh" />
+            }
+            else
+            {
+                <WebEditorTilePalette State="_editorScene.State" OnChanged="Refresh" />
+            }
         }
 
         @if (_showPickupPalette)

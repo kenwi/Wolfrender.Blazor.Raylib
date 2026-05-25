@@ -284,7 +284,7 @@ public class World : IScene
                 _collisionSystem.Update(_player, deltaTime);
                 _pickupSystem.Update(_player);
                 _cameraSystem.Update(_player, _inputState.IsMouseFree, mouseDelta);
-                _doorSystem.Update(deltaTime, _inputState, _player.Position, _enemySystem.Enemies);
+                _doorSystem.Update(deltaTime, _inputState, _player, _enemySystem.Enemies);
                 _animationSystem.Update(deltaTime);
                 _enemySystem.Update(deltaTime);
 
@@ -300,7 +300,7 @@ public class World : IScene
                 HandlePlayerDeath();
                 _player.Velocity = Vector3.Zero;
                 _cameraSystem.UpdateDeathFall(_player, deltaTime);
-                _doorSystem.Update(deltaTime, _inputState, _player.Position, _enemySystem.Enemies);
+                _doorSystem.Update(deltaTime, _inputState, _player, _enemySystem.Enemies);
                 _animationSystem.Update(deltaTime);
                 _enemySystem.Update(deltaTime);
                 TryRestartFromGameOver();
@@ -436,6 +436,9 @@ public class World : IScene
 
         _effectSystem.RenderScreenOverlay(GetScreenWidth(), GetScreenHeight());
 
+        if (_player.IsAlive && !_consoleOverlay.IsOpen && _doorSystem.HasLockedHint)
+            DrawDoorLockedHint();
+
         if (!_player.IsAlive && !_consoleOverlay.IsOpen)
             DrawGameOverOverlay();
 
@@ -478,6 +481,30 @@ public class World : IScene
         DrawText("KEYS:", 10, y, fontSize, Color.RayWhite);
         DrawText(" GOLD", 58, y, fontSize, goldColor);
         DrawText(" SILVER", 118, y, fontSize, silverColor);
+    }
+
+    private void DrawDoorLockedHint()
+    {
+        int screenW = GetScreenWidth();
+        int screenH = GetScreenHeight();
+
+        const string subtitle = "DOOR LOCKED";
+        const int subtitleSize = 28;
+        const int titleSize = 52;
+        string title = _doorSystem.LockedHintOverlayText;
+
+        int titleW = MeasureText(title, titleSize);
+        int subtitleW = MeasureText(subtitle, subtitleSize);
+        int panelW = Math.Max(titleW, subtitleW) + 80;
+        int panelH = 140;
+        int panelX = (screenW - panelW) / 2;
+        int panelY = (screenH - panelH) / 2;
+
+        DrawRectangle(panelX, panelY, panelW, panelH, new Color(0, 0, 0, 200));
+        DrawRectangleLines(panelX, panelY, panelW, panelH, _doorSystem.LockedHintColor);
+
+        DrawText(subtitle, (screenW - subtitleW) / 2, panelY + 16, subtitleSize, new Color(220, 220, 220, 255));
+        DrawText(title, (screenW - titleW) / 2, panelY + 56, titleSize, _doorSystem.LockedHintColor);
     }
 
     private void DrawGameOverOverlay()

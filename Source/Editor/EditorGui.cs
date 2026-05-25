@@ -511,6 +511,15 @@ public class EditorGui
             ImGui.PopStyleColor(2);
         }
 
+        if (layers[activeLayerIndex].Name == EditorState.DoorsLayerName)
+        {
+            RenderDoorPaletteButtons(ref selectedTileId, buttonSize);
+            ImGui.Separator();
+            ImGui.Text($"Selected: {(selectedTileId == 0 ? "Eraser" : DoorTileEncoding.GetPaletteLabel(selectedTileId))}");
+            ImGui.End();
+            return;
+        }
+
         ImGui.Separator();
         ImGui.Text("Tiles:");
 
@@ -569,6 +578,34 @@ public class EditorGui
         ImGui.Text($"Selected: {(selectedTileId == 0 ? "Eraser" : $"ID {selectedTileId}")}");
 
         ImGui.End();
+    }
+
+    private void RenderDoorPaletteButtons(ref uint selectedTileId, float buttonSize)
+    {
+        ImGui.Text("Doors:");
+        uint[] doorIds =
+        {
+            DoorTileEncoding.Horizontal,
+            DoorTileEncoding.Vertical,
+            DoorTileEncoding.HorizontalGold,
+            DoorTileEncoding.VerticalGold,
+            DoorTileEncoding.HorizontalSilver,
+            DoorTileEncoding.VerticalSilver
+        };
+
+        foreach (uint doorId in doorIds)
+        {
+            bool selected = selectedTileId == doorId;
+            if (selected)
+                ImGui.PushStyleColor(ImGuiCol.Border, new Vector4(1f, 1f, 0f, 1f));
+
+            if (ImGui.Button($"{DoorTileEncoding.GetPaletteLabel(doorId)}\n(ID {doorId})",
+                    new Vector2(buttonSize + 28, buttonSize * 0.85f)))
+                selectedTileId = doorId;
+
+            if (selected)
+                ImGui.PopStyleColor();
+        }
     }
 
     public void RenderPickupPalette(ref PickupType selectedPickupType)

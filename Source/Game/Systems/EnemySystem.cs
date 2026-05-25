@@ -721,10 +721,8 @@ public class EnemySystem
             position.X / LevelData.QuadSize,
             position.Z / LevelData.QuadSize);
         var closestDoor = _doorSystem.FindClosestDoor(doorSearchPos);
-        if (closestDoor != null)
-        {
+        if (closestDoor != null && !closestDoor.IsLocked)
             _doorSystem.OpenDoor(closestDoor);
-        }
     }
 
     /// <summary>

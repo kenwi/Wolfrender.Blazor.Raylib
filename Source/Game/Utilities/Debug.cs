@@ -296,10 +296,11 @@ public static class Debug
                 // Table header
                 // Calculate scaled column widths based on font scale
                 float fontScale = 2;//ImGui.GetWindowFontScale();
-                if (ImGui.BeginTable("DoorsTable", 7, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable | ImGuiTableFlags.SizingStretchProp))
+                if (ImGui.BeginTable("DoorsTable", 8, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable | ImGuiTableFlags.SizingStretchProp))
                 {
                     ImGui.TableSetupColumn("ID", ImGuiTableColumnFlags.WidthFixed, 40 * fontScale);
                     ImGui.TableSetupColumn("State", ImGuiTableColumnFlags.WidthFixed, 80 * fontScale);
+                    ImGui.TableSetupColumn("Lock", ImGuiTableColumnFlags.WidthFixed, 70 * fontScale);
                     ImGui.TableSetupColumn("Rotation", ImGuiTableColumnFlags.WidthFixed, 80 * fontScale);
                     ImGui.TableSetupColumn("Position", ImGuiTableColumnFlags.WidthFixed, 120 * fontScale);
                     ImGui.TableSetupColumn("Start Pos", ImGuiTableColumnFlags.WidthFixed, 120 * fontScale);
@@ -328,6 +329,12 @@ public static class Debug
                             _ => new System.Numerics.Vector4(1, 1, 1, 1) // White
                         };
                         ImGui.TextColored(stateColor, door.DoorState.ToString());
+
+                        ImGui.TableNextColumn();
+                        string lockLabel = door.RequiresGoldKey ? "Gold"
+                            : door.RequiresSilverKey ? "Silver"
+                            : "-";
+                        ImGui.Text(lockLabel);
                         
                         // Rotation
                         ImGui.TableNextColumn();

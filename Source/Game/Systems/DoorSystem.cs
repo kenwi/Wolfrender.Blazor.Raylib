@@ -13,7 +13,15 @@ public class DoorSystem
     private Vector2 _playerPosition;
     private IReadOnlyList<Enemy> _enemies = Array.Empty<Enemy>();
 
+    private const float LockedHintDurationSeconds = 2.5f;
+    private float _lockedHintRemaining;
+    private string _lockedHintOverlayText = string.Empty;
+    private Color _lockedHintColor = Color.RayWhite;
+
     public List<Door> Doors => _doors;
+    public bool HasLockedHint => _lockedHintRemaining > 0f;
+    public string LockedHintOverlayText => _lockedHintOverlayText;
+    public Color LockedHintColor => _lockedHintColor;
 
     public DoorSystem(uint[] doorTiles, int mapWidth, List<Texture2D> textures)
     {
@@ -35,18 +43,19 @@ public class DoorSystem
         for (int index = 0; index < doorTiles.Length; index++)
         {
             var value = doorTiles[index];
-            if (value > 0)
+            if (!DoorTileEncoding.TryParse(value, out var rotation, out var lockKind))
+                continue;
+
+            var colRow = LevelData.GetColRow(index, mapWidth);
+            _doors.Add(new Door
             {
-                var colRow = LevelData.GetColRow(index, mapWidth);
-                var door = new Door()
-                {
-                    Position = new Vector2(colRow.col, colRow.row),
-                    StartPosition = new Vector2(colRow.col, colRow.row),
-                    DoorRotation = (DoorRotation)value,
-                    DoorState = DoorState.CLOSED
-                };
-                _doors.Add(door);
-            }
+                Position = new Vector2(colRow.col, colRow.row),
+                StartPosition = new Vector2(colRow.col, colRow.row),
+                DoorRotation = rotation,
+                RequiresGoldKey = lockKind == DoorLockKind.Gold,
+                RequiresSilverKey = lockKind == DoorLockKind.Silver,
+                DoorState = DoorState.CLOSED
+            });
         }
     }
 
@@ -65,24 +74,80 @@ public class DoorSystem
         }
     }
     
-    public void Update(float deltaTime, InputState input, Vector3 playerPosition, IReadOnlyList<Enemy> enemies)
+    public void Update(float deltaTime, InputState input, Player player, IReadOnlyList<Enemy> enemies)
     {
-        _playerPosition = new Vector2(playerPosition.X / _quadSize, playerPosition.Z / _quadSize);
+        _playerPosition = new Vector2(player.Position.X / _quadSize, player.Position.Z / _quadSize);
         _enemies = enemies;
+
+        if (_lockedHintRemaining > 0f)
+            _lockedHintRemaining = MathF.Max(0f, _lockedHintRemaining - deltaTime);
+
         if (input.IsInteractPressed)
-        {
-            var closestDoor = FindClosestDoor(_playerPosition);
-            if (closestDoor != null)
-            {
-                var distanceFromPlayer = Vector2.Distance(_playerPosition, closestDoor.Position);
-                if (closestDoor != null && distanceFromPlayer < 1.5f)
-                {
-                    OpenDoor(closestDoor);
-                }
-            }
-        }
+            TryInteractOpenDoor(player);
 
         Animate(deltaTime);
+    }
+
+    private void TryInteractOpenDoor(Player player)
+    {
+        var closestDoor = FindClosestDoor(_playerPosition);
+        if (closestDoor == null)
+            return;
+
+        if (Vector2.Distance(_playerPosition, closestDoor.Position) >= 1.5f)
+            return;
+
+        if (!CanPlayerOpen(closestDoor, player))
+        {
+            ShowLockedHint(closestDoor);
+            return;
+        }
+
+        OpenDoor(closestDoor);
+    }
+
+    public static bool CanPlayerOpen(Door door, Player player)
+    {
+        if (door.RequiresGoldKey && !player.HasGoldKey)
+            return false;
+        if (door.RequiresSilverKey && !player.HasSilverKey)
+            return false;
+        return true;
+    }
+
+    public static string GetLockedMessage(Door door)
+    {
+        if (door.RequiresGoldKey)
+            return "Door is locked (gold key required)";
+        if (door.RequiresSilverKey)
+            return "Door is locked (silver key required)";
+        return "Door is locked";
+    }
+
+    public static string GetLockedOverlayText(Door door)
+    {
+        if (door.RequiresGoldKey)
+            return "GOLD KEY REQUIRED";
+        if (door.RequiresSilverKey)
+            return "SILVER KEY REQUIRED";
+        return "KEY REQUIRED";
+    }
+
+    public static Color GetLockedOverlayColor(Door door)
+    {
+        if (door.RequiresGoldKey)
+            return new Color(255, 210, 40, 255);
+        if (door.RequiresSilverKey)
+            return new Color(200, 220, 255, 255);
+        return Color.RayWhite;
+    }
+
+    private void ShowLockedHint(Door door)
+    {
+        _lockedHintOverlayText = GetLockedOverlayText(door);
+        _lockedHintColor = GetLockedOverlayColor(door);
+        _lockedHintRemaining = LockedHintDurationSeconds;
+        Debug.Log(GetLockedMessage(door));
     }
 
     public Door? FindClosestDoor(Vector2 position)
@@ -93,6 +158,9 @@ public class DoorSystem
 
     public void OpenDoor(Door door)
     {
+        if (door.DoorState is DoorState.OPEN or DoorState.OPENING)
+            return;
+
         door.DoorState = DoorState.OPENING;
         door.TimeDoorHasBeenOpen = 0;
         door.TimeDoorHasBeenOpening = 0;

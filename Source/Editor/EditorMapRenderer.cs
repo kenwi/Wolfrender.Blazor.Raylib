@@ -73,9 +73,10 @@ public class EditorMapRenderer
                 float drawX = x * tileSize + camera.Offset.X;
                 float drawY = y * tileSize + camera.Offset.Y;
 
-                bool isVerticalDoor = tileId == (uint)DoorRotation.VERTICAL;
-                bool isHorizontalDoor = tileId == (uint)DoorRotation.HORIZONTAL;
-                int textureIndex = (isVerticalDoor || isHorizontalDoor)
+                bool isDoorTile = DoorTileEncoding.TryParse(tileId, out var doorRotation, out var lockKind);
+                bool isVerticalDoor = doorRotation == DoorRotation.VERTICAL;
+                bool isHorizontalDoor = doorRotation == DoorRotation.HORIZONTAL;
+                int textureIndex = isDoorTile
                     ? (int)DoorRotation.HORIZONTAL - 1
                     : (int)tileId - 1;
 
@@ -97,6 +98,16 @@ public class EditorMapRenderer
                         rotation,
                         Color.White
                     );
+
+                    if (lockKind != DoorLockKind.None)
+                    {
+                        var lockColor = lockKind == DoorLockKind.Gold
+                            ? new Color(255, 210, 40, 255)
+                            : new Color(200, 220, 255, 255);
+                        string label = lockKind == DoorLockKind.Gold ? "G" : "S";
+                        DrawCircle((int)(drawX + tileSize * 0.75f), (int)(drawY + tileSize * 0.25f), tileSize * 0.2f, lockColor);
+                        DrawText(label, (int)(drawX + tileSize * 0.65f), (int)(drawY + tileSize * 0.12f), (int)(tileSize * 0.35f), Color.Black);
+                    }
                 }
                 else
                 {
