@@ -148,7 +148,7 @@ public class LevelEditorScene : IScene
             {
                 _mapRenderer.RenderEnemyLayer(
                     _state.Camera, _state.EnemySystem, _state.IsMouseOverUI,
-                    _state.IsSimulating, _state.DrawEnemyLineOfSight,
+                    _state.IsSimulating, _state.DrawEnemyLineOfSight, _state.ShowPatrolPaths,
                     ref _state.HoveredEnemyIndex, _state.SelectedEnemyIndex,
                     _state.IsEditingPatrolPath, _state.PatrolEditEnemyIndex, _state.PatrolPathInProgress);
             }
@@ -169,7 +169,8 @@ public class LevelEditorScene : IScene
         }
 
         // Draw player position indicator
-        _mapRenderer.RenderPlayerIndicator(_state.Player, _state.Camera);
+        _mapRenderer.RenderPlayerIndicator(
+            _state.Player, _state.Camera, _state.HoveredPlayer, _state.IsDraggingPlayer);
 
         // Pathfinding visualizer overlay
         _mapRenderer.DrawPathPreview(_state.PathStart, _state.PathEnd, _state.PathResult, _state.Camera);
@@ -184,7 +185,7 @@ public class LevelEditorScene : IScene
         int tileY = (int)MathF.Floor(worldPos.Y);
         bool tileInBounds = tileX >= 0 && tileX < _state.MapData.Width && tileY >= 0 && tileY < _state.MapData.Height;
 
-        if (tileInBounds)
+        if (tileInBounds && _state.ShouldShowTileHighlight())
         {
             _mapRenderer.DrawTileHighlight(tileX, tileY, _state.Camera);
         }
@@ -195,8 +196,8 @@ public class LevelEditorScene : IScene
         if (menuToggleSim) _state.ToggleSimulation();
         _gui.RenderFileDialogs(_state.RefreshLayerReferences);
         _gui.RenderLayerPanel(_state.Layers, ref _state.ActiveLayerIndex);
-        _gui.RenderTilePalette(_state.Layers, _state.ActiveLayerIndex, ref _state.SelectedTileId, ref _state.SelectedPickupType);
-        _gui.RenderPickupPalette(ref _state.SelectedPickupType);
+        _gui.RenderTilePalette(_state.Layers, _state.ActiveLayerIndex, _state, ref _state.SelectedTileId, ref _state.SelectedPickupType);
+        _gui.RenderPickupPalette(_state);
         _gui.RenderInfoPanel(tileX, tileY, worldPos, tileInBounds, _state.CursorInfoFollowsMouse, _state.Layers);
         _gui.RenderEnemyPropertiesPanel(ref _state.SelectedEnemyIndex, ref _state.IsEditingPatrolPath, ref _state.PatrolEditEnemyIndex, _state.PatrolPathInProgress);
         _gui.RenderPickupPropertiesPanel(ref _state.SelectedPickupIndex);
@@ -250,8 +251,37 @@ public class LevelEditorScene : IScene
         }
     }
 
+    private void HandlePlayerInput(bool mouseOverUI)
+    {
+        if (_state.IsSimulating) return;
+
+        var mouseScreen = GetMousePosition();
+        _state.UpdatePlayerHover(_state.Camera, mouseScreen, mouseOverUI);
+
+        if (!mouseOverUI && IsMouseButtonPressed(MouseButton.Left) && _state.HoveredPlayer)
+            _state.IsDraggingPlayer = true;
+
+        if (_state.IsDraggingPlayer && IsMouseButtonDown(MouseButton.Left))
+        {
+            var dragPos = _state.Camera.ScreenToWorld(GetMousePosition());
+            int tx = (int)MathF.Floor(dragPos.X);
+            int ty = (int)MathF.Floor(dragPos.Y);
+            if (tx >= 0 && tx < _state.MapData.Width && ty >= 0 && ty < _state.MapData.Height
+                && _state.CanPlacePickupAt(tx, ty))
+            {
+                _state.SyncPlayerToSpawnTile(tx, ty);
+            }
+        }
+
+        if (IsMouseButtonReleased(MouseButton.Left))
+            _state.IsDraggingPlayer = false;
+    }
+
     private void HandleTileAndEnemyInput(bool mouseOverUI)
     {
+        if (!_state.IsSimulating)
+            HandlePlayerInput(mouseOverUI);
+
         bool isEnemyLayer = _state.IsOnEnemyLayer;
         bool isPickupLayer = _state.IsOnPickupLayer;
 
@@ -259,8 +289,7 @@ public class LevelEditorScene : IScene
         {
             _state.SwitchToEnemyLayer();
             isEnemyLayer = true;
-            _state.SelectedEnemyIndex = _state.HoveredEnemyIndex;
-            _state.IsDraggingEnemy = true;
+            _state.SelectEnemy(_state.HoveredEnemyIndex);
         }
 
         if (!mouseOverUI && !isPickupLayer && _state.HoveredPickupIndex >= 0 && IsMouseButtonPressed(MouseButton.Left))
@@ -270,15 +299,40 @@ public class LevelEditorScene : IScene
             _state.SelectPickup(_state.HoveredPickupIndex);
         }
 
-        if (!mouseOverUI && isEnemyLayer)
+        if (!mouseOverUI && isEnemyLayer && IsMouseButtonPressed(MouseButton.Left))
+        {
+            if (_state.HoveredPickupIndex >= 0)
+            {
+                _state.SwitchToPickupLayer();
+                isEnemyLayer = false;
+                isPickupLayer = true;
+                _state.SelectPickup(_state.HoveredPickupIndex);
+            }
+            else
+            {
+                var clickPos = _state.Camera.ScreenToWorld(GetMousePosition());
+                int cx = (int)MathF.Floor(clickPos.X);
+                int cy = (int)MathF.Floor(clickPos.Y);
+                uint doorTile = _state.GetDoorTileAt(cx, cy);
+                if (doorTile != 0)
+                {
+                    _state.SwitchToDoorLayer();
+                    _state.SelectedTileId = doorTile;
+                    isEnemyLayer = false;
+                }
+            }
+        }
+
+        if (!mouseOverUI && isEnemyLayer && !_state.IsDraggingPlayer)
         {
             HandleEnemyInput();
         }
-        else if (!mouseOverUI && isPickupLayer)
+        else if (!mouseOverUI && isPickupLayer && !_state.IsDraggingPlayer)
         {
             HandlePickupInput();
         }
-        else if (!mouseOverUI && IsMouseButtonDown(MouseButton.Left) && !isEnemyLayer && !isPickupLayer)
+        else if (!mouseOverUI && IsMouseButtonDown(MouseButton.Left) && !isEnemyLayer && !isPickupLayer
+                 && !_state.IsDraggingPlayer)
         {
             var paintPos = _state.Camera.ScreenToWorld(GetMousePosition());
             int px = (int)MathF.Floor(paintPos.X);
@@ -310,7 +364,8 @@ public class LevelEditorScene : IScene
                 var paintPos = _state.Camera.ScreenToWorld(GetMousePosition());
                 int px = (int)MathF.Floor(paintPos.X);
                 int py = (int)MathF.Floor(paintPos.Y);
-                _state.PlacePickup(px, py);
+                if (!_state.TrySwitchLayerFromPickupClick(px, py))
+                    _state.PlacePickup(px, py);
             }
         }
 

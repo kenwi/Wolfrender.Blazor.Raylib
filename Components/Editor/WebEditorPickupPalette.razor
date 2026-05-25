@@ -2,22 +2,37 @@
 @using Game.Editor
 @using Game.Utilities
 
+<svg class="pickup-palette-filters" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <filter id="pickup-color-key" color-interpolation-filters="sRGB">
+            <feFlood flood-color="@PickupSprites.TransparencyKeyHex" flood-opacity="1" result="keyCol"/>
+            <feComposite in="SourceGraphic" in2="keyCol" operator="arithmetic" k1="1" k2="-1" k3="0" k4="0" result="diff"/>
+            <feColorMatrix in="diff" type="matrix"
+                values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1 1 1 0 -0.06" result="alphaImg"/>
+            <feComponentTransfer in="alphaImg" result="alphaCut">
+                <feFuncA type="table" tableValues="0 0 0 0 1 1 1 1 1 1"/>
+            </feComponentTransfer>
+            <feComposite in="SourceGraphic" in2="alphaCut" operator="in" result="cut"/>
+            <feFlood flood-color="#000000" flood-opacity="1" result="bg"/>
+            <feComposite in="cut" in2="bg" operator="over"/>
+        </filter>
+    </defs>
+</svg>
+
 <div class="editor-panel editor-pickup-palette" @onpointerenter="OnPointerEnter" @onpointerleave="OnPointerLeave">
     <h3>Pickup Palette</h3>
     <div class="info-label">Active: @State.ActiveLayer.Name</div>
 
-    <div class="pickup-palette-grid">
+    <div class="info-label" style="margin-top: 8px;">Pickups:</div>
+    <div class="tile-grid">
         @foreach (PickupType type in Enum.GetValues<PickupType>())
         {
             var pickupType = type;
-            var rgba = $"rgba({PickupVisuals.GetColor(type).R},{PickupVisuals.GetColor(type).G},{PickupVisuals.GetColor(type).B},0.85)";
             <button type="button"
-                    class="pickup-palette-btn @(State.SelectedPickupType == type ? "selected" : "")"
-                    style="background: @rgba"
+                    class="tile-btn @(State.SelectedPickupType == type ? "selected" : "")"
                     title="@type"
                     @onclick="() => SelectType(pickupType)">
-                <span class="pickup-palette-label">@PickupVisuals.GetLabel(type)</span>
-                <span class="pickup-palette-name">@type</span>
+                <span class="pickup-palette-sprite-sheet" style="@PickupSprites.GetPaletteSpriteSheetStyle(type)"></span>
             </button>
         }
     </div>
@@ -34,6 +49,7 @@
     private void SelectType(PickupType type)
     {
         State.SelectedPickupType = type;
+        State.SwitchToPickupLayer();
         OnChanged.InvokeAsync();
     }
 

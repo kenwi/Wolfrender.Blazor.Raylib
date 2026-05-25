@@ -150,7 +150,8 @@ public class EditorMapRenderer
         }
     }
 
-    public void RenderPlayerIndicator(Entities.Player player, EditorCamera camera)
+    public void RenderPlayerIndicator(
+        Entities.Player player, EditorCamera camera, bool hoveredPlayer, bool isDraggingPlayer)
     {
         float tileSize = camera.TileSize;
         float quadSize = Utilities.LevelData.QuadSize;
@@ -163,8 +164,23 @@ public class EditorMapRenderer
         float radius = tileSize * 0.35f;
 
         DrawCircle((int)screenX, (int)screenY, radius, new Color(30, 120, 255, 200));
-        DrawCircleLines((int)screenX, (int)screenY, radius, new Color(80, 170, 255, 255));
-        DrawCircleLines((int)screenX, (int)screenY, radius + 1f, new Color(80, 170, 255, 255));
+
+        if (hoveredPlayer)
+        {
+            DrawCircleLines((int)screenX, (int)screenY, radius + 2f, Color.Yellow);
+            DrawCircleLines((int)screenX, (int)screenY, radius + 3f, Color.Yellow);
+        }
+
+        if (isDraggingPlayer)
+        {
+            DrawCircleLines((int)screenX, (int)screenY, radius + 1f, Color.White);
+            DrawCircleLines((int)screenX, (int)screenY, radius + 4f, Color.White);
+        }
+        else
+        {
+            DrawCircleLines((int)screenX, (int)screenY, radius, new Color(80, 170, 255, 255));
+            DrawCircleLines((int)screenX, (int)screenY, radius + 1f, new Color(80, 170, 255, 255));
+        }
 
         var cam = player.Camera;
         var lookDir = Vector3.Normalize(cam.Target - cam.Position);
@@ -181,7 +197,8 @@ public class EditorMapRenderer
 
     public void RenderEnemyLayer(
         EditorCamera camera, EnemySystem enemySystem, bool isMouseOverUI,
-        bool isSimulating, bool drawEnemyLineOfSight, ref int hoveredEnemyIndex, int selectedEnemyIndex,
+        bool isSimulating, bool drawEnemyLineOfSight, bool showPatrolPaths,
+        ref int hoveredEnemyIndex, int selectedEnemyIndex,
         bool isEditingPatrolPath, int patrolEditEnemyIndex, List<PatrolWaypoint> patrolPathInProgress)
     {
         float tileSize = camera.TileSize;
@@ -228,7 +245,7 @@ public class EditorMapRenderer
             float endY = centerY + MathF.Sin(angle) * dirLen;
             DrawLineEx(new Vector2(centerX, centerY), new Vector2(endX, endY), 2f, Color.White);
 
-            if (enemy.ShowPatrolPath && enemy.PatrolPath.Count > 0)
+            if (showPatrolPaths && enemy.ShowPatrolPath && enemy.PatrolPath.Count > 0)
             {
                 DrawPatrolPath(enemy, enemy.PatrolPath, camera, new Color(0, 200, 255, 200));
             }
@@ -262,11 +279,19 @@ public class EditorMapRenderer
         var mouseScreen = GetMousePosition();
         hoveredPickupIndex = -1;
 
-        float radius = tileSize * 0.32f;
+        var objectsTex = _mapData.Textures.Count > PickupSprites.ObjectsTextureIndex
+            ? _mapData.Textures[PickupSprites.ObjectsTextureIndex]
+            : default;
+        bool hasSpriteSheet = objectsTex.Id != 0;
+
+        float radius = tileSize * 0.35f;
 
         for (int i = 0; i < _mapData.Pickups.Count; i++)
         {
             var pickup = _mapData.Pickups[i];
+            float drawX = pickup.TileX * tileSize + camera.Offset.X;
+            float drawY = pickup.TileY * tileSize + camera.Offset.Y;
+
             var center = TileToCenterScreen(pickup.TileX, pickup.TileY, tileSize, camera.Offset);
             float centerX = center.X;
             float centerY = center.Y;
@@ -279,24 +304,34 @@ public class EditorMapRenderer
                     hoveredPickupIndex = i;
             }
 
-            var color = PickupVisuals.GetColor(pickup.Type);
-            DrawCircle((int)centerX, (int)centerY, radius, color);
-            DrawCircleLines((int)centerX, (int)centerY, radius + 1f, Color.White);
+            if (hasSpriteSheet)
+            {
+                // Visual-only offset: center the sprite on the tile (map data unchanged).
+                float visualY = drawY - tileSize * 0.5f;
+                var dest = new Rectangle(drawX, visualY, tileSize, tileSize);
+                PrimitiveRenderer.DrawScreenSprite(
+                    objectsTex,
+                    PickupSprites.GetFrameRect(pickup.Type),
+                    dest,
+                    Color.White);
+            }
+            else
+            {
+                var color = PickupVisuals.GetColor(pickup.Type);
+                DrawCircle((int)centerX, (int)centerY, radius, color);
+            }
 
             if (i == hoveredPickupIndex)
             {
+                DrawCircleLines((int)centerX, (int)centerY, radius + 2f, Color.Yellow);
                 DrawCircleLines((int)centerX, (int)centerY, radius + 3f, Color.Yellow);
-                DrawCircleLines((int)centerX, (int)centerY, radius + 4f, Color.Yellow);
             }
 
             if (i == selectedPickupIndex)
             {
-                DrawCircleLines((int)centerX, (int)centerY, radius + 2f, Color.White);
+                DrawCircleLines((int)centerX, (int)centerY, radius + 1f, Color.White);
+                DrawCircleLines((int)centerX, (int)centerY, radius + 4f, Color.White);
             }
-
-            string label = PickupVisuals.GetLabel(pickup.Type);
-            int labelW = MeasureText(label, 14);
-            DrawText(label, (int)(centerX - labelW / 2f), (int)(centerY - 6), 14, Color.White);
         }
     }
 

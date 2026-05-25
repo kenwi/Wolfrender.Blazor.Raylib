@@ -37,6 +37,9 @@ public class MapData
     public uint[] Doors { get; set; } = Array.Empty<uint>();
     public List<EnemyPlacement> Enemies { get; set; } = new();
     public List<PickupPlacement> Pickups { get; set; } = new();
+    public int PlayerSpawnTileX { get; set; } = 30;
+    public int PlayerSpawnTileY { get; set; } = 28;
+    public float PlayerSpawnWorldY { get; set; } = 2f;
     public List<Texture2D> Textures { get; set; } = new();
     public int Width { get; set; }
     public int Height { get; set; }

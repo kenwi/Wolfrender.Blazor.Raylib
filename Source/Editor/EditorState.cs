@@ -13,6 +13,7 @@ public class EditorState
 {
     public const string EnemiesLayerName = "Enemies";
     public const string PickupsLayerName = "Pickups";
+    public const string WallsLayerName = "Walls";
 
     public readonly MapData MapData;
     public readonly EnemySystem EnemySystem;
@@ -39,6 +40,10 @@ public class EditorState
     public int SelectedPickupIndex = -1;
     public bool IsDraggingPickup;
 
+    // Player spawn editing
+    public bool HoveredPlayer;
+    public bool IsDraggingPlayer;
+
     // Patrol path editing
     public bool IsEditingPatrolPath;
     public int PatrolEditEnemyIndex = -1;
@@ -59,6 +64,9 @@ public class EditorState
 
     /// <summary>When true, the editor draws live enemy FOV / line-of-sight cones during simulation.</summary>
     public bool DrawEnemyLineOfSight = true;
+
+    /// <summary>When false, authored patrol paths are hidden for all enemies (per-enemy toggle still applies when true).</summary>
+    public bool ShowPatrolPaths = false;
 
     // Mouse-over-UI flag (set by the active UI layer each frame)
     public bool IsMouseOverUI;
@@ -88,6 +96,8 @@ public class EditorState
             new() { Name = EnemiesLayerName, Tiles = Array.Empty<uint>() },
             new() { Name = PickupsLayerName, Tiles = Array.Empty<uint>() },
         };
+
+        ApplyPlayerSpawnFromMap();
     }
 
     public EditorLayer ActiveLayer => Layers[ActiveLayerIndex];
@@ -114,13 +124,32 @@ public class EditorState
         {
             TileX = x, TileY = y, Rotation = 0, EnemyType = "Guard"
         });
+        DeselectPickup();
         SelectedEnemyIndex = MapData.Enemies.Count - 1;
         IsDraggingEnemy = true;
         NotifyStateChanged();
     }
 
+    public void DeselectEnemy()
+    {
+        SelectedEnemyIndex = -1;
+        IsDraggingEnemy = false;
+    }
+
+    public void DeselectPickup()
+    {
+        SelectedPickupIndex = -1;
+        IsDraggingPickup = false;
+    }
+
+    /// <summary>Hide the yellow tile-under-cursor highlight when pointing at or dragging an entity.</summary>
+    public bool ShouldShowTileHighlight() =>
+        !HoveredPlayer && HoveredEnemyIndex < 0 && HoveredPickupIndex < 0
+        && !IsDraggingPlayer && !IsDraggingEnemy && !IsDraggingPickup;
+
     public void SelectEnemy(int index)
     {
+        DeselectPickup();
         SelectedEnemyIndex = index;
         IsDraggingEnemy = true;
         NotifyStateChanged();
@@ -148,6 +177,11 @@ public class EditorState
     public void PlacePickup(int x, int y)
     {
         if (x < 0 || x >= MapData.Width || y < 0 || y >= MapData.Height) return;
+        if (!CanPlacePickupAt(x, y))
+        {
+            SetStatus("Cannot place pickup on walls or doors");
+            return;
+        }
 
         int existing = FindPickupIndexAt(x, y);
         if (existing >= 0)
@@ -159,6 +193,7 @@ public class EditorState
             TileY = y,
             Type = SelectedPickupType
         });
+        DeselectEnemy();
         SelectedPickupIndex = MapData.Pickups.Count - 1;
         IsDraggingPickup = true;
         SetStatus($"Placed {SelectedPickupType} pickup");
@@ -167,6 +202,7 @@ public class EditorState
 
     public void SelectPickup(int index)
     {
+        DeselectEnemy();
         SelectedPickupIndex = index;
         IsDraggingPickup = true;
         if (index >= 0 && index < MapData.Pickups.Count)
@@ -178,6 +214,7 @@ public class EditorState
     {
         if (SelectedPickupIndex < 0 || SelectedPickupIndex >= MapData.Pickups.Count) return;
         if (x < 0 || x >= MapData.Width || y < 0 || y >= MapData.Height) return;
+        if (!CanPlacePickupAt(x, y)) return;
 
         var pickup = MapData.Pickups[SelectedPickupIndex];
         if (pickup.TileX == x && pickup.TileY == y)
@@ -265,6 +302,9 @@ public class EditorState
         MapData.Doors = new uint[tileCount];
         MapData.Enemies.Clear();
         MapData.Pickups.Clear();
+        MapData.PlayerSpawnTileX = 30;
+        MapData.PlayerSpawnTileY = 28;
+        MapData.PlayerSpawnWorldY = 2f;
         SelectedEnemyIndex = -1;
         HoveredEnemyIndex = -1;
         SelectedPickupIndex = -1;
@@ -291,6 +331,7 @@ public class EditorState
                 _ => layer.Tiles
             };
         }
+        ApplyPlayerSpawnFromMap();
         NotifyStateChanged();
     }
 
@@ -313,6 +354,7 @@ public class EditorState
             if (Layers[i].Name == EnemiesLayerName)
             {
                 ActiveLayerIndex = i;
+                NotifyStateChanged();
                 break;
             }
         }
@@ -325,9 +367,126 @@ public class EditorState
             if (Layers[i].Name == PickupsLayerName)
             {
                 ActiveLayerIndex = i;
+                NotifyStateChanged();
                 break;
             }
         }
+    }
+
+    public void SwitchToDoorLayer()
+    {
+        for (int i = 0; i < Layers.Count; i++)
+        {
+            if (Layers[i].Name == DoorsLayerName)
+            {
+                ActiveLayerIndex = i;
+                NotifyStateChanged();
+                break;
+            }
+        }
+    }
+
+    public void SwitchToWallsLayer()
+    {
+        for (int i = 0; i < Layers.Count; i++)
+        {
+            if (Layers[i].Name == WallsLayerName)
+            {
+                ActiveLayerIndex = i;
+                NotifyStateChanged();
+                break;
+            }
+        }
+    }
+
+    public uint GetDoorTileAt(int tileX, int tileY)
+    {
+        if (tileX < 0 || tileX >= MapData.Width || tileY < 0 || tileY >= MapData.Height)
+            return 0;
+        uint tile = MapData.Doors[MapData.Width * tileY + tileX];
+        return DoorTileEncoding.IsDoorTile(tile) ? tile : 0;
+    }
+
+    public uint GetWallTileAt(int tileX, int tileY)
+    {
+        if (tileX < 0 || tileX >= MapData.Width || tileY < 0 || tileY >= MapData.Height)
+            return 0;
+        uint tile = MapData.Walls[MapData.Width * tileY + tileX];
+        return tile > 0 ? tile : 0;
+    }
+
+    public bool CanPlacePickupAt(int tileX, int tileY) =>
+        GetDoorTileAt(tileX, tileY) == 0 && GetWallTileAt(tileX, tileY) == 0;
+
+    /// <summary>
+    /// When the pickups layer is active, clicking a door or wall tile switches to that layer.
+    /// Returns true if the click was handled (layer switched).
+    /// </summary>
+    public void ApplyPlayerSpawnFromMap()
+    {
+        SyncPlayerToSpawnTile(MapData.PlayerSpawnTileX, MapData.PlayerSpawnTileY);
+    }
+
+    public void SyncPlayerToSpawnTile(int tileX, int tileY)
+    {
+        if (tileX < 0 || tileX >= MapData.Width || tileY < 0 || tileY >= MapData.Height)
+            return;
+
+        MapData.PlayerSpawnTileX = tileX;
+        MapData.PlayerSpawnTileY = tileY;
+        Player.Position = LevelData.GetTileAnchorWorld(tileX, tileY, MapData.PlayerSpawnWorldY);
+        Player.OldPosition = Player.Position;
+
+        var cam = Player.Camera;
+        Vector3 forward = cam.Target - cam.Position;
+        float lookDistance = forward.Length();
+        if (lookDistance < 0.0001f)
+            forward = new Vector3(0f, 0f, -1f);
+        else
+            forward = Vector3.Normalize(forward);
+
+        cam.Position = Player.Position;
+        cam.Target = Player.Position + forward * lookDistance;
+        Player.Camera = cam;
+        NotifyStateChanged();
+    }
+
+    public void UpdatePlayerHover(EditorCamera camera, Vector2 mouseScreen, bool isMouseOverUI)
+    {
+        HoveredPlayer = false;
+        if (isMouseOverUI) return;
+
+        float tileSize = camera.TileSize;
+        float quadSize = LevelData.QuadSize;
+        float tileX = Player.Position.X / quadSize;
+        float tileY = Player.Position.Z / quadSize;
+        float centerX = (tileX + 0.5f) * tileSize + camera.Offset.X;
+        float centerY = (tileY + 0.5f) * tileSize + camera.Offset.Y;
+        float radius = tileSize * 0.35f;
+        float dx = mouseScreen.X - centerX;
+        float dy = mouseScreen.Y - centerY;
+        HoveredPlayer = dx * dx + dy * dy <= radius * radius;
+    }
+
+    public bool TrySwitchLayerFromPickupClick(int tileX, int tileY)
+    {
+        uint doorTile = GetDoorTileAt(tileX, tileY);
+        if (doorTile != 0)
+        {
+            SwitchToDoorLayer();
+            SelectedTileId = doorTile;
+            return true;
+        }
+
+        uint wallTile = GetWallTileAt(tileX, tileY);
+        if (wallTile != 0)
+        {
+            SwitchToWallsLayer();
+            SelectedTileId = wallTile;
+            return true;
+        }
+
+        return false;
     }
 
     // ─── Pathfinding visualizer ──────────────────────────────────────────────────
