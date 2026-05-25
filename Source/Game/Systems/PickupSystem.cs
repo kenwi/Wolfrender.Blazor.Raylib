@@ -47,11 +47,10 @@ public class PickupSystem
         if (!player.IsAlive || _pickupByTile.Length == 0)
             return;
 
-        // Match DrawSpriteTexture anchor (stored tile-center position + halfTile on X/Z).
-        float halfTile = LevelData.QuadSize * 0.5f;
+        // Match DrawSpriteTexture anchor (pickup position is the tile corner on X/Z).
         float invQuad = 1f / LevelData.QuadSize;
-        int tileX = (int)((player.Position.X - halfTile) * invQuad);
-        int tileY = (int)((player.Position.Z - halfTile) * invQuad);
+        int tileX = (int)(player.Position.X * invQuad);
+        int tileY = (int)(player.Position.Z * invQuad);
         if (tileX < 0 || tileX >= _mapWidth || tileY < 0 || tileY >= _mapHeight)
             return;
 
@@ -67,20 +66,13 @@ public class PickupSystem
 
     public void Render(Vector3 cameraPosition)
     {
-        float halfTile = LevelData.QuadSize * 0.5f;
-
         foreach (var pickup in _activePickups)
         {
             if (_objectsTexture.Id > 0)
             {
-                var billboardPosition = new Vector3(
-                    pickup.Position.X + halfTile,
-                    pickup.Position.Y,
-                    pickup.Position.Z + halfTile);
-
                 PrimitiveRenderer.DrawSpriteTexture(
                     _objectsTexture,
-                    billboardPosition,
+                    pickup.Position,
                     cameraPosition,
                     Color.White,
                     frameRect: PickupSprites.GetFrameRect(pickup.Type),
@@ -106,9 +98,9 @@ public class PickupSystem
             TileY = placement.TileY,
             Amount = PickupDefaults.GetAmount(placement.Type, placement.Amount),
             Position = new Vector3(
-                placement.TileX * quad + quad * 0.5f,
+                placement.TileX * quad,
                 1.5f,
-                placement.TileY * quad + quad * 0.5f)
+                placement.TileY * quad)
         };
     }
 
@@ -117,29 +109,41 @@ public class PickupSystem
     private static void ApplyPickup(Player player, Pickup pickup)
     {
         int amount = pickup.Amount;
+        string positions = FormatPickupPositions(player, pickup);
+
         switch (pickup.Type)
         {
             case PickupType.Health:
                 player.Health = MathF.Min(player.MaxHealth, player.Health + amount);
-                Debug.Log($"Picked up health (+{amount}), HP {(int)player.Health}/{(int)player.MaxHealth}");
+                Debug.Log($"Picked up health (+{amount}), HP {(int)player.Health}/{(int)player.MaxHealth}. {positions}");
                 break;
             case PickupType.Ammo:
                 player.Ammo += amount;
-                Debug.Log($"Picked up ammo (+{amount}), total {player.Ammo}");
+                Debug.Log($"Picked up ammo (+{amount}), total {player.Ammo}. {positions}");
                 break;
             case PickupType.MachineGun:
                 player.HasMachineGun = true;
                 player.Ammo += amount;
-                Debug.Log($"Picked up machine gun (+{amount} ammo), total {player.Ammo}");
+                Debug.Log($"Picked up machine gun (+{amount} ammo), total {player.Ammo}. {positions}");
                 break;
             case PickupType.GoldKey:
                 player.HasGoldKey = true;
-                Debug.Log("Picked up gold key");
+                Debug.Log($"Picked up gold key. {positions}");
                 break;
             case PickupType.SilverKey:
                 player.HasSilverKey = true;
-                Debug.Log("Picked up silver key");
+                Debug.Log($"Picked up silver key. {positions}");
                 break;
         }
+    }
+
+    private static string FormatPickupPositions(Player player, Pickup pickup)
+    {
+        var p = player.Position;
+        var m = pickup.Position;
+        float invQuad = 1f / LevelData.QuadSize;
+        int playerTileX = (int)(p.X * invQuad);
+        int playerTileY = (int)(p.Z * invQuad);
+        return $"pickup tile ({pickup.TileX}, {pickup.TileY}), player tile ({playerTileX}, {playerTileY}), pickup world ({m.X:F1}, {m.Y:F1}, {m.Z:F1}), player ({p.X:F1}, {p.Y:F1}, {p.Z:F1})";
     }
 }
