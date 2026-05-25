@@ -3,7 +3,10 @@
 
 @if (_editorScene != null)
 {
-    <div class="editor-overlay">
+    <div class="editor-overlay"
+         @onpointermove="OnOverlayPointerMove"
+         @onpointerup="OnOverlayPointerUp"
+         @onpointercancel="OnOverlayPointerUp">
         <WebEditorMenuBar State="_editorScene.State"
                           OnNewLevel="OnNewLevel"
                           OnSaveLevel="() => _showSaveDialog = true"
@@ -12,6 +15,7 @@
                           @bind-ShowTilePalette="_showTilePalette"
                           @bind-ShowCursorInfo="_showCursorInfo"
                           @bind-ShowEnemyProperties="_showEnemyProperties"
+                          @bind-ShowPlayerProperties="_showPlayerProperties"
                           @bind-ShowPickupPalette="_showPickupPalette"
                           @bind-ShowPickupProperties="_showPickupProperties"
                           @bind-ShowDebugLog="_showDebugLog" />
@@ -46,7 +50,11 @@
                                  TileInBounds="_cursorInBounds" />
         }
 
-        @if (_showEnemyProperties)
+        @if (_editorScene.State.ShouldShowPlayerPropertiesPanel(_showPlayerProperties))
+        {
+            <WebEditorPlayerProperties State="_editorScene.State" OnChanged="Refresh" />
+        }
+        else if (_editorScene.State.ShouldShowEnemyPropertiesPanel(_showEnemyProperties))
         {
             <WebEditorEnemyProperties State="_editorScene.State" OnChanged="Refresh" />
         }

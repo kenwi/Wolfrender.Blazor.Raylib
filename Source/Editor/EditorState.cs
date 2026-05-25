@@ -42,6 +42,7 @@ public class EditorState
 
     // Player spawn editing
     public bool HoveredPlayer;
+    public bool IsPlayerSelected;
     public bool IsDraggingPlayer;
 
     // Patrol path editing
@@ -70,6 +71,17 @@ public class EditorState
 
     // Mouse-over-UI flag (set by the active UI layer each frame)
     public bool IsMouseOverUI;
+
+    /// <summary>Shared screen position for player/enemy properties panels (web: CSS top/right; desktop: ImGui pos).</summary>
+    public const int EntityPropertiesPanelWidth = 280;
+    public int EntityPropertiesPanelTop { get; set; } = 500;
+    public int EntityPropertiesPanelRight { get; set; } = 10;
+    public bool IsDraggingEntityPropertiesPanel { get; private set; }
+
+    private float _entityPropsDragPointerX;
+    private float _entityPropsDragPointerY;
+    private int _entityPropsDragStartTop;
+    private int _entityPropsDragStartRight;
 
     // Status message
     public string StatusMessage = "";
@@ -109,6 +121,56 @@ public class EditorState
 
     public void NotifyStateChanged() => StateChanged?.Invoke();
 
+    public void OnEnemyPlacementEdited()
+    {
+        if (IsSimulating)
+            EnemySystem.Rebuild(MapData.Enemies, MapData);
+        NotifyStateChanged();
+    }
+
+    public Vector2 GetEntityPropertiesImGuiPos(int screenWidth) =>
+        new(screenWidth - EntityPropertiesPanelRight - EntityPropertiesPanelWidth, EntityPropertiesPanelTop);
+
+    public void SetEntityPropertiesFromImGuiPos(Vector2 pos, int screenWidth)
+    {
+        EntityPropertiesPanelTop = Math.Max(0, (int)pos.Y);
+        EntityPropertiesPanelRight = Math.Max(0, screenWidth - (int)pos.X - EntityPropertiesPanelWidth);
+    }
+
+    public void BeginEntityPropertiesPanelDrag(float clientX, float clientY)
+    {
+        IsDraggingEntityPropertiesPanel = true;
+        _entityPropsDragPointerX = clientX;
+        _entityPropsDragPointerY = clientY;
+        _entityPropsDragStartTop = EntityPropertiesPanelTop;
+        _entityPropsDragStartRight = EntityPropertiesPanelRight;
+    }
+
+    public void UpdateEntityPropertiesPanelDrag(float clientX, float clientY)
+    {
+        if (!IsDraggingEntityPropertiesPanel) return;
+
+        int dy = (int)(clientY - _entityPropsDragPointerY);
+        int dx = (int)(clientX - _entityPropsDragPointerX);
+        EntityPropertiesPanelTop = Math.Max(0, _entityPropsDragStartTop + dy);
+        EntityPropertiesPanelRight = Math.Max(0, _entityPropsDragStartRight - dx);
+        NotifyStateChanged();
+    }
+
+    public void EndEntityPropertiesPanelDrag()
+    {
+        if (!IsDraggingEntityPropertiesPanel) return;
+        IsDraggingEntityPropertiesPanel = false;
+        NotifyStateChanged();
+    }
+
+    /// <summary>At most one entity properties panel is shown: player spawn or selected enemy.</summary>
+    public bool ShouldShowPlayerPropertiesPanel(bool windowVisible) =>
+        windowVisible && IsPlayerSelected;
+
+    public bool ShouldShowEnemyPropertiesPanel(bool windowVisible) =>
+        windowVisible && SelectedEnemyIndex >= 0 && !IsPlayerSelected;
+
     public void PaintTile(int x, int y)
     {
         if (IsOnEnemyLayer || IsOnPickupLayer) return;
@@ -125,6 +187,7 @@ public class EditorState
             TileX = x, TileY = y, Rotation = 0, EnemyType = "Guard"
         });
         DeselectPickup();
+        DeselectPlayer();
         SelectedEnemyIndex = MapData.Enemies.Count - 1;
         IsDraggingEnemy = true;
         NotifyStateChanged();
@@ -142,6 +205,21 @@ public class EditorState
         IsDraggingPickup = false;
     }
 
+    public void DeselectPlayer()
+    {
+        IsPlayerSelected = false;
+        IsDraggingPlayer = false;
+    }
+
+    public void SelectPlayer()
+    {
+        DeselectEnemy();
+        DeselectPickup();
+        IsPlayerSelected = true;
+        IsDraggingPlayer = true;
+        NotifyStateChanged();
+    }
+
     /// <summary>Hide the yellow tile-under-cursor highlight when pointing at or dragging an entity.</summary>
     public bool ShouldShowTileHighlight() =>
         !HoveredPlayer && HoveredEnemyIndex < 0 && HoveredPickupIndex < 0
@@ -150,6 +228,7 @@ public class EditorState
     public void SelectEnemy(int index)
     {
         DeselectPickup();
+        DeselectPlayer();
         SelectedEnemyIndex = index;
         IsDraggingEnemy = true;
         NotifyStateChanged();
@@ -194,6 +273,7 @@ public class EditorState
             Type = SelectedPickupType
         });
         DeselectEnemy();
+        DeselectPlayer();
         SelectedPickupIndex = MapData.Pickups.Count - 1;
         IsDraggingPickup = true;
         SetStatus($"Placed {SelectedPickupType} pickup");
@@ -203,6 +283,7 @@ public class EditorState
     public void SelectPickup(int index)
     {
         DeselectEnemy();
+        DeselectPlayer();
         SelectedPickupIndex = index;
         IsDraggingPickup = true;
         if (index >= 0 && index < MapData.Pickups.Count)
@@ -305,6 +386,8 @@ public class EditorState
         MapData.PlayerSpawnTileX = 30;
         MapData.PlayerSpawnTileY = 28;
         MapData.PlayerSpawnWorldY = 2f;
+        MapData.PlayerSpawnRotation = -MathF.PI / 2f;
+        DeselectPlayer();
         SelectedEnemyIndex = -1;
         HoveredEnemyIndex = -1;
         SelectedPickupIndex = -1;
@@ -319,6 +402,7 @@ public class EditorState
         HoveredEnemyIndex = -1;
         SelectedPickupIndex = -1;
         HoveredPickupIndex = -1;
+        DeselectPlayer();
 
         foreach (var layer in Layers)
         {
@@ -425,6 +509,7 @@ public class EditorState
     public void ApplyPlayerSpawnFromMap()
     {
         SyncPlayerToSpawnTile(MapData.PlayerSpawnTileX, MapData.PlayerSpawnTileY);
+        ApplyPlayerSpawnRotation();
     }
 
     public void SyncPlayerToSpawnTile(int tileX, int tileY)
@@ -436,19 +521,37 @@ public class EditorState
         MapData.PlayerSpawnTileY = tileY;
         Player.Position = LevelData.GetTileAnchorWorld(tileX, tileY, MapData.PlayerSpawnWorldY);
         Player.OldPosition = Player.Position;
+        ApplyPlayerSpawnRotation();
+        NotifyStateChanged();
+    }
+
+    public void SetPlayerSpawnRotationIndex(int rotIndex)
+    {
+        const float step = MathF.PI / 4f;
+        MapData.PlayerSpawnRotation = Math.Clamp(rotIndex, 0, 7) * step;
+        ApplyPlayerSpawnRotation();
+        NotifyStateChanged();
+    }
+
+    public void ApplyPlayerSpawnRotation()
+    {
+        float r = MapData.PlayerSpawnRotation;
+        var forward = new Vector3(MathF.Cos(r), 0f, MathF.Sin(r));
 
         var cam = Player.Camera;
-        Vector3 forward = cam.Target - cam.Position;
-        float lookDistance = forward.Length();
+        float lookDistance = (cam.Target - cam.Position).Length();
         if (lookDistance < 0.0001f)
-            forward = new Vector3(0f, 0f, -1f);
-        else
-            forward = Vector3.Normalize(forward);
+            lookDistance = 1f;
 
         cam.Position = Player.Position;
         cam.Target = Player.Position + forward * lookDistance;
         Player.Camera = cam;
-        NotifyStateChanged();
+    }
+
+    public static int GetSpawnRotationIndex(float rotationRadians)
+    {
+        const float step = MathF.PI / 4f;
+        return Math.Clamp((int)MathF.Round(rotationRadians / step), 0, 7);
     }
 
     public void UpdatePlayerHover(EditorCamera camera, Vector2 mouseScreen, bool isMouseOverUI)

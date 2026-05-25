@@ -23,6 +23,8 @@ public class EnemyPlacement
     public string EnemyType { get; set; } = "Guard";
     public List<PatrolWaypoint> PatrolPath { get; set; } = new();
     public bool ShowPatrolPath { get; set; } = true;
+    /// <summary>When true, the enemy spawns already in <see cref="Entities.EnemyState.CORPSE"/>.</summary>
+    public bool StartsAsCorpse { get; set; }
 }
 
 /// <summary>
@@ -40,6 +42,8 @@ public class MapData
     public int PlayerSpawnTileX { get; set; } = 30;
     public int PlayerSpawnTileY { get; set; } = 28;
     public float PlayerSpawnWorldY { get; set; } = 2f;
+    /// <summary>Spawn facing in radians, snapped to 45° steps (same convention as <see cref="EnemyPlacement.Rotation"/>).</summary>
+    public float PlayerSpawnRotation { get; set; } = -MathF.PI / 2f;
     public List<Texture2D> Textures { get; set; } = new();
     public int Width { get; set; }
     public int Height { get; set; }

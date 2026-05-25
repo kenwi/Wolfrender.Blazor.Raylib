@@ -119,7 +119,8 @@ public class WebEditorScene : IScene
         }
 
         _mapRenderer.RenderPlayerIndicator(
-            State.Player, State.Camera, State.HoveredPlayer, State.IsDraggingPlayer);
+            State.Player, State.Camera, State.MapData.PlayerSpawnRotation,
+            State.HoveredPlayer, State.IsPlayerSelected, State.IsDraggingPlayer);
 
         var mouseScreen = GetMousePosition();
         var worldPos = State.Camera.ScreenToWorld(mouseScreen);
@@ -180,7 +181,7 @@ public class WebEditorScene : IScene
         State.UpdatePlayerHover(State.Camera, mouseScreen, State.IsMouseOverUI);
 
         if (!State.IsMouseOverUI && IsMouseButtonPressed(MouseButton.Left) && State.HoveredPlayer)
-            State.IsDraggingPlayer = true;
+            State.SelectPlayer();
 
         if (State.IsDraggingPlayer && IsMouseButtonDown(MouseButton.Left))
         {

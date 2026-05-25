@@ -6,8 +6,7 @@
 {
     var enemy = State.MapData.Enemies[State.SelectedEnemyIndex];
 
-    <div class="editor-panel editor-enemy-props" @onpointerenter="OnPointerEnter" @onpointerleave="OnPointerLeave">
-        <h3>Enemy Properties</h3>
+    <WebEditorEntityPropertiesPanel State="State" Title="Enemy Properties">
         <div class="info-value">Enemy #@State.SelectedEnemyIndex</div>
 
         <div class="info-label" style="margin-top: 6px;">Tile X</div>
@@ -28,6 +27,11 @@
 
         <div class="info-label" style="margin-top: 6px;">Type: @enemy.EnemyType</div>
         <button class="editor-btn" @onclick="() => SetGuardType(enemy)">Guard</button>
+
+        <label class="editor-checkbox-row" style="margin-top: 8px; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" checked="@enemy.StartsAsCorpse" @onchange="e => ToggleCorpse(enemy, e)" />
+            <span>Corpse (dead on spawn)</span>
+        </label>
 
         <h3 style="margin-top: 10px;">Patrol Path</h3>
 
@@ -57,7 +61,7 @@
         <div style="margin-top: 10px;">
             <button class="editor-btn danger" style="width: 100%;" @onclick="OnDelete">Delete Enemy</button>
         </div>
-    </div>
+    </WebEditorEntityPropertiesPanel>
 }
 
 @code {
@@ -118,6 +122,11 @@
         OnChanged.InvokeAsync();
     }
 
-    private void OnPointerEnter() => State.IsMouseOverUI = true;
-    private void OnPointerLeave() => State.IsMouseOverUI = false;
+    private void ToggleCorpse(EnemyPlacement enemy, ChangeEventArgs e)
+    {
+        enemy.StartsAsCorpse = e.Value is bool b && b;
+        State.OnEnemyPlacementEdited();
+        OnChanged.InvokeAsync();
+    }
+
 }

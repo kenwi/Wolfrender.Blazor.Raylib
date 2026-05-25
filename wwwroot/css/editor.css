@@ -212,11 +212,14 @@
     width: 260px;
 }
 
-.editor-enemy-props {
+.editor-entity-props {
     position: absolute;
-    top: 500px;
-    right: 10px;
     width: 280px;
+}
+
+.editor-entity-props .editor-panel-drag-handle {
+    cursor: move;
+    user-select: none;
 }
 
 .editor-pickup-props {

@@ -18,6 +18,7 @@ public class EnemyPlacementData
     public float Rotation { get; set; }
     public string EnemyType { get; set; } = "Guard";
     public List<PatrolWaypointData> PatrolPath { get; set; } = new();
+    public bool StartsAsCorpse { get; set; }
 }
 
 public class PickupPlacementData
@@ -33,6 +34,7 @@ public class PlayerSpawnData
     public int TileX { get; set; } = 30;
     public int TileY { get; set; } = 28;
     public float WorldY { get; set; } = 2f;
+    public float Rotation { get; set; } = -MathF.PI / 2f;
 }
 
 public class LevelFileData
@@ -121,7 +123,8 @@ public static class LevelSerializer
                 {
                     TileX = w.TileX,
                     TileY = w.TileY
-                }).ToList()
+                }).ToList(),
+                StartsAsCorpse = e.StartsAsCorpse
             }).ToList(),
             Pickups = mapData.Pickups.Select(p => new PickupPlacementData
             {
@@ -134,7 +137,8 @@ public static class LevelSerializer
             {
                 TileX = mapData.PlayerSpawnTileX,
                 TileY = mapData.PlayerSpawnTileY,
-                WorldY = mapData.PlayerSpawnWorldY
+                WorldY = mapData.PlayerSpawnWorldY,
+                Rotation = mapData.PlayerSpawnRotation
             }
         };
 
@@ -165,7 +169,8 @@ public static class LevelSerializer
             {
                 TileX = w.TileX,
                 TileY = w.TileY
-            }).ToList()
+            }).ToList(),
+            StartsAsCorpse = e.StartsAsCorpse
         }).ToList();
         mapData.Pickups = (fileData.Pickups ?? new List<PickupPlacementData>()).Select(p => new PickupPlacement
         {
@@ -180,6 +185,7 @@ public static class LevelSerializer
             mapData.PlayerSpawnTileX = fileData.PlayerSpawn.TileX;
             mapData.PlayerSpawnTileY = fileData.PlayerSpawn.TileY;
             mapData.PlayerSpawnWorldY = fileData.PlayerSpawn.WorldY;
+            mapData.PlayerSpawnRotation = fileData.PlayerSpawn.Rotation;
         }
     }
 

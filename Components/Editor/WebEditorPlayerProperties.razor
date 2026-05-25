@@ -1,0 +1,62 @@
+@using Game.Editor
+@using Game.Utilities
+
+@if (State.IsPlayerSelected)
+{
+    <WebEditorEntityPropertiesPanel State="State" Title="Player Properties">
+        <div class="info-value">Player spawn</div>
+
+        <div class="info-label" style="margin-top: 6px;">Tile X</div>
+        <input type="number" class="editor-input" value="@State.MapData.PlayerSpawnTileX" min="0" max="@(State.MapData.Width - 1)"
+               @onchange="SetTileX" />
+
+        <div class="info-label" style="margin-top: 4px;">Tile Y</div>
+        <input type="number" class="editor-input" value="@State.MapData.PlayerSpawnTileY" min="0" max="@(State.MapData.Height - 1)"
+               @onchange="SetTileY" />
+
+        <div class="info-label" style="margin-top: 6px;">World Position</div>
+        <div class="info-value">X: @((State.MapData.PlayerSpawnTileX * LevelData.QuadSize).ToString("F1")) &nbsp; Y: @State.MapData.PlayerSpawnWorldY.ToString("F1") &nbsp; Z: @((State.MapData.PlayerSpawnTileY * LevelData.QuadSize).ToString("F1"))</div>
+
+        <div class="info-label" style="margin-top: 6px;">Rotation: @RotationLabels[EditorState.GetSpawnRotationIndex(State.MapData.PlayerSpawnRotation)]</div>
+        <input type="range" class="editor-slider" min="0" max="7" step="1"
+               value="@EditorState.GetSpawnRotationIndex(State.MapData.PlayerSpawnRotation)"
+               @onchange="SetRotation" />
+    </WebEditorEntityPropertiesPanel>
+}
+
+@code {
+    [Parameter] public EditorState State { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private static readonly string[] RotationLabels = { "0°", "45°", "90°", "135°", "180°", "225°", "270°", "315°" };
+
+    private void SetTileX(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var val))
+        {
+            int x = Math.Clamp(val, 0, State.MapData.Width - 1);
+            State.SyncPlayerToSpawnTile(x, State.MapData.PlayerSpawnTileY);
+            OnChanged.InvokeAsync();
+        }
+    }
+
+    private void SetTileY(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var val))
+        {
+            int y = Math.Clamp(val, 0, State.MapData.Height - 1);
+            State.SyncPlayerToSpawnTile(State.MapData.PlayerSpawnTileX, y);
+            OnChanged.InvokeAsync();
+        }
+    }
+
+    private void SetRotation(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var idx))
+        {
+            State.SetPlayerSpawnRotationIndex(idx);
+            OnChanged.InvokeAsync();
+        }
+    }
+
+}

@@ -48,10 +48,13 @@ public class EditorGui
     private bool _showTilePalette = true;
     private bool _showCursorInfo = true;
     private bool _showEnemyProperties = true;
+    private bool _showPlayerProperties = true;
     private bool _showPickupPalette = true;
     private bool _showPickupProperties = true;
     private bool _showDebugLog = false;
     private bool _showPathfinding;
+
+    private string? _entityPropertiesActiveWindowTitle;
 
     public float GuiScale => _guiScale;
     public string StatusMessage => _statusMessage;
@@ -199,6 +202,9 @@ public class EditorGui
 
                 if (ImGui.MenuItem("Enemy Properties", null, _showEnemyProperties))
                     _showEnemyProperties = !_showEnemyProperties;
+
+                if (ImGui.MenuItem("Player Properties", null, _showPlayerProperties))
+                    _showPlayerProperties = !_showPlayerProperties;
 
                 if (ImGui.MenuItem("Pickup Properties", null, _showPickupProperties))
                     _showPickupProperties = !_showPickupProperties;
@@ -959,21 +965,93 @@ public class EditorGui
         ImGui.End();
     }
 
-    // ─── Enemy Properties Panel ──────────────────────────────────────────────────
-
-    public void RenderEnemyPropertiesPanel(
+    public void RenderEntityPropertiesPanel(
+        EditorState state,
         ref int selectedEnemyIndex,
         ref bool isEditingPatrolPath, ref int patrolEditEnemyIndex,
         List<PatrolWaypoint> patrolPathInProgress)
     {
-        if (!_showEnemyProperties) return;
-        if (selectedEnemyIndex < 0 || selectedEnemyIndex >= _mapData.Enemies.Count)
-            return;
+        bool showPlayer = state.ShouldShowPlayerPropertiesPanel(_showPlayerProperties);
+        bool showEnemy = state.ShouldShowEnemyPropertiesPanel(_showEnemyProperties);
 
+        if (!showPlayer && !showEnemy)
+        {
+            _entityPropertiesActiveWindowTitle = null;
+            return;
+        }
+
+        if (showPlayer)
+            RenderPlayerPropertiesPanel(state);
+        else
+            RenderEnemyPropertiesPanel(state, ref selectedEnemyIndex, ref isEditingPatrolPath,
+                ref patrolEditEnemyIndex, patrolPathInProgress);
+    }
+
+    private void BeginSyncedEntityPropertiesWindow(string title, ref bool open, EditorState state)
+    {
+        if (_entityPropertiesActiveWindowTitle != title)
+            ImGui.SetNextWindowPos(state.GetEntityPropertiesImGuiPos(GetScreenWidth()), ImGuiCond.Appearing);
+        _entityPropertiesActiveWindowTitle = title;
+        ImGui.Begin(title, ref open, ImGuiWindowFlags.AlwaysAutoResize);
+    }
+
+    private void EndSyncedEntityPropertiesWindow(EditorState state)
+    {
+        state.SetEntityPropertiesFromImGuiPos(ImGui.GetWindowPos(), GetScreenWidth());
+        ImGui.End();
+    }
+
+    // ─── Player Properties Panel ─────────────────────────────────────────────────
+
+    private void RenderPlayerPropertiesPanel(EditorState state)
+    {
+        BeginSyncedEntityPropertiesWindow("Player Properties", ref _showPlayerProperties, state);
+        ImGui.SetWindowFontScale(_guiScale);
+
+        ImGui.Text("Player Spawn");
+        ImGui.Separator();
+
+        int tileX = state.MapData.PlayerSpawnTileX;
+        int tileY = state.MapData.PlayerSpawnTileY;
+        if (ImGui.InputInt("Tile X", ref tileX))
+        {
+            tileX = Math.Clamp(tileX, 0, _mapData.Width - 1);
+            state.SyncPlayerToSpawnTile(tileX, state.MapData.PlayerSpawnTileY);
+        }
+        if (ImGui.InputInt("Tile Y", ref tileY))
+        {
+            tileY = Math.Clamp(tileY, 0, _mapData.Height - 1);
+            state.SyncPlayerToSpawnTile(state.MapData.PlayerSpawnTileX, tileY);
+        }
+
+        ImGui.Spacing();
+
+        float worldX = state.MapData.PlayerSpawnTileX * Utilities.LevelData.QuadSize;
+        float worldZ = state.MapData.PlayerSpawnTileY * Utilities.LevelData.QuadSize;
+        ImGui.Text("World Position");
+        ImGui.Text($"  X: {worldX:F1}  Y: {state.MapData.PlayerSpawnWorldY:F1}  Z: {worldZ:F1}");
+
+        ImGui.Spacing();
+
+        int rotIndex = EditorState.GetSpawnRotationIndex(state.MapData.PlayerSpawnRotation);
+        string[] labels = { "0°", "45°", "90°", "135°", "180°", "225°", "270°", "315°" };
+        if (ImGui.SliderInt("Rotation", ref rotIndex, 0, 7, labels[rotIndex]))
+            state.SetPlayerSpawnRotationIndex(rotIndex);
+
+        EndSyncedEntityPropertiesWindow(state);
+    }
+
+    // ─── Enemy Properties Panel ──────────────────────────────────────────────────
+
+    private void RenderEnemyPropertiesPanel(
+        EditorState state,
+        ref int selectedEnemyIndex,
+        ref bool isEditingPatrolPath, ref int patrolEditEnemyIndex,
+        List<PatrolWaypoint> patrolPathInProgress)
+    {
         var enemy = _mapData.Enemies[selectedEnemyIndex];
 
-        ImGui.SetNextWindowPos(new Vector2(GetScreenWidth() - 300, 500), ImGuiCond.FirstUseEver);
-        ImGui.Begin("Enemy Properties", ref _showEnemyProperties, ImGuiWindowFlags.AlwaysAutoResize);
+        BeginSyncedEntityPropertiesWindow("Enemy Properties", ref _showEnemyProperties, state);
         ImGui.SetWindowFontScale(_guiScale);
 
         ImGui.Text($"Enemy #{selectedEnemyIndex}");
@@ -1012,6 +1090,16 @@ public class EditorGui
 
         ImGui.Text($"Type: {enemy.EnemyType}");
         if (ImGui.Button("Guard")) enemy.EnemyType = "Guard";
+
+        ImGui.Spacing();
+
+        bool startsAsCorpse = enemy.StartsAsCorpse;
+        if (ImGui.Checkbox("Corpse (dead on spawn)", ref startsAsCorpse))
+        {
+            enemy.StartsAsCorpse = startsAsCorpse;
+            if (state.IsSimulating)
+                state.EnemySystem.Rebuild(state.MapData.Enemies, state.MapData);
+        }
 
         ImGui.Spacing();
         ImGui.Separator();
@@ -1079,7 +1167,7 @@ public class EditorGui
         }
         ImGui.PopStyleColor(2);
 
-        ImGui.End();
+        EndSyncedEntityPropertiesWindow(state);
     }
 
     // ─── Debug Log Panel ────────────────────────────────────────────────────────

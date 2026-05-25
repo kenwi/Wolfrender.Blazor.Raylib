@@ -52,6 +52,18 @@ public class EnemySystem
         _enemies = new List<Enemy>();
     }
 
+    public static void ApplyPlacementSpawnState(Enemy enemy, EnemyPlacement placement)
+    {
+        if (!placement.StartsAsCorpse)
+            return;
+
+        enemy.Health = 0f;
+        enemy.EnemyState = EnemyState.CORPSE;
+        enemy.DyingAnimationIndex = 4;
+        enemy.StateTimer = 0f;
+        enemy.CorpseLingerSeconds = float.MaxValue;
+    }
+
     /// <summary>
     /// Rebuild the enemy list from MapData enemy placements.
     /// Call this when the level data has changed (e.g. after editing in the level editor).
@@ -78,6 +90,7 @@ public class EnemySystem
                 PatrolPath = placement.PatrolPath.Select(wp =>
                     LevelData.GetTileAnchorWorld(wp.TileX, wp.TileY, 2f)).ToList()
             };
+            ApplyPlacementSpawnState(enemy, placement);
             _enemies.Add(enemy);
         }
     }

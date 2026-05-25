@@ -18,12 +18,6 @@ public class World : IScene
     private static readonly Vector3 InitialPlayerPosition =
         new(30.0f * LevelData.QuadSize, 2.0f, 28f * LevelData.QuadSize);
 
-    /// <summary>Legacy eye position used only to derive heading; <see cref="CameraSystem"/> always sets camera at the player.</summary>
-    private static readonly Vector3 LegacyCameraEyeForHeading =
-        new(30.0f * LevelData.QuadSize, 2.0f, 30f * LevelData.QuadSize);
-
-    private static readonly Vector3 LegacyCameraTargetForHeading = new(120.0f, 2.0f, 119.0f);
-
     private readonly Player _player;
     private readonly SoundSystem _soundSystem;
     private readonly EffectSystem _effectSystem;
@@ -233,11 +227,10 @@ public class World : IScene
         // CameraSystem forces camera.Position = player.Position every frame. If we leave
         // camera at a different point (old ctor did), the first frame after the console
         // closes snaps the view - looks like restart "moved" the player when toggling UI.
-        Vector3 heading = LegacyCameraTargetForHeading - LegacyCameraEyeForHeading;
-        float lookDistance = heading.Length();
-        Vector3 forward = lookDistance > 0.0001f
-            ? Vector3.Normalize(heading)
-            : new Vector3(0f, 0f, -1f);
+        float r = _mapData.PlayerSpawnRotation;
+        Vector3 forward = new(MathF.Cos(r), 0f, MathF.Sin(r));
+        const float defaultLookDistance = 1f;
+        float lookDistance = defaultLookDistance;
 
         var cam = _player.Camera;
         cam.Position = _player.Position;

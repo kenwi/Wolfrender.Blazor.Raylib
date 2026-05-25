@@ -170,7 +170,8 @@ public class LevelEditorScene : IScene
 
         // Draw player position indicator
         _mapRenderer.RenderPlayerIndicator(
-            _state.Player, _state.Camera, _state.HoveredPlayer, _state.IsDraggingPlayer);
+            _state.Player, _state.Camera, _state.MapData.PlayerSpawnRotation,
+            _state.HoveredPlayer, _state.IsPlayerSelected, _state.IsDraggingPlayer);
 
         // Pathfinding visualizer overlay
         _mapRenderer.DrawPathPreview(_state.PathStart, _state.PathEnd, _state.PathResult, _state.Camera);
@@ -199,7 +200,7 @@ public class LevelEditorScene : IScene
         _gui.RenderTilePalette(_state.Layers, _state.ActiveLayerIndex, _state, ref _state.SelectedTileId, ref _state.SelectedPickupType);
         _gui.RenderPickupPalette(_state);
         _gui.RenderInfoPanel(tileX, tileY, worldPos, tileInBounds, _state.CursorInfoFollowsMouse, _state.Layers);
-        _gui.RenderEnemyPropertiesPanel(ref _state.SelectedEnemyIndex, ref _state.IsEditingPatrolPath, ref _state.PatrolEditEnemyIndex, _state.PatrolPathInProgress);
+        _gui.RenderEntityPropertiesPanel(_state, ref _state.SelectedEnemyIndex, ref _state.IsEditingPatrolPath, ref _state.PatrolEditEnemyIndex, _state.PatrolPathInProgress);
         _gui.RenderPickupPropertiesPanel(ref _state.SelectedPickupIndex);
         _gui.RenderDebugLogPanel();
         _gui.RenderPathfindingPanel(_state);
@@ -259,7 +260,7 @@ public class LevelEditorScene : IScene
         _state.UpdatePlayerHover(_state.Camera, mouseScreen, mouseOverUI);
 
         if (!mouseOverUI && IsMouseButtonPressed(MouseButton.Left) && _state.HoveredPlayer)
-            _state.IsDraggingPlayer = true;
+            _state.SelectPlayer();
 
         if (_state.IsDraggingPlayer && IsMouseButtonDown(MouseButton.Left))
         {

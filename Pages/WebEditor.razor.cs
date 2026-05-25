@@ -28,6 +28,7 @@ public partial class WebEditor : IDisposable
     private bool _showTilePalette = true;
     private bool _showCursorInfo = true;
     private bool _showEnemyProperties = true;
+    private bool _showPlayerProperties = true;
     private bool _showPickupPalette = true;
     private bool _showPickupProperties = true;
     private bool _showDebugLog = false;
@@ -171,6 +172,21 @@ public partial class WebEditor : IDisposable
     private async Task Refresh()
     {
         await InvokeAsync(StateHasChanged);
+    }
+
+    private async void OnOverlayPointerMove(PointerEventArgs e)
+    {
+        var state = _editorScene?.State;
+        if (state == null || !state.IsDraggingEntityPropertiesPanel)
+            return;
+
+        state.UpdateEntityPropertiesPanelDrag((float)e.ClientX, (float)e.ClientY);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void OnOverlayPointerUp(PointerEventArgs e)
+    {
+        _editorScene?.State.EndEntityPropertiesPanelDrag();
     }
 
     public void Dispose()

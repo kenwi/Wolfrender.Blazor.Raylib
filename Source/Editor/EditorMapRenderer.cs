@@ -151,7 +151,8 @@ public class EditorMapRenderer
     }
 
     public void RenderPlayerIndicator(
-        Entities.Player player, EditorCamera camera, bool hoveredPlayer, bool isDraggingPlayer)
+        Entities.Player player, EditorCamera camera, float spawnRotation,
+        bool hoveredPlayer, bool isPlayerSelected, bool isDraggingPlayer)
     {
         float tileSize = camera.TileSize;
         float quadSize = Utilities.LevelData.QuadSize;
@@ -171,7 +172,12 @@ public class EditorMapRenderer
             DrawCircleLines((int)screenX, (int)screenY, radius + 3f, Color.Yellow);
         }
 
-        if (isDraggingPlayer)
+        if (isPlayerSelected)
+        {
+            DrawCircleLines((int)screenX, (int)screenY, radius + 1f, Color.White);
+            DrawCircleLines((int)screenX, (int)screenY, radius + 4f, Color.White);
+        }
+        else if (isDraggingPlayer)
         {
             DrawCircleLines((int)screenX, (int)screenY, radius + 1f, Color.White);
             DrawCircleLines((int)screenX, (int)screenY, radius + 4f, Color.White);
@@ -182,9 +188,7 @@ public class EditorMapRenderer
             DrawCircleLines((int)screenX, (int)screenY, radius + 1f, new Color(80, 170, 255, 255));
         }
 
-        var cam = player.Camera;
-        var lookDir = Vector3.Normalize(cam.Target - cam.Position);
-        float angle = MathF.Atan2(lookDir.Z, lookDir.X);
+        float angle = spawnRotation;
         float dirLen = radius * 0.9f;
         float endX = screenX + MathF.Cos(angle) * dirLen;
         float endY = screenY + MathF.Sin(angle) * dirLen;
@@ -225,7 +229,10 @@ public class EditorMapRenderer
                 }
             }
 
-            DrawCircle((int)centerX, (int)centerY, radius, new Color(200, 40, 40, 200));
+            var fillColor = enemy.StartsAsCorpse
+                ? new Color(90, 90, 90, 200)
+                : new Color(200, 40, 40, 200);
+            DrawCircle((int)centerX, (int)centerY, radius, fillColor);
 
             if (i == hoveredEnemyIndex)
             {
