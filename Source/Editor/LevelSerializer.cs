@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Game.Entities;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 
@@ -19,6 +20,14 @@ public class EnemyPlacementData
     public List<PatrolWaypointData> PatrolPath { get; set; } = new();
 }
 
+public class PickupPlacementData
+{
+    public int TileX { get; set; }
+    public int TileY { get; set; }
+    public string Type { get; set; } = "Health";
+    public int Amount { get; set; }
+}
+
 public class LevelFileData
 {
     public int Width { get; set; }
@@ -28,6 +37,7 @@ public class LevelFileData
     public uint[] Ceiling { get; set; } = Array.Empty<uint>();
     public uint[] Doors { get; set; } = Array.Empty<uint>();
     public List<EnemyPlacementData> Enemies { get; set; } = new();
+    public List<PickupPlacementData> Pickups { get; set; } = new();
 }
 
 public enum BmpTileLayer { Floor, Walls, Ceiling, Doors }
@@ -104,6 +114,13 @@ public static class LevelSerializer
                     TileX = w.TileX,
                     TileY = w.TileY
                 }).ToList()
+            }).ToList(),
+            Pickups = mapData.Pickups.Select(p => new PickupPlacementData
+            {
+                TileX = p.TileX,
+                TileY = p.TileY,
+                Type = p.Type.ToString(),
+                Amount = p.Amount
             }).ToList()
         };
 
@@ -136,6 +153,20 @@ public static class LevelSerializer
                 TileY = w.TileY
             }).ToList()
         }).ToList();
+        mapData.Pickups = (fileData.Pickups ?? new List<PickupPlacementData>()).Select(p => new PickupPlacement
+        {
+            TileX = p.TileX,
+            TileY = p.TileY,
+            Type = ParsePickupType(p.Type),
+            Amount = p.Amount
+        }).ToList();
+    }
+
+    private static PickupType ParsePickupType(string type)
+    {
+        return Enum.TryParse<PickupType>(type, ignoreCase: true, out var result)
+            ? result
+            : PickupType.Health;
     }
 
     public static void LoadFromTmx(MapData mapData, string path)
@@ -157,6 +188,7 @@ public static class LevelSerializer
         mapData.Walls = (uint[])walls.Data!.Value.GlobalTileIDs!.Value.Clone();
         mapData.Ceiling = (uint[])ceiling.Data!.Value.GlobalTileIDs!.Value.Clone();
         mapData.Doors = (uint[])doors.Data!.Value.GlobalTileIDs!.Value.Clone();
+        mapData.Pickups = new List<PickupPlacement>();
     }
 
     public static void LoadFromBmp(MapData mapData, string path)
@@ -182,6 +214,7 @@ public static class LevelSerializer
         mapData.Ceiling = new uint[tileCount];
         mapData.Doors = new uint[tileCount];
         mapData.Enemies = new List<EnemyPlacement>();
+        mapData.Pickups = new List<PickupPlacement>();
 
         for (int tileY = 0; tileY < mapHeight; tileY++)
         {

@@ -46,6 +46,7 @@ public class World : IScene
     private  RenderTexture2D _sceneRenderTexture;
     private InputState _inputState = new();
     private readonly EnemySystem _enemySystem;
+    private readonly PickupSystem _pickupSystem;
     private bool _deathHandled;
 
     public Player Player => _player;
@@ -76,6 +77,8 @@ public class World : IScene
         _hudSystem = new HudSystem(screenWidth, screenHeight);
         _minimapSystem = new MinimapSystem(_level, _renderSystem);
         _enemySystem = new EnemySystem(_player, _inputSystem, _collisionSystem, _doorSystem, _combatFeedback);
+        _pickupSystem = new PickupSystem();
+        _pickupSystem.Rebuild(_mapData.Pickups, _mapData);
         _animationSystem = new AnimationSystem(
             _textures[GameTextureIndex.EnemyGuard],
             _textures[GameTextureIndex.Weapons],
@@ -121,6 +124,7 @@ public class World : IScene
         // Rebuild doors and enemies from current MapData (may have changed in the editor)
         _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
         _enemySystem.Rebuild(_mapData.Enemies, _mapData);
+        _pickupSystem.Rebuild(_mapData.Pickups, _mapData);
 
         // Browser pointer lock requires a user gesture (click) before it can activate,
         // so start with mouse free and let InputSystem lock on first click.
@@ -174,6 +178,7 @@ public class World : IScene
         ResetPlayerToInitialSpawn();
         _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
         _enemySystem.Rebuild(_mapData.Enemies, _mapData);
+        _pickupSystem.Rebuild(_mapData.Pickups, _mapData);
         _effectSystem.Clear();
         _cameraSystem.ResetDeathFall();
         _deathHandled = false;
@@ -385,6 +390,8 @@ public class World : IScene
         {
             EndShaderMode();
         }
+
+        _pickupSystem.Render(_player.Camera.Position);
 
         // Draw 3D debug overlays (unlit, after shader ends)
         Debug.Draw3DOverlays(_inputState.IsDebugEnabled);

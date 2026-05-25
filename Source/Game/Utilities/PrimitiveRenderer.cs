@@ -590,5 +590,45 @@ public static class PrimitiveRenderer
         
         LevelData.DrawedQuads += 1;
     }
+
+    /// <summary>
+    /// Untextured semi-transparent billboard (faces the camera; optional 8-dir snap).
+    /// Draw after the lighting shader ends so colors are not attenuated.
+    /// </summary>
+    public static void DrawColoredBillboard(
+        Vector3 position,
+        Vector3 cameraPosition,
+        Color color,
+        float width = 1.5f,
+        float height = 1.5f,
+        bool quantizeToEightDirections = false)
+    {
+        SpriteBillboardGeometry.ComputeBillboardQuad(
+            position,
+            cameraPosition,
+            width,
+            height,
+            yAxisAngleRadians: 0f,
+            out var topLeft,
+            out var topRight,
+            out var bottomRight,
+            out var bottomLeft,
+            quantizeToEightDirections);
+
+        Rlgl.Begin(DrawMode.Quads);
+        Rlgl.Color4ub(color.R, color.G, color.B, color.A);
+
+        var normal = SpriteBillboardGeometry.ComputeBillboardFacingDirection(
+            position, cameraPosition, quantizeToEightDirections);
+        Rlgl.Normal3f(normal.X, normal.Y, normal.Z);
+
+        Rlgl.Vertex3f(topLeft.X, topLeft.Y, topLeft.Z);
+        Rlgl.Vertex3f(topRight.X, topRight.Y, topRight.Z);
+        Rlgl.Vertex3f(bottomRight.X, bottomRight.Y, bottomRight.Z);
+        Rlgl.Vertex3f(bottomLeft.X, bottomLeft.Y, bottomLeft.Z);
+
+        Rlgl.End();
+        LevelData.DrawedQuads += 1;
+    }
 }
 
