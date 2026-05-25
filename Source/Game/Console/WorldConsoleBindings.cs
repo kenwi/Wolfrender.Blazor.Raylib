@@ -35,7 +35,8 @@ public static class WorldConsoleBindings
                 overlay.ClearScrollback();
                 return ConsoleCommandResult.Ok("Console output cleared. History (↑/↓) is unchanged.");
             },
-            () => world.CurrentLevelPath);
+            () => world.CurrentLevelPath,
+            world.ListPickupsForConsole);
     }
 
     private static IReadOnlyList<RootBinding> CreateRoots(World world, Player player, EnemySystem enemySystem)

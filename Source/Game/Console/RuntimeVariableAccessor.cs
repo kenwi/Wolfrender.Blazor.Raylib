@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Numerics;
 using System.Reflection;
+using Game.Utilities;
 
 namespace Game.Console;
 
@@ -224,11 +225,23 @@ public sealed class RuntimeVariableAccessor : IConsoleVariableAccessor
         {
             float f => f.ToString("0.###", CultureInfo.InvariantCulture),
             double d => d.ToString("0.###", CultureInfo.InvariantCulture),
-            Vector2 v2 => $"{v2.X.ToString("0.###", CultureInfo.InvariantCulture)},{v2.Y.ToString("0.###", CultureInfo.InvariantCulture)}",
-            Vector3 v3 => $"{v3.X.ToString("0.###", CultureInfo.InvariantCulture)},{v3.Y.ToString("0.###", CultureInfo.InvariantCulture)},{v3.Z.ToString("0.###", CultureInfo.InvariantCulture)}",
+            Vector2 v2 => FormatVector2(v2),
+            Vector3 v3 => FormatVector3(v3),
             _ => Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty
         };
     }
+
+    private static string FormatVector2(Vector2 v) =>
+        $"{F(v.X)},{F(v.Y)}";
+
+    /// <summary>World X/Y/Z plus map tile containing X/Z (same as pickup collection).</summary>
+    private static string FormatVector3(Vector3 v)
+    {
+        var (tileX, tileY) = LevelData.GetTileFromWorld(v.X, v.Z);
+        return $"{F(v.X)},{F(v.Y)},{F(v.Z)} tile=({tileX},{tileY})";
+    }
+
+    private static string F(float n) => n.ToString("0.###", CultureInfo.InvariantCulture);
 
     private static bool TryParseValue(string text, Type targetType, out object value, out string error)
     {

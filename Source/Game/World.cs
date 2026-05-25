@@ -174,6 +174,41 @@ public class World : IScene
         }
     }
 
+    /// <summary>Console: <c>get pickups</c> — list placements from level data and runtime active state.</summary>
+    public ConsoleCommandResult ListPickupsForConsole()
+    {
+        var placements = _mapData.Pickups;
+        if (placements.Count == 0)
+            return ConsoleCommandResult.Ok($"No pickups in '{_currentLevelPath}'.");
+
+        var activeByTile = new HashSet<(int X, int Y)>(
+            _pickupSystem.ActivePickups.Select(p => (p.TileX, p.TileY)));
+
+        var rows = new List<string>(placements.Count);
+        for (int i = 0; i < placements.Count; i++)
+        {
+            var placement = placements[i];
+            int amount = PickupDefaults.GetAmount(placement.Type, placement.Amount);
+            string amountText = placement.Amount == 0
+                ? $"amount={amount} (default)"
+                : $"amount={amount}";
+
+            var world = LevelData.GetTileAnchorWorld(placement.TileX, placement.TileY, 1.5f);
+            string active = activeByTile.Contains((placement.TileX, placement.TileY)) ? "yes" : "no";
+
+            rows.Add(
+                $"#{i} {placement.Type} tile=({placement.TileX},{placement.TileY}) {amountText} " +
+                $"world=({world.X:F1},{world.Y:F1},{world.Z:F1}) active={active}");
+        }
+
+        int activeCount = _pickupSystem.ActivePickups.Count;
+        string summary = placements.Count == 1
+            ? $"1 pickup in '{_currentLevelPath}' ({activeCount} active):"
+            : $"{placements.Count} pickups in '{_currentLevelPath}' ({activeCount} active):";
+
+        return ConsoleCommandResult.Ok(summary, rows);
+    }
+
     private void ResetLevelState()
     {
         ResetPlayerToInitialSpawn();

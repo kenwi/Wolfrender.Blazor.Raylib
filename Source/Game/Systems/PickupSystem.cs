@@ -10,6 +10,9 @@ namespace Game.Systems;
 /// </summary>
 public class PickupSystem
 {
+    /// <summary>Nudge tile lookup on world Z by half a tile before flooring.</summary>
+    private static float CollectTileOffsetZ => LevelData.QuadSize * 0.5f;
+
     private Texture2D _objectsTexture;
 
     private readonly List<Pickup> _activePickups = new();
@@ -47,7 +50,9 @@ public class PickupSystem
         if (!player.IsAlive || _pickupByTile.Length == 0)
             return;
 
-        var (tileX, tileY) = LevelData.GetTileFromWorld(player.Position.X, player.Position.Z);
+        var (tileX, tileY) = LevelData.GetTileFromWorld(
+            player.Position.X + CollectTileOffsetZ,
+            player.Position.Z + CollectTileOffsetZ);
         if (tileX < 0 || tileX >= _mapWidth || tileY < 0 || tileY >= _mapHeight)
             return;
 
@@ -134,7 +139,7 @@ public class PickupSystem
     {
         var p = player.Position;
         var m = pickup.Position;
-        var (playerTileX, playerTileY) = LevelData.GetTileFromWorld(p.X, p.Z);
+        var (playerTileX, playerTileY) = LevelData.GetTileFromWorld(p.X, p.Z - CollectTileOffsetZ);
         return $"pickup tile ({pickup.TileX}, {pickup.TileY}), player tile ({playerTileX}, {playerTileY}), pickup world ({m.X:F1}, {m.Y:F1}, {m.Z:F1}), player ({p.X:F1}, {p.Y:F1}, {p.Z:F1})";
     }
 }
