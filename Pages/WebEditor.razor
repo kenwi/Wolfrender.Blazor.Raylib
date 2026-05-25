@@ -12,6 +12,8 @@
                           @bind-ShowTilePalette="_showTilePalette"
                           @bind-ShowCursorInfo="_showCursorInfo"
                           @bind-ShowEnemyProperties="_showEnemyProperties"
+                          @bind-ShowPickupPalette="_showPickupPalette"
+                          @bind-ShowPickupProperties="_showPickupProperties"
                           @bind-ShowDebugLog="_showDebugLog" />
 
         @if (_showLayers)
@@ -21,7 +23,19 @@
 
         @if (_showTilePalette)
         {
-            <WebEditorTilePalette State="_editorScene.State" OnChanged="Refresh" />
+            @if (_editorScene.State.IsOnDoorLayer)
+            {
+                <WebEditorDoorPalette State="_editorScene.State" OnChanged="Refresh" />
+            }
+            else
+            {
+                <WebEditorTilePalette State="_editorScene.State" OnChanged="Refresh" />
+            }
+        }
+
+        @if (_showPickupPalette)
+        {
+            <WebEditorPickupPalette State="_editorScene.State" OnChanged="Refresh" />
         }
 
         @if (_showCursorInfo)
@@ -35,6 +49,11 @@
         @if (_showEnemyProperties)
         {
             <WebEditorEnemyProperties State="_editorScene.State" OnChanged="Refresh" />
+        }
+
+        @if (_showPickupProperties)
+        {
+            <WebEditorPickupProperties State="_editorScene.State" OnChanged="Refresh" />
         }
 
         @if (_showDebugLog)

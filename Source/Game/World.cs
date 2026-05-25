@@ -46,6 +46,7 @@ public class World : IScene
     private  RenderTexture2D _sceneRenderTexture;
     private InputState _inputState = new();
     private readonly EnemySystem _enemySystem;
+    private readonly PickupSystem _pickupSystem;
     private bool _deathHandled;
 
     public Player Player => _player;
@@ -76,6 +77,9 @@ public class World : IScene
         _hudSystem = new HudSystem(screenWidth, screenHeight);
         _minimapSystem = new MinimapSystem(_level, _renderSystem);
         _enemySystem = new EnemySystem(_player, _inputSystem, _collisionSystem, _doorSystem, _combatFeedback);
+        _pickupSystem = new PickupSystem();
+        _pickupSystem.SetObjectsTexture(_textures[GameTextureIndex.Objects]);
+        _pickupSystem.Rebuild(_mapData.Pickups, _mapData);
         _animationSystem = new AnimationSystem(
             _textures[GameTextureIndex.EnemyGuard],
             _textures[GameTextureIndex.Weapons],
@@ -121,6 +125,7 @@ public class World : IScene
         // Rebuild doors and enemies from current MapData (may have changed in the editor)
         _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
         _enemySystem.Rebuild(_mapData.Enemies, _mapData);
+        _pickupSystem.Rebuild(_mapData.Pickups, _mapData);
 
         // Browser pointer lock requires a user gesture (click) before it can activate,
         // so start with mouse free and let InputSystem lock on first click.
@@ -169,11 +174,47 @@ public class World : IScene
         }
     }
 
+    /// <summary>Console: <c>get pickups</c> — list placements from level data and runtime active state.</summary>
+    public ConsoleCommandResult ListPickupsForConsole()
+    {
+        var placements = _mapData.Pickups;
+        if (placements.Count == 0)
+            return ConsoleCommandResult.Ok($"No pickups in '{_currentLevelPath}'.");
+
+        var activeByTile = new HashSet<(int X, int Y)>(
+            _pickupSystem.ActivePickups.Select(p => (p.TileX, p.TileY)));
+
+        var rows = new List<string>(placements.Count);
+        for (int i = 0; i < placements.Count; i++)
+        {
+            var placement = placements[i];
+            int amount = PickupDefaults.GetAmount(placement.Type, placement.Amount);
+            string amountText = placement.Amount == 0
+                ? $"amount={amount} (default)"
+                : $"amount={amount}";
+
+            var world = LevelData.GetTileAnchorWorld(placement.TileX, placement.TileY, 1.5f);
+            string active = activeByTile.Contains((placement.TileX, placement.TileY)) ? "yes" : "no";
+
+            rows.Add(
+                $"#{i} {placement.Type} tile=({placement.TileX},{placement.TileY}) {amountText} " +
+                $"world=({world.X:F1},{world.Y:F1},{world.Z:F1}) active={active}");
+        }
+
+        int activeCount = _pickupSystem.ActivePickups.Count;
+        string summary = placements.Count == 1
+            ? $"1 pickup in '{_currentLevelPath}' ({activeCount} active):"
+            : $"{placements.Count} pickups in '{_currentLevelPath}' ({activeCount} active):";
+
+        return ConsoleCommandResult.Ok(summary, rows);
+    }
+
     private void ResetLevelState()
     {
         ResetPlayerToInitialSpawn();
         _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
         _enemySystem.Rebuild(_mapData.Enemies, _mapData);
+        _pickupSystem.Rebuild(_mapData.Pickups, _mapData);
         _effectSystem.Clear();
         _cameraSystem.ResetDeathFall();
         _deathHandled = false;
@@ -186,6 +227,7 @@ public class World : IScene
         _player.Velocity = Vector3.Zero;
         _player.Health = _player.MaxHealth;
         _player.WeaponCooldownRemaining = 0f;
+        _player.ResetInventory();
 
         // CameraSystem forces camera.Position = player.Position every frame. If we leave
         // camera at a different point (old ctor did), the first frame after the console
@@ -276,8 +318,9 @@ public class World : IScene
                 _player.Velocity = _inputSystem.GetMoveDirection(_player) * _player.MoveSpeed;
                 _movementSystem.Update(_player, deltaTime);
                 _collisionSystem.Update(_player, deltaTime);
+                _pickupSystem.Update(_player);
                 _cameraSystem.Update(_player, _inputState.IsMouseFree, mouseDelta);
-                _doorSystem.Update(deltaTime, _inputState, _player.Position, _enemySystem.Enemies);
+                _doorSystem.Update(deltaTime, _inputState, _player, _enemySystem.Enemies);
                 _animationSystem.Update(deltaTime);
                 _enemySystem.Update(deltaTime);
 
@@ -293,7 +336,7 @@ public class World : IScene
                 HandlePlayerDeath();
                 _player.Velocity = Vector3.Zero;
                 _cameraSystem.UpdateDeathFall(_player, deltaTime);
-                _doorSystem.Update(deltaTime, _inputState, _player.Position, _enemySystem.Enemies);
+                _doorSystem.Update(deltaTime, _inputState, _player, _enemySystem.Enemies);
                 _animationSystem.Update(deltaTime);
                 _enemySystem.Update(deltaTime);
                 TryRestartFromGameOver();
@@ -386,6 +429,8 @@ public class World : IScene
             EndShaderMode();
         }
 
+        _pickupSystem.Render(_player.Camera.Position);
+
         // Draw 3D debug overlays (unlit, after shader ends)
         Debug.Draw3DOverlays(_inputState.IsDebugEnabled);
         
@@ -419,10 +464,16 @@ public class World : IScene
         var healthLabel = $"HEALTH: {(int)_player.Health} / {(int)_player.MaxHealth}";
         DrawText(healthLabel, 10, 40, 20, _player.IsAlive ? Color.RayWhite : Color.Red);
 
+        if (_player.IsAlive)
+            DrawInventoryHud();
+
         if (_player.IsAlive && !_consoleOverlay.IsOpen)
             _animationSystem.RenderWeaponOverlay(GetScreenWidth(), GetScreenHeight());
 
         _effectSystem.RenderScreenOverlay(GetScreenWidth(), GetScreenHeight());
+
+        if (_player.IsAlive && !_consoleOverlay.IsOpen && _doorSystem.HasLockedHint)
+            DrawDoorLockedHint();
 
         if (!_player.IsAlive && !_consoleOverlay.IsOpen)
             DrawGameOverOverlay();
@@ -444,6 +495,52 @@ public class World : IScene
         _consoleOverlay.Render();
         
         EndDrawing();
+    }
+
+    private void DrawInventoryHud()
+    {
+        const int fontSize = 18;
+        int y = 68;
+
+        string weaponLabel = _player.HasMachineGun ? "WEAPON: MACHINE GUN" : "WEAPON: PISTOL";
+        DrawText(weaponLabel, 10, y, fontSize, Color.RayWhite);
+        y += 24;
+
+        if (_player.HasMachineGun || _player.Ammo > 0)
+        {
+            DrawText($"AMMO: {_player.Ammo}", 10, y, fontSize, new Color(255, 220, 40, 255));
+            y += 24;
+        }
+
+        var goldColor = _player.HasGoldKey ? new Color(255, 210, 40, 255) : new Color(100, 90, 50, 255);
+        var silverColor = _player.HasSilverKey ? new Color(200, 220, 255, 255) : new Color(90, 95, 110, 255);
+        DrawText("KEYS:", 10, y, fontSize, Color.RayWhite);
+        DrawText(" GOLD", 58, y, fontSize, goldColor);
+        DrawText(" SILVER", 118, y, fontSize, silverColor);
+    }
+
+    private void DrawDoorLockedHint()
+    {
+        int screenW = GetScreenWidth();
+        int screenH = GetScreenHeight();
+
+        const string subtitle = "DOOR LOCKED";
+        const int subtitleSize = 28;
+        const int titleSize = 52;
+        string title = _doorSystem.LockedHintOverlayText;
+
+        int titleW = MeasureText(title, titleSize);
+        int subtitleW = MeasureText(subtitle, subtitleSize);
+        int panelW = Math.Max(titleW, subtitleW) + 80;
+        int panelH = 140;
+        int panelX = (screenW - panelW) / 2;
+        int panelY = (screenH - panelH) / 2;
+
+        DrawRectangle(panelX, panelY, panelW, panelH, new Color(0, 0, 0, 200));
+        DrawRectangleLines(panelX, panelY, panelW, panelH, _doorSystem.LockedHintColor);
+
+        DrawText(subtitle, (screenW - subtitleW) / 2, panelY + 16, subtitleSize, new Color(220, 220, 220, 255));
+        DrawText(title, (screenW - titleW) / 2, panelY + 56, titleSize, _doorSystem.LockedHintColor);
     }
 
     private void DrawGameOverOverlay()

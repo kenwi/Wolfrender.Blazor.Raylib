@@ -1,4 +1,5 @@
 using System.Numerics;
+using Game.Entities;
 using Game.Systems;
 using Game.Utilities;
 
@@ -11,6 +12,7 @@ namespace Game.Editor;
 public class EditorState
 {
     public const string EnemiesLayerName = "Enemies";
+    public const string PickupsLayerName = "Pickups";
 
     public readonly MapData MapData;
     public readonly EnemySystem EnemySystem;
@@ -30,6 +32,12 @@ public class EditorState
     public int HoveredEnemyIndex = -1;
     public int SelectedEnemyIndex = -1;
     public bool IsDraggingEnemy;
+
+    // Pickup editing
+    public PickupType SelectedPickupType = PickupType.Health;
+    public int HoveredPickupIndex = -1;
+    public int SelectedPickupIndex = -1;
+    public bool IsDraggingPickup;
 
     // Patrol path editing
     public bool IsEditingPatrolPath;
@@ -76,19 +84,24 @@ public class EditorState
             new() { Name = "Floor", Tiles = mapData.Floor },
             new() { Name = "Walls", Tiles = mapData.Walls },
             new() { Name = "Ceiling", Tiles = mapData.Ceiling, IsVisible = false },
-            new() { Name = "Doors", Tiles = mapData.Doors },
+            new() { Name = DoorsLayerName, Tiles = mapData.Doors },
             new() { Name = EnemiesLayerName, Tiles = Array.Empty<uint>() },
+            new() { Name = PickupsLayerName, Tiles = Array.Empty<uint>() },
         };
     }
 
     public EditorLayer ActiveLayer => Layers[ActiveLayerIndex];
     public bool IsOnEnemyLayer => Layers[ActiveLayerIndex].Name == EnemiesLayerName;
+    public bool IsOnPickupLayer => Layers[ActiveLayerIndex].Name == PickupsLayerName;
+    public bool IsOnDoorLayer => Layers[ActiveLayerIndex].Name == DoorsLayerName;
+
+    public const string DoorsLayerName = "Doors";
 
     public void NotifyStateChanged() => StateChanged?.Invoke();
 
     public void PaintTile(int x, int y)
     {
-        if (IsOnEnemyLayer) return;
+        if (IsOnEnemyLayer || IsOnPickupLayer) return;
         if (x < 0 || x >= MapData.Width || y < 0 || y >= MapData.Height) return;
         var layer = Layers[ActiveLayerIndex];
         layer.Tiles[MapData.Width * y + x] = SelectedTileId;
@@ -126,6 +139,65 @@ public class EditorState
         if (SelectedEnemyIndex < 0 || SelectedEnemyIndex >= MapData.Enemies.Count) return;
         MapData.Enemies.RemoveAt(SelectedEnemyIndex);
         SelectedEnemyIndex = -1;
+        NotifyStateChanged();
+    }
+
+    public int FindPickupIndexAt(int tileX, int tileY) =>
+        MapData.Pickups.FindIndex(p => p.TileX == tileX && p.TileY == tileY);
+
+    public void PlacePickup(int x, int y)
+    {
+        if (x < 0 || x >= MapData.Width || y < 0 || y >= MapData.Height) return;
+
+        int existing = FindPickupIndexAt(x, y);
+        if (existing >= 0)
+            MapData.Pickups.RemoveAt(existing);
+
+        MapData.Pickups.Add(new PickupPlacement
+        {
+            TileX = x,
+            TileY = y,
+            Type = SelectedPickupType
+        });
+        SelectedPickupIndex = MapData.Pickups.Count - 1;
+        IsDraggingPickup = true;
+        SetStatus($"Placed {SelectedPickupType} pickup");
+        NotifyStateChanged();
+    }
+
+    public void SelectPickup(int index)
+    {
+        SelectedPickupIndex = index;
+        IsDraggingPickup = true;
+        if (index >= 0 && index < MapData.Pickups.Count)
+            SelectedPickupType = MapData.Pickups[index].Type;
+        NotifyStateChanged();
+    }
+
+    public void MovePickup(int x, int y)
+    {
+        if (SelectedPickupIndex < 0 || SelectedPickupIndex >= MapData.Pickups.Count) return;
+        if (x < 0 || x >= MapData.Width || y < 0 || y >= MapData.Height) return;
+
+        var pickup = MapData.Pickups[SelectedPickupIndex];
+        if (pickup.TileX == x && pickup.TileY == y)
+            return;
+
+        int occupant = FindPickupIndexAt(x, y);
+        if (occupant >= 0 && occupant != SelectedPickupIndex)
+            MapData.Pickups.RemoveAt(occupant);
+
+        pickup.TileX = x;
+        pickup.TileY = y;
+        if (SelectedPickupIndex >= MapData.Pickups.Count)
+            SelectedPickupIndex = MapData.Pickups.Count - 1;
+    }
+
+    public void DeleteSelectedPickup()
+    {
+        if (SelectedPickupIndex < 0 || SelectedPickupIndex >= MapData.Pickups.Count) return;
+        MapData.Pickups.RemoveAt(SelectedPickupIndex);
+        SelectedPickupIndex = -1;
         NotifyStateChanged();
     }
 
@@ -181,7 +253,7 @@ public class EditorState
     public void UpdateDoorsDuringSimulation(float deltaTime, bool interactPressed)
     {
         var input = new InputState { IsInteractPressed = interactPressed };
-        DoorSystem.Update(deltaTime, input, Player.Position, EnemySystem.Enemies);
+        DoorSystem.Update(deltaTime, input, Player, EnemySystem.Enemies);
     }
 
     public void ClearLevel()
@@ -192,8 +264,11 @@ public class EditorState
         MapData.Ceiling = new uint[tileCount];
         MapData.Doors = new uint[tileCount];
         MapData.Enemies.Clear();
+        MapData.Pickups.Clear();
         SelectedEnemyIndex = -1;
         HoveredEnemyIndex = -1;
+        SelectedPickupIndex = -1;
+        HoveredPickupIndex = -1;
         RefreshLayerReferences();
         SetStatus("New empty level created");
     }
@@ -202,6 +277,8 @@ public class EditorState
     {
         SelectedEnemyIndex = -1;
         HoveredEnemyIndex = -1;
+        SelectedPickupIndex = -1;
+        HoveredPickupIndex = -1;
 
         foreach (var layer in Layers)
         {
@@ -234,6 +311,18 @@ public class EditorState
         for (int i = 0; i < Layers.Count; i++)
         {
             if (Layers[i].Name == EnemiesLayerName)
+            {
+                ActiveLayerIndex = i;
+                break;
+            }
+        }
+    }
+
+    public void SwitchToPickupLayer()
+    {
+        for (int i = 0; i < Layers.Count; i++)
+        {
+            if (Layers[i].Name == PickupsLayerName)
             {
                 ActiveLayerIndex = i;
                 break;

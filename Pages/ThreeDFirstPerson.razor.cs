@@ -106,6 +106,7 @@ public partial class ThreeDFirstPerson : IDisposable
             "resources/door.png",
             "resources/enemy_guard.png",
             "resources/weapons2.png",
+            "resources/Objects.png",
             "resources/level.json",
             "resources/test.json",
             "resources/shaders/transparency.fs",

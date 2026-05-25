@@ -1,0 +1,145 @@
+using System.Numerics;
+using Game.Entities;
+using Game.Utilities;
+using Raylib_cs;
+
+namespace Game.Systems;
+
+/// <summary>
+/// Spawns, draws, and collects level pickups via tile lookup under the player.
+/// </summary>
+public class PickupSystem
+{
+    /// <summary>Nudge tile lookup on world Z by half a tile before flooring.</summary>
+    private static float CollectTileOffsetZ => LevelData.QuadSize * 0.5f;
+
+    private Texture2D _objectsTexture;
+
+    private readonly List<Pickup> _activePickups = new();
+    private Pickup?[] _pickupByTile = Array.Empty<Pickup?>();
+    private int _mapWidth;
+    private int _mapHeight;
+
+    public IReadOnlyList<Pickup> ActivePickups => _activePickups;
+
+    public void SetObjectsTexture(Texture2D texture) => _objectsTexture = texture;
+
+    public void Rebuild(IReadOnlyList<PickupPlacement> placements, MapData mapData)
+    {
+        _mapWidth = mapData.Width;
+        _mapHeight = mapData.Height;
+        int tileCount = mapData.Width * mapData.Height;
+        _pickupByTile = new Pickup?[tileCount];
+        _activePickups.Clear();
+
+        foreach (var placement in placements)
+        {
+            if (placement.TileX < 0 || placement.TileX >= mapData.Width
+                || placement.TileY < 0 || placement.TileY >= mapData.Height)
+                continue;
+
+            var pickup = CreatePickup(placement);
+            int idx = TileIndex(placement.TileX, placement.TileY);
+            _pickupByTile[idx] = pickup;
+            _activePickups.Add(pickup);
+        }
+    }
+
+    public void Update(Player player)
+    {
+        if (!player.IsAlive || _pickupByTile.Length == 0)
+            return;
+
+        var (tileX, tileY) = LevelData.GetTileFromWorld(
+            player.Position.X + CollectTileOffsetZ,
+            player.Position.Z + CollectTileOffsetZ);
+        if (tileX < 0 || tileX >= _mapWidth || tileY < 0 || tileY >= _mapHeight)
+            return;
+
+        int idx = TileIndex(tileX, tileY);
+        var pickup = _pickupByTile[idx];
+        if (pickup is null)
+            return;
+
+        ApplyPickup(player, pickup);
+        _pickupByTile[idx] = null;
+        _activePickups.Remove(pickup);
+    }
+
+    public void Render(Vector3 cameraPosition)
+    {
+        foreach (var pickup in _activePickups)
+        {
+            if (_objectsTexture.Id > 0)
+            {
+                PrimitiveRenderer.DrawSpriteTexture(
+                    _objectsTexture,
+                    pickup.Position,
+                    cameraPosition,
+                    Color.White,
+                    frameRect: PickupSprites.GetFrameRect(pickup.Type),
+                    quantizeToEightDirections: false);
+            }
+            else
+            {
+                PrimitiveRenderer.DrawColoredBillboard(
+                    pickup.Position,
+                    cameraPosition,
+                    PickupVisuals.GetColor(pickup.Type));
+            }
+        }
+    }
+
+    private Pickup CreatePickup(PickupPlacement placement)
+    {
+        return new Pickup
+        {
+            Type = placement.Type,
+            TileX = placement.TileX,
+            TileY = placement.TileY,
+            Amount = PickupDefaults.GetAmount(placement.Type, placement.Amount),
+            Position = LevelData.GetTileAnchorWorld(placement.TileX, placement.TileY, 1.5f)
+        };
+    }
+
+    private int TileIndex(int tileX, int tileY) => _mapWidth * tileY + tileX;
+
+    private static void ApplyPickup(Player player, Pickup pickup)
+    {
+        int amount = pickup.Amount;
+        string positions = FormatPickupPositions(player, pickup);
+
+        switch (pickup.Type)
+        {
+            case PickupType.Health:
+                player.Health = MathF.Min(player.MaxHealth, player.Health + amount);
+                Debug.Log($"Picked up health (+{amount}), HP {(int)player.Health}/{(int)player.MaxHealth}. {positions}");
+                break;
+            case PickupType.Ammo:
+                player.Ammo += amount;
+                Debug.Log($"Picked up ammo (+{amount}), total {player.Ammo}. {positions}");
+                break;
+            case PickupType.MachineGun:
+                player.HasMachineGun = true;
+                player.Ammo += amount;
+                Debug.Log($"Picked up machine gun (+{amount} ammo), total {player.Ammo}. {positions}");
+                break;
+            case PickupType.GoldKey:
+                player.HasGoldKey = true;
+                Debug.Log($"Picked up gold key. {positions}");
+                break;
+            case PickupType.SilverKey:
+                player.HasSilverKey = true;
+                Debug.Log($"Picked up silver key. {positions}");
+                break;
+        }
+    }
+
+    private static string FormatPickupPositions(Player player, Pickup pickup)
+    {
+        var p = player.Position;
+        var m = pickup.Position;
+        var (playerTileX, playerTileY) = LevelData.GetTileFromWorld(p.X, p.Z - CollectTileOffsetZ);
+        return $"pickup tile ({pickup.TileX}, {pickup.TileY}), player tile ({playerTileX}, {playerTileY}), pickup world ({m.X:F1}, {m.Y:F1}, {m.Z:F1}), player ({p.X:F1}, {p.Y:F1}, {p.Z:F1})";
+    }
+}

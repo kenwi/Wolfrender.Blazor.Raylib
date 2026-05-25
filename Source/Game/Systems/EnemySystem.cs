@@ -66,10 +66,7 @@ public class EnemySystem
 
         foreach (var placement in placements)
         {
-            var startPos = new Vector3(
-                placement.TileX * LevelData.QuadSize,
-                2f,
-                placement.TileY * LevelData.QuadSize);
+            var startPos = LevelData.GetTileAnchorWorld(placement.TileX, placement.TileY, 2f);
 
             var enemy = new EnemyGuard
             {
@@ -78,10 +75,8 @@ public class EnemySystem
                 Rotation = placement.Rotation,
                 MoveSpeed = 2f,
                 CurrentWaypointIndex = 0,
-                PatrolPath = placement.PatrolPath.Select(wp => new Vector3(
-                    wp.TileX * LevelData.QuadSize,
-                    2f,
-                    wp.TileY * LevelData.QuadSize)).ToList()
+                PatrolPath = placement.PatrolPath.Select(wp =>
+                    LevelData.GetTileAnchorWorld(wp.TileX, wp.TileY, 2f)).ToList()
             };
             _enemies.Add(enemy);
         }
@@ -721,10 +716,8 @@ public class EnemySystem
             position.X / LevelData.QuadSize,
             position.Z / LevelData.QuadSize);
         var closestDoor = _doorSystem.FindClosestDoor(doorSearchPos);
-        if (closestDoor != null)
-        {
+        if (closestDoor != null && !closestDoor.IsLocked)
             _doorSystem.OpenDoor(closestDoor);
-        }
     }
 
     /// <summary>

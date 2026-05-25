@@ -138,6 +138,58 @@
     width: 260px;
 }
 
+.editor-pickup-palette {
+    position: absolute;
+    top: 340px;
+    left: 10px;
+    width: 260px;
+}
+
+.editor-door-palette {
+    position: absolute;
+    top: 46px;
+    left: 10px;
+    width: 260px;
+}
+
+.door-palette-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.door-palette-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 8px 10px;
+    border: 2px solid #555;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #fff;
+    background: #2a2a2a;
+    font-size: 12px;
+}
+
+.door-palette-btn:hover {
+    border-color: #aaa;
+}
+
+.door-palette-btn.selected {
+    border-color: #ff0;
+    box-shadow: 0 0 6px rgba(255, 255, 0, 0.5);
+}
+
+.door-palette-label {
+    font-weight: 700;
+}
+
+.door-palette-id {
+    font-size: 11px;
+    opacity: 0.75;
+}
+
 .editor-cursor-info {
     position: absolute;
     top: 340px;
@@ -146,6 +198,13 @@
 }
 
 .editor-enemy-props {
+    position: absolute;
+    top: 500px;
+    right: 10px;
+    width: 280px;
+}
+
+.editor-pickup-props {
     position: absolute;
     top: 500px;
     right: 10px;
@@ -305,6 +364,49 @@
 
 .tile-content-enemy {
     color: #f55;
+}
+
+.tile-content-pickup {
+    color: #6d6;
+}
+
+.pickup-palette-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.pickup-palette-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 52px;
+    border: 2px solid #555;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #fff;
+    font-size: 12px;
+}
+
+.pickup-palette-btn:hover {
+    border-color: #aaa;
+}
+
+.pickup-palette-btn.selected {
+    border-color: #ff0;
+    box-shadow: 0 0 6px rgba(255, 255, 0, 0.5);
+}
+
+.pickup-palette-label {
+    font-weight: 700;
+    font-size: 16px;
+}
+
+.pickup-palette-name {
+    font-size: 11px;
+    opacity: 0.9;
 }
 
 /* Shortcut hints */

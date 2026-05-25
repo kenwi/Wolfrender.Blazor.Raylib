@@ -35,7 +35,8 @@ public static class WorldConsoleBindings
                 overlay.ClearScrollback();
                 return ConsoleCommandResult.Ok("Console output cleared. History (↑/↓) is unchanged.");
             },
-            () => world.CurrentLevelPath);
+            () => world.CurrentLevelPath,
+            world.ListPickupsForConsole);
     }
 
     private static IReadOnlyList<RootBinding> CreateRoots(World world, Player player, EnemySystem enemySystem)
@@ -55,7 +56,11 @@ public static class WorldConsoleBindings
                 {
                     "Player.MoveSpeed",
                     "Player.Position",
-                    "Player.CollisionRadius"
+                    "Player.CollisionRadius",
+                    "Player.Ammo",
+                    "Player.HasMachineGun",
+                    "Player.HasGoldKey",
+                    "Player.HasSilverKey"
                 },
                 DiscoveryFactory = () => DiscoverVariablesForInstance(player, "Player")
             },
@@ -119,6 +124,10 @@ public static class WorldConsoleBindings
             "Player.MoveSpeed",
             "Player.Position",
             "Player.CollisionRadius",
+            "Player.Ammo",
+            "Player.HasMachineGun",
+            "Player.HasGoldKey",
+            "Player.HasSilverKey",
             "Enemy[index].MoveSpeed",
             "Enemy[index].Position",
             "Enemy[index].Rotation",

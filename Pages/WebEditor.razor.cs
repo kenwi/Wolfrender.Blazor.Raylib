@@ -28,6 +28,8 @@ public partial class WebEditor : IDisposable
     private bool _showTilePalette = true;
     private bool _showCursorInfo = true;
     private bool _showEnemyProperties = true;
+    private bool _showPickupPalette = true;
+    private bool _showPickupProperties = true;
     private bool _showDebugLog = false;
 
     // File dialogs
@@ -57,6 +59,7 @@ public partial class WebEditor : IDisposable
             "resources/wood.png",
             "resources/door.png",
             "resources/enemy_guard.png",
+            "resources/Objects.png",
             "resources/level.json",
             "resources/test.json",
             "resources/shaders/transparency.fs",

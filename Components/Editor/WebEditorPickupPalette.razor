@@ -1,0 +1,42 @@
+@using Game.Entities
+@using Game.Editor
+@using Game.Utilities
+
+<div class="editor-panel editor-pickup-palette" @onpointerenter="OnPointerEnter" @onpointerleave="OnPointerLeave">
+    <h3>Pickup Palette</h3>
+    <div class="info-label">Active: @State.ActiveLayer.Name</div>
+
+    <div class="pickup-palette-grid">
+        @foreach (PickupType type in Enum.GetValues<PickupType>())
+        {
+            var pickupType = type;
+            var rgba = $"rgba({PickupVisuals.GetColor(type).R},{PickupVisuals.GetColor(type).G},{PickupVisuals.GetColor(type).B},0.85)";
+            <button type="button"
+                    class="pickup-palette-btn @(State.SelectedPickupType == type ? "selected" : "")"
+                    style="background: @rgba"
+                    title="@type"
+                    @onclick="() => SelectType(pickupType)">
+                <span class="pickup-palette-label">@PickupVisuals.GetLabel(type)</span>
+                <span class="pickup-palette-name">@type</span>
+            </button>
+        }
+    </div>
+
+    <div class="info-label" style="margin-top: 6px;">
+        Selected: @State.SelectedPickupType — click map to place (replaces existing on tile)
+    </div>
+</div>
+
+@code {
+    [Parameter] public EditorState State { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private void SelectType(PickupType type)
+    {
+        State.SelectedPickupType = type;
+        OnChanged.InvokeAsync();
+    }
+
+    private void OnPointerEnter() => State.IsMouseOverUI = true;
+    private void OnPointerLeave() => State.IsMouseOverUI = false;
+}

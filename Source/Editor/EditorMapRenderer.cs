@@ -1,6 +1,7 @@
 using System.Numerics;
 using Game.Entities;
 using Game.Systems;
+using Game.Utilities;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 using Color = Raylib_cs.Color;
@@ -72,9 +73,10 @@ public class EditorMapRenderer
                 float drawX = x * tileSize + camera.Offset.X;
                 float drawY = y * tileSize + camera.Offset.Y;
 
-                bool isVerticalDoor = tileId == (uint)DoorRotation.VERTICAL;
-                bool isHorizontalDoor = tileId == (uint)DoorRotation.HORIZONTAL;
-                int textureIndex = (isVerticalDoor || isHorizontalDoor)
+                bool isDoorTile = DoorTileEncoding.TryParse(tileId, out var doorRotation, out var lockKind);
+                bool isVerticalDoor = doorRotation == DoorRotation.VERTICAL;
+                bool isHorizontalDoor = doorRotation == DoorRotation.HORIZONTAL;
+                int textureIndex = isDoorTile
                     ? (int)DoorRotation.HORIZONTAL - 1
                     : (int)tileId - 1;
 
@@ -96,6 +98,16 @@ public class EditorMapRenderer
                         rotation,
                         Color.White
                     );
+
+                    if (lockKind != DoorLockKind.None)
+                    {
+                        var lockColor = lockKind == DoorLockKind.Gold
+                            ? new Color(255, 210, 40, 255)
+                            : new Color(200, 220, 255, 255);
+                        string label = lockKind == DoorLockKind.Gold ? "G" : "S";
+                        DrawCircle((int)(drawX + tileSize * 0.75f), (int)(drawY + tileSize * 0.25f), tileSize * 0.2f, lockColor);
+                        DrawText(label, (int)(drawX + tileSize * 0.65f), (int)(drawY + tileSize * 0.12f), (int)(tileSize * 0.35f), Color.Black);
+                    }
                 }
                 else
                 {
@@ -142,11 +154,11 @@ public class EditorMapRenderer
     {
         float tileSize = camera.TileSize;
         float quadSize = Utilities.LevelData.QuadSize;
-        float tilePosX = player.Position.X / quadSize;
-        float tilePosZ = player.Position.Z / quadSize;
 
-        float screenX = (tilePosX + 0.5f) * tileSize + camera.Offset.X;
-        float screenY = (tilePosZ + 0.5f) * tileSize + camera.Offset.Y;
+        var screen = WorldAnchorToTileCenterScreen(
+            player.Position.X, player.Position.Z, quadSize, tileSize, camera.Offset);
+        float screenX = screen.X;
+        float screenY = screen.Y;
 
         float radius = tileSize * 0.35f;
 
@@ -182,8 +194,9 @@ public class EditorMapRenderer
         {
             var enemy = _mapData.Enemies[i];
 
-            float centerX = (enemy.TileX + 0.5f) * tileSize + camera.Offset.X;
-            float centerY = (enemy.TileY + 0.5f) * tileSize + camera.Offset.Y;
+            var center = TileToCenterScreen(enemy.TileX, enemy.TileY, tileSize, camera.Offset);
+            float centerX = center.X;
+            float centerY = center.Y;
 
             if (!isMouseOverUI)
             {
@@ -225,8 +238,9 @@ public class EditorMapRenderer
                 DrawPatrolPath(enemy, patrolPathInProgress, camera, new Color(255, 200, 0, 220));
 
                 var lastWp = patrolPathInProgress[^1];
-                float lastWpX = (lastWp.TileX + 0.5f) * tileSize + camera.Offset.X;
-                float lastWpY = (lastWp.TileY + 0.5f) * tileSize + camera.Offset.Y;
+                var lastWpScreen = TileToCenterScreen(lastWp.TileX, lastWp.TileY, tileSize, camera.Offset);
+                float lastWpX = lastWpScreen.X;
+                float lastWpY = lastWpScreen.Y;
                 DrawLineEx(new Vector2(lastWpX, lastWpY), mouseScreen, 1f, new Color(255, 200, 0, 120));
             }
         }
@@ -238,6 +252,54 @@ public class EditorMapRenderer
         }
     }
 
+    public void RenderPickupLayer(
+        EditorCamera camera,
+        bool isMouseOverUI,
+        ref int hoveredPickupIndex,
+        int selectedPickupIndex)
+    {
+        float tileSize = camera.TileSize;
+        var mouseScreen = GetMousePosition();
+        hoveredPickupIndex = -1;
+
+        float radius = tileSize * 0.32f;
+
+        for (int i = 0; i < _mapData.Pickups.Count; i++)
+        {
+            var pickup = _mapData.Pickups[i];
+            var center = TileToCenterScreen(pickup.TileX, pickup.TileY, tileSize, camera.Offset);
+            float centerX = center.X;
+            float centerY = center.Y;
+
+            if (!isMouseOverUI)
+            {
+                float dx = mouseScreen.X - centerX;
+                float dy = mouseScreen.Y - centerY;
+                if (dx * dx + dy * dy <= radius * radius)
+                    hoveredPickupIndex = i;
+            }
+
+            var color = PickupVisuals.GetColor(pickup.Type);
+            DrawCircle((int)centerX, (int)centerY, radius, color);
+            DrawCircleLines((int)centerX, (int)centerY, radius + 1f, Color.White);
+
+            if (i == hoveredPickupIndex)
+            {
+                DrawCircleLines((int)centerX, (int)centerY, radius + 3f, Color.Yellow);
+                DrawCircleLines((int)centerX, (int)centerY, radius + 4f, Color.Yellow);
+            }
+
+            if (i == selectedPickupIndex)
+            {
+                DrawCircleLines((int)centerX, (int)centerY, radius + 2f, Color.White);
+            }
+
+            string label = PickupVisuals.GetLabel(pickup.Type);
+            int labelW = MeasureText(label, 14);
+            DrawText(label, (int)(centerX - labelW / 2f), (int)(centerY - 6), 14, Color.White);
+        }
+    }
+
     private void RenderLiveEnemies(EnemySystem enemySystem, EditorCamera camera, bool drawLineOfSight)
     {
         float tileSize = camera.TileSize;
@@ -246,11 +308,10 @@ public class EditorMapRenderer
 
         foreach (var liveEnemy in enemySystem.Enemies)
         {
-            float tilePosX = liveEnemy.Position.X / quadSize;
-            float tilePosZ = liveEnemy.Position.Z / quadSize;
-
-            float liveCX = (tilePosX + 0.5f) * tileSize + camera.Offset.X;
-            float liveCY = (tilePosZ + 0.5f) * tileSize + camera.Offset.Y;
+            var liveCenter = WorldAnchorToTileCenterScreen(
+                liveEnemy.Position.X, liveEnemy.Position.Z, quadSize, tileSize, camera.Offset);
+            float liveCX = liveCenter.X;
+            float liveCY = liveCenter.Y;
 
             // Draw FOV polygon
             if (drawLineOfSight && liveEnemy.FovPolygon.Count >= 3)
@@ -350,13 +411,15 @@ public class EditorMapRenderer
     public void DrawPatrolPath(EnemyPlacement enemy, List<PatrolWaypoint> path, EditorCamera camera, Color color)
     {
         float tileSize = camera.TileSize;
-        float prevX = (enemy.TileX + 0.5f) * tileSize + camera.Offset.X;
-        float prevY = (enemy.TileY + 0.5f) * tileSize + camera.Offset.Y;
+        var prev = TileToCenterScreen(enemy.TileX, enemy.TileY, tileSize, camera.Offset);
+        float prevX = prev.X;
+        float prevY = prev.Y;
 
         for (int w = 0; w < path.Count; w++)
         {
-            float wpX = (path[w].TileX + 0.5f) * tileSize + camera.Offset.X;
-            float wpY = (path[w].TileY + 0.5f) * tileSize + camera.Offset.Y;
+            var wpScreen = TileToCenterScreen(path[w].TileX, path[w].TileY, tileSize, camera.Offset);
+            float wpX = wpScreen.X;
+            float wpY = wpScreen.Y;
 
             DrawLineEx(new Vector2(prevX, prevY), new Vector2(wpX, wpY), 2f, color);
             DrawCircle((int)wpX, (int)wpY, tileSize * 0.12f, color);
@@ -380,8 +443,10 @@ public class EditorMapRenderer
 
         foreach (var enemy in enemySystem.Enemies)
         {
-            float prevX = (enemy.Position.X / quadSize + 0.5f) * tileSize + camera.Offset.X;
-            float prevY = (enemy.Position.Z / quadSize + 0.5f) * tileSize + camera.Offset.Y;
+            var prevScreen = WorldAnchorToTileCenterScreen(
+                enemy.Position.X, enemy.Position.Z, quadSize, tileSize, camera.Offset);
+            float prevX = prevScreen.X;
+            float prevY = prevScreen.Y;
 
             bool hasChasePath =
                 enemy.ChasePath.Count > 0 && enemy.ChasePathIndex < enemy.ChasePath.Count;
@@ -391,8 +456,9 @@ public class EditorMapRenderer
                 for (int i = enemy.ChasePathIndex; i < enemy.ChasePath.Count; i++)
                 {
                     var wp = enemy.ChasePath[i];
-                    float wpX = (wp.X / quadSize + 0.5f) * tileSize + camera.Offset.X;
-                    float wpY = (wp.Z / quadSize + 0.5f) * tileSize + camera.Offset.Y;
+                    var wpScreen = WorldAnchorToTileCenterScreen(wp.X, wp.Z, quadSize, tileSize, camera.Offset);
+                    float wpX = wpScreen.X;
+                    float wpY = wpScreen.Y;
                     DrawLineEx(new Vector2(prevX, prevY), new Vector2(wpX, wpY), 2.5f, pathColor);
                     DrawCircle((int)wpX, (int)wpY, tileSize * 0.1f, pathColor);
                     prevX = wpX;
@@ -405,8 +471,9 @@ public class EditorMapRenderer
                 // player's last known position — draw a thin fallback line so this case
                 // is visible in the debug overlay.
                 var ls = enemy.LastSeenPlayerPosition.Value;
-                float lx = (ls.X / quadSize + 0.5f) * tileSize + camera.Offset.X;
-                float ly = (ls.Z / quadSize + 0.5f) * tileSize + camera.Offset.Y;
+                var lsScreen = WorldAnchorToTileCenterScreen(ls.X, ls.Z, quadSize, tileSize, camera.Offset);
+                float lx = lsScreen.X;
+                float ly = lsScreen.Y;
                 DrawLineEx(new Vector2(prevX, prevY), new Vector2(lx, ly), 1.5f, fallbackColor);
                 DrawCircleLines((int)lx, (int)ly, tileSize * 0.18f, fallbackColor);
             }
@@ -457,6 +524,22 @@ public class EditorMapRenderer
 
     private static Vector2 TileCenter(Vector2 tile, float tileSize, Vector2 offset) =>
         new((tile.X + 0.5f) * tileSize + offset.X, (tile.Y + 0.5f) * tileSize + offset.Y);
+
+    /// <summary>2D editor: center of the tile square for integer tile indices.</summary>
+    private static Vector2 TileToCenterScreen(int tileX, int tileY, float tileSize, Vector2 offset) =>
+        new((tileX + 0.5f) * tileSize + offset.X, (tileY + 0.5f) * tileSize + offset.Y);
+
+    /// <summary>
+    /// 2D editor: game entities use <see cref="LevelData.GetTileAnchorWorld"/>; show them at the
+    /// visual center of that tile (anchor + half a tile in screen space).
+    /// </summary>
+    private static Vector2 WorldAnchorToTileCenterScreen(
+        float worldX, float worldZ, float quadSize, float tileSize, Vector2 offset)
+    {
+        float tileX = worldX / quadSize;
+        float tileY = worldZ / quadSize;
+        return new((tileX + 0.5f) * tileSize + offset.X, (tileY + 0.5f) * tileSize + offset.Y);
+    }
 
     /// <summary>
     /// Draw a yellow highlight rectangle around the hovered tile.

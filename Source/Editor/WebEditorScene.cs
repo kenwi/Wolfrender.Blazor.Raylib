@@ -102,7 +102,13 @@ public class WebEditorScene : IScene
                     ref State.HoveredEnemyIndex, State.SelectedEnemyIndex,
                     State.IsEditingPatrolPath, State.PatrolEditEnemyIndex, State.PatrolPathInProgress);
             }
-            else if (State.IsSimulating && layer.Name == "Doors")
+            else if (layer.Name == EditorState.PickupsLayerName)
+            {
+                _mapRenderer.RenderPickupLayer(
+                    State.Camera, State.IsMouseOverUI,
+                    ref State.HoveredPickupIndex, State.SelectedPickupIndex);
+            }
+            else if (State.IsSimulating && layer.Name == EditorState.DoorsLayerName)
             {
                 _mapRenderer.RenderLiveDoors(State.DoorSystem, State.Camera);
             }
@@ -168,6 +174,7 @@ public class WebEditorScene : IScene
     private void HandleTileAndEnemyInput()
     {
         bool isEnemyLayer = State.IsOnEnemyLayer;
+        bool isPickupLayer = State.IsOnPickupLayer;
 
         if (!State.IsMouseOverUI && !isEnemyLayer && State.HoveredEnemyIndex >= 0 && IsMouseButtonPressed(MouseButton.Left))
         {
@@ -177,11 +184,22 @@ public class WebEditorScene : IScene
             State.IsDraggingEnemy = true;
         }
 
+        if (!State.IsMouseOverUI && !isPickupLayer && State.HoveredPickupIndex >= 0 && IsMouseButtonPressed(MouseButton.Left))
+        {
+            State.SwitchToPickupLayer();
+            isPickupLayer = true;
+            State.SelectPickup(State.HoveredPickupIndex);
+        }
+
         if (!State.IsMouseOverUI && isEnemyLayer)
         {
             HandleEnemyInput();
         }
-        else if (!State.IsMouseOverUI && IsMouseButtonDown(MouseButton.Left) && !isEnemyLayer)
+        else if (!State.IsMouseOverUI && isPickupLayer)
+        {
+            HandlePickupInput();
+        }
+        else if (!State.IsMouseOverUI && IsMouseButtonDown(MouseButton.Left) && !isEnemyLayer && !isPickupLayer)
         {
             var paintPos = State.Camera.ScreenToWorld(GetMousePosition());
             int px = (int)MathF.Floor(paintPos.X);
@@ -194,6 +212,40 @@ public class WebEditorScene : IScene
         {
             State.DeleteSelectedEnemy();
         }
+
+        if (isPickupLayer && State.SelectedPickupIndex >= 0 && State.SelectedPickupIndex < State.MapData.Pickups.Count
+            && IsKeyPressed(KeyboardKey.Delete))
+        {
+            State.DeleteSelectedPickup();
+        }
+    }
+
+    private void HandlePickupInput()
+    {
+        if (IsMouseButtonPressed(MouseButton.Left))
+        {
+            if (State.HoveredPickupIndex >= 0)
+                State.SelectPickup(State.HoveredPickupIndex);
+            else
+            {
+                var paintPos = State.Camera.ScreenToWorld(GetMousePosition());
+                int px = (int)MathF.Floor(paintPos.X);
+                int py = (int)MathF.Floor(paintPos.Y);
+                State.PlacePickup(px, py);
+            }
+        }
+
+        if (State.IsDraggingPickup && IsMouseButtonDown(MouseButton.Left)
+            && State.SelectedPickupIndex >= 0 && State.SelectedPickupIndex < State.MapData.Pickups.Count)
+        {
+            var dragPos = State.Camera.ScreenToWorld(GetMousePosition());
+            int dx = (int)MathF.Floor(dragPos.X);
+            int dy = (int)MathF.Floor(dragPos.Y);
+            State.MovePickup(dx, dy);
+        }
+
+        if (IsMouseButtonReleased(MouseButton.Left))
+            State.IsDraggingPickup = false;
     }
 
     private void HandleEnemyInput()

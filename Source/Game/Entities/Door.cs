@@ -22,6 +22,10 @@ public class Door
     public Vector2 Position { get; set; }
     public DoorState DoorState { get; set; }
     public DoorRotation DoorRotation { get; set; }
+    public bool RequiresGoldKey { get; set; }
+    public bool RequiresSilverKey { get; set; }
     public float TimeDoorHasBeenOpen { get; set; }
     public float TimeDoorHasBeenOpening { get; set; }
+
+    public bool IsLocked => RequiresGoldKey || RequiresSilverKey;
 }
