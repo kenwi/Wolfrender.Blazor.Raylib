@@ -1,4 +1,5 @@
 using System.Numerics;
+using Game.Utilities;
 
 namespace Game.Console;
 
@@ -15,6 +16,7 @@ public static class ConsoleSelfTests
         TestParserQuotedArgs();
         TestStringVariableStore();
         TestRuntimeAccessorGetSet();
+        TestLevelCatalogNormalizePath();
     }
 
     private static void TestParserQuotedArgs()
@@ -39,6 +41,14 @@ public static class ConsoleSelfTests
             throw new InvalidOperationException("StringVariableStore get failed.");
         if (value != "abc")
             throw new InvalidOperationException("StringVariableStore roundtrip mismatch.");
+    }
+
+    private static void TestLevelCatalogNormalizePath()
+    {
+        if (LevelCatalog.NormalizePath("test") != "resources/test.json")
+            throw new InvalidOperationException("LevelCatalog should prefix resources/ and .json.");
+        if (LevelCatalog.NormalizePath("resources/foo.json") != "resources/foo.json")
+            throw new InvalidOperationException("LevelCatalog should preserve explicit paths.");
     }
 
     private static void TestRuntimeAccessorGetSet()

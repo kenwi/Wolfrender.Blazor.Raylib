@@ -1,4 +1,5 @@
 using Game.Console.Commands;
+using Game.Utilities;
 
 namespace Game.Console;
 
@@ -14,7 +15,8 @@ public sealed class RuntimeConsoleService
         IConsoleOutput output,
         Func<string, ConsoleCommandResult> loadLevel,
         Func<ConsoleCommandResult> restartCurrentLevel,
-        Func<ConsoleCommandResult> clearConsoleScrollback)
+        Func<ConsoleCommandResult> clearConsoleScrollback,
+        Func<string> getCurrentLevelPath)
     {
         _output = output;
 
@@ -25,6 +27,7 @@ public sealed class RuntimeConsoleService
             new GetCommand(),
             new SetCommand(),
             new LoadCommand(),
+            new ListLevelsCommand(),
             new RestartLevelCommand(),
             new ClearCommand()
         };
@@ -36,7 +39,8 @@ public sealed class RuntimeConsoleService
             LoadLevel = loadLevel,
             RestartCurrentLevel = restartCurrentLevel,
             ClearConsoleScrollback = clearConsoleScrollback,
-            GetAllCommands = () => _dispatcher.Commands
+            GetAllCommands = () => _dispatcher.Commands,
+            GetCurrentLevelPath = getCurrentLevelPath
         };
     }
 
@@ -98,6 +102,13 @@ public sealed class RuntimeConsoleService
 
             if (string.Equals(command, "help", StringComparison.OrdinalIgnoreCase))
                 return _dispatcher.Commands.Select(c => c.Name);
+
+            if (string.Equals(command, "load", StringComparison.OrdinalIgnoreCase))
+            {
+                return LevelCatalog.ListJsonLevels()
+                    .SelectMany(p => new[] { p, Path.GetFileName(p), Path.GetFileNameWithoutExtension(p) })
+                    .Distinct(StringComparer.OrdinalIgnoreCase);
+            }
         }
 
         return Array.Empty<string>();

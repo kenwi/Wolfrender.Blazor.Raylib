@@ -28,13 +28,14 @@ public static class WorldConsoleBindings
         return new RuntimeConsoleService(
             variables,
             output,
-            level => ConsoleCommandResult.Ok($"Level loading is not wired yet. Requested: '{level}'."),
+            world.LoadLevel,
             world.RestartCurrentLevel,
             () =>
             {
                 overlay.ClearScrollback();
                 return ConsoleCommandResult.Ok("Console output cleared. History (↑/↓) is unchanged.");
-            });
+            },
+            () => world.CurrentLevelPath);
     }
 
     private static IReadOnlyList<RootBinding> CreateRoots(World world, Player player, EnemySystem enemySystem)

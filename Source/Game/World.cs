@@ -12,7 +12,7 @@ namespace Game;
 
 public class World : IScene
 {
-    private const string LevelJsonResourcePath = "resources/level.json";
+    private string _currentLevelPath = LevelCatalog.DefaultLevelPath;
 
     /// <summary>Feet / collision origin at level start and after <c>restart</c>.</summary>
     private static readonly Vector3 InitialPlayerPosition =
@@ -50,6 +50,7 @@ public class World : IScene
     public Player Player => _player;
     public EnemySystem EnemySystem => _enemySystem;
     public DoorSystem DoorSystem => _doorSystem;
+    public string CurrentLevelPath => _currentLevelPath;
 
     public World(MapData mapData)
     {
@@ -130,23 +131,49 @@ public class World : IScene
     }
 
     /// <summary>
-    /// Reload <see cref="LevelJsonResourcePath"/> into the shared <see cref="MapData"/> and reset gameplay state.
+    /// Loads a level JSON from <see cref="LevelCatalog"/> and resets gameplay state.
+    /// </summary>
+    public ConsoleCommandResult LoadLevel(string pathOrName)
+    {
+        if (!LevelCatalog.TryResolve(pathOrName, out var resolvedPath, out var error))
+            return ConsoleCommandResult.Fail(error);
+
+        try
+        {
+            LevelSerializer.LoadFromJson(_mapData, Utilities.Res.Path(resolvedPath));
+            _currentLevelPath = resolvedPath;
+            ResetLevelState();
+            return ConsoleCommandResult.Ok($"Loaded '{resolvedPath}'.");
+        }
+        catch (Exception ex)
+        {
+            return ConsoleCommandResult.Fail($"load: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Reload <see cref="CurrentLevelPath"/> into the shared <see cref="MapData"/> and reset gameplay state.
     /// </summary>
     public ConsoleCommandResult RestartCurrentLevel()
     {
         try
         {
-            LevelSerializer.LoadFromJson(_mapData, Utilities.Res.Path(LevelJsonResourcePath));
-            ResetPlayerToInitialSpawn();
-            _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
-            _enemySystem.Rebuild(_mapData.Enemies, _mapData);
-            _effectSystem.Clear();
-            return ConsoleCommandResult.Ok($"Restarted from '{LevelJsonResourcePath}'.");
+            LevelSerializer.LoadFromJson(_mapData, Utilities.Res.Path(_currentLevelPath));
+            ResetLevelState();
+            return ConsoleCommandResult.Ok($"Restarted from '{_currentLevelPath}'.");
         }
         catch (Exception ex)
         {
             return ConsoleCommandResult.Fail($"restart: {ex.Message}");
         }
+    }
+
+    private void ResetLevelState()
+    {
+        ResetPlayerToInitialSpawn();
+        _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
+        _enemySystem.Rebuild(_mapData.Enemies, _mapData);
+        _effectSystem.Clear();
     }
 
     private void ResetPlayerToInitialSpawn()
