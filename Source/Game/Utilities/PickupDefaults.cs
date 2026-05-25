@@ -1,0 +1,23 @@
+using Game.Entities;
+
+namespace Game.Utilities;
+
+public static class PickupDefaults
+{
+    public const int HealthAmount = 25;
+    public const int AmmoAmount = 30;
+    public const int MachineGunAmmoAmount = 30;
+
+    public static int GetAmount(PickupType type, int placementAmount) =>
+        placementAmount > 0 ? placementAmount : GetDefaultAmount(type);
+
+    public static int GetDefaultAmount(PickupType type) => type switch
+    {
+        PickupType.Health => HealthAmount,
+        PickupType.Ammo => AmmoAmount,
+        PickupType.MachineGun => MachineGunAmmoAmount,
+        PickupType.GoldKey => 0,
+        PickupType.SilverKey => 0,
+        _ => 0
+    };
+}

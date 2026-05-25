@@ -1,3 +1,4 @@
+using Game.Entities;
 using Raylib_cs;
 
 namespace Game;
@@ -35,6 +36,7 @@ public class MapData
     public uint[] Ceiling { get; set; } = Array.Empty<uint>();
     public uint[] Doors { get; set; } = Array.Empty<uint>();
     public List<EnemyPlacement> Enemies { get; set; } = new();
+    public List<PickupPlacement> Pickups { get; set; } = new();
     public List<Texture2D> Textures { get; set; } = new();
     public int Width { get; set; }
     public int Height { get; set; }

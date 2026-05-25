@@ -1,0 +1,52 @@
+@using Game.Editor
+@using Game.Utilities
+
+<div class="editor-panel editor-door-palette" @onpointerenter="OnPointerEnter" @onpointerleave="OnPointerLeave">
+    <h3>Door Palette</h3>
+    <div class="info-label">Active: @State.ActiveLayer.Name</div>
+
+    <button class="editor-btn eraser-btn @(State.SelectedTileId == 0 ? "selected" : "")"
+            @onclick="() => SelectTile(0)">
+        Eraser (Empty)
+    </button>
+
+    <div class="door-palette-grid">
+        @foreach (var door in DoorEntries)
+        {
+            <button class="door-palette-btn @(State.SelectedTileId == door.Id ? "selected" : "")"
+                    title="Tile ID: @door.Id"
+                    @onclick="() => SelectTile(door.Id)">
+                <span class="door-palette-label">@door.Label</span>
+                <span class="door-palette-id">ID @door.Id</span>
+            </button>
+        }
+    </div>
+
+    <div class="info-label" style="margin-top: 6px;">
+        Selected: @(State.SelectedTileId == 0 ? "Eraser" : DoorTileEncoding.GetPaletteLabel(State.SelectedTileId))
+    </div>
+</div>
+
+@code {
+    [Parameter] public EditorState State { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private static readonly (uint Id, string Label)[] DoorEntries =
+    {
+        (DoorTileEncoding.Horizontal, "Door H"),
+        (DoorTileEncoding.Vertical, "Door V"),
+        (DoorTileEncoding.HorizontalGold, "Gold H"),
+        (DoorTileEncoding.VerticalGold, "Gold V"),
+        (DoorTileEncoding.HorizontalSilver, "Silver H"),
+        (DoorTileEncoding.VerticalSilver, "Silver V"),
+    };
+
+    private void SelectTile(uint tileId)
+    {
+        State.SelectedTileId = tileId;
+        OnChanged.InvokeAsync();
+    }
+
+    private void OnPointerEnter() => State.IsMouseOverUI = true;
+    private void OnPointerLeave() => State.IsMouseOverUI = false;
+}

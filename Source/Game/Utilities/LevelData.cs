@@ -36,6 +36,17 @@ public class LevelData
 
     public static (int col, int row) GetColRow(int index, int width = MapWidth) => (index % width, index / width);
 
+    /// <summary>
+    /// World X/Z anchor for tile (tileX, tileY) — same as walls, floors, and enemies
+    /// (<c>RenderSystem</c> / <c>EnemySystem</c>: cube and billboards centered on this point).
+    /// </summary>
+    public static Vector3 GetTileAnchorWorld(int tileX, int tileY, float worldY = 0f) =>
+        new(tileX * QuadSize, worldY, tileY * QuadSize);
+
+    /// <summary>Map tile whose quad cell contains the given world X/Z.</summary>
+    public static (int tileX, int tileY) GetTileFromWorld(float worldX, float worldZ) =>
+        ((int)MathF.Floor(worldX / QuadSize), (int)MathF.Floor(worldZ / QuadSize));
+
     public bool IsWallAt(float worldX, float worldZ)
     {
         int tileX = (int)(worldX / 4 + 0.5f);

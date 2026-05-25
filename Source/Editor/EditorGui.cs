@@ -1,5 +1,7 @@
 using System.Numerics;
+using Game.Entities;
 using Game.Systems;
+using Game.Utilities;
 using ImGuiNET;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
@@ -40,6 +42,8 @@ public class EditorGui
     private bool _showTilePalette = true;
     private bool _showCursorInfo = true;
     private bool _showEnemyProperties = true;
+    private bool _showPickupPalette = true;
+    private bool _showPickupProperties = true;
     private bool _showDebugLog = true;
     private bool _showPathfinding;
 
@@ -181,11 +185,17 @@ public class EditorGui
                 if (ImGui.MenuItem("Tile Palette", null, _showTilePalette))
                     _showTilePalette = !_showTilePalette;
 
+                if (ImGui.MenuItem("Pickup Palette", null, _showPickupPalette))
+                    _showPickupPalette = !_showPickupPalette;
+
                 if (ImGui.MenuItem("Cursor Info", null, _showCursorInfo))
                     _showCursorInfo = !_showCursorInfo;
 
                 if (ImGui.MenuItem("Enemy Properties", null, _showEnemyProperties))
                     _showEnemyProperties = !_showEnemyProperties;
+
+                if (ImGui.MenuItem("Pickup Properties", null, _showPickupProperties))
+                    _showPickupProperties = !_showPickupProperties;
 
                 if (ImGui.MenuItem("Debug Log", null, _showDebugLog))
                     _showDebugLog = !_showDebugLog;
@@ -473,7 +483,7 @@ public class EditorGui
 
     // ─── Tile Palette ────────────────────────────────────────────────────────────
 
-    public void RenderTilePalette(List<EditorLayer> layers, int activeLayerIndex, ref uint selectedTileId)
+    public void RenderTilePalette(List<EditorLayer> layers, int activeLayerIndex, ref uint selectedTileId, ref PickupType selectedPickupType)
     {
         if (!_showTilePalette) return;
 
@@ -499,6 +509,15 @@ public class EditorGui
         if (isEraserSelected)
         {
             ImGui.PopStyleColor(2);
+        }
+
+        if (layers[activeLayerIndex].Name == EditorState.DoorsLayerName)
+        {
+            RenderDoorPaletteButtons(ref selectedTileId, buttonSize);
+            ImGui.Separator();
+            ImGui.Text($"Selected: {(selectedTileId == 0 ? "Eraser" : DoorTileEncoding.GetPaletteLabel(selectedTileId))}");
+            ImGui.End();
+            return;
         }
 
         ImGui.Separator();
@@ -561,11 +580,81 @@ public class EditorGui
         ImGui.End();
     }
 
+    private void RenderDoorPaletteButtons(ref uint selectedTileId, float buttonSize)
+    {
+        ImGui.Text("Doors:");
+        uint[] doorIds =
+        {
+            DoorTileEncoding.Horizontal,
+            DoorTileEncoding.Vertical,
+            DoorTileEncoding.HorizontalGold,
+            DoorTileEncoding.VerticalGold,
+            DoorTileEncoding.HorizontalSilver,
+            DoorTileEncoding.VerticalSilver
+        };
+
+        foreach (uint doorId in doorIds)
+        {
+            bool selected = selectedTileId == doorId;
+            if (selected)
+                ImGui.PushStyleColor(ImGuiCol.Border, new Vector4(1f, 1f, 0f, 1f));
+
+            if (ImGui.Button($"{DoorTileEncoding.GetPaletteLabel(doorId)}\n(ID {doorId})",
+                    new Vector2(buttonSize + 28, buttonSize * 0.85f)))
+                selectedTileId = doorId;
+
+            if (selected)
+                ImGui.PopStyleColor();
+        }
+    }
+
+    public void RenderPickupPalette(ref PickupType selectedPickupType)
+    {
+        if (!_showPickupPalette) return;
+
+        ImGui.SetNextWindowPos(new Vector2(10, 280), ImGuiCond.FirstUseEver);
+        ImGui.Begin("Pickup Palette", ref _showPickupPalette, ImGuiWindowFlags.AlwaysAutoResize);
+        ImGui.SetWindowFontScale(_guiScale);
+
+        RenderPickupPaletteButtons(ref selectedPickupType);
+
+        ImGui.End();
+    }
+
     // ─── Cursor Info Panel ───────────────────────────────────────────────────────
+
+    private void RenderPickupPaletteButtons(ref PickupType selectedPickupType)
+    {
+        float buttonSize = 56f;
+        foreach (PickupType type in Enum.GetValues<PickupType>())
+        {
+            var color = PickupVisuals.GetColor(type);
+            var imguiColor = new Vector4(color.R / 255f, color.G / 255f, color.B / 255f, 0.85f);
+            var hoverColor = new Vector4(
+                MathF.Min(imguiColor.X * 1.15f, 1f),
+                MathF.Min(imguiColor.Y * 1.15f, 1f),
+                MathF.Min(imguiColor.Z * 1.15f, 1f),
+                imguiColor.W);
+            bool selected = selectedPickupType == type;
+            if (selected)
+                ImGui.PushStyleColor(ImGuiCol.Border, new Vector4(1f, 1f, 0f, 1f));
+
+            ImGui.PushStyleColor(ImGuiCol.Button, imguiColor);
+            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, hoverColor);
+            if (ImGui.Button($"{type}\n{PickupVisuals.GetLabel(type)}", new Vector2(buttonSize + 24, buttonSize)))
+                selectedPickupType = type;
+            ImGui.PopStyleColor(2);
+            if (selected)
+                ImGui.PopStyleColor();
+        }
+
+        ImGui.Separator();
+        ImGui.Text($"Selected: {selectedPickupType}");
+    }
 
     public void RenderInfoPanel(
         int tileX, int tileY, Vector2 worldPos, bool tileInBounds,
-        bool cursorInfoFollowsMouse, List<EditorLayer> layers, string enemiesLayerName)
+        bool cursorInfoFollowsMouse, List<EditorLayer> layers)
     {
         if (!_showCursorInfo) return;
 
@@ -608,7 +697,7 @@ public class EditorGui
             ImGui.Separator();
             foreach (var layer in layers)
             {
-                if (layer.Name == enemiesLayerName)
+                if (layer.Name == EditorState.EnemiesLayerName)
                 {
                     var enemyHere = _mapData.Enemies.FindIndex(e => e.TileX == tileX && e.TileY == tileY);
                     string status = enemyHere >= 0
@@ -616,6 +705,17 @@ public class EditorGui
                         : "empty";
                     var color = enemyHere >= 0
                         ? new Vector4(1f, 0.3f, 0.3f, 1f)
+                        : new Vector4(0.5f, 0.5f, 0.5f, 1f);
+                    ImGui.TextColored(color, $"  {layer.Name}: {status}");
+                }
+                else if (layer.Name == EditorState.PickupsLayerName)
+                {
+                    int pickupHere = _mapData.Pickups.FindIndex(p => p.TileX == tileX && p.TileY == tileY);
+                    string status = pickupHere >= 0
+                        ? $"{_mapData.Pickups[pickupHere].Type} (#{pickupHere})"
+                        : "empty";
+                    var color = pickupHere >= 0
+                        ? new Vector4(0.3f, 1f, 0.5f, 1f)
                         : new Vector4(0.5f, 0.5f, 0.5f, 1f);
                     ImGui.TextColored(color, $"  {layer.Name}: {status}");
                 }
@@ -633,6 +733,51 @@ public class EditorGui
         else
         {
             ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1f), "Outside map bounds");
+        }
+
+        ImGui.End();
+    }
+
+    // ─── Pickup Properties Panel ───────────────────────────────────────────────────
+
+    public void RenderPickupPropertiesPanel(ref int selectedPickupIndex)
+    {
+        if (!_showPickupProperties) return;
+        if (selectedPickupIndex < 0 || selectedPickupIndex >= _mapData.Pickups.Count)
+            return;
+
+        var pickup = _mapData.Pickups[selectedPickupIndex];
+
+        ImGui.SetNextWindowPos(new Vector2(GetScreenWidth() - 300, 620), ImGuiCond.FirstUseEver);
+        ImGui.Begin("Pickup Properties", ref _showPickupProperties, ImGuiWindowFlags.AlwaysAutoResize);
+        ImGui.SetWindowFontScale(_guiScale);
+
+        ImGui.Text($"Pickup #{selectedPickupIndex}");
+        ImGui.Separator();
+
+        int tileX = pickup.TileX;
+        int tileY = pickup.TileY;
+        if (ImGui.InputInt("Tile X", ref tileX))
+            pickup.TileX = Math.Clamp(tileX, 0, _mapData.Width - 1);
+        if (ImGui.InputInt("Tile Y", ref tileY))
+            pickup.TileY = Math.Clamp(tileY, 0, _mapData.Height - 1);
+
+        int amount = pickup.Amount;
+        if (ImGui.InputInt("Amount (0=default)", ref amount))
+            pickup.Amount = Math.Max(0, amount);
+
+        ImGui.Spacing();
+        ImGui.Text("Type:");
+        foreach (PickupType type in Enum.GetValues<PickupType>())
+        {
+            if (ImGui.RadioButton(type.ToString(), pickup.Type == type))
+                pickup.Type = type;
+        }
+
+        if (ImGui.Button("Delete Pickup"))
+        {
+            _mapData.Pickups.RemoveAt(selectedPickupIndex);
+            selectedPickupIndex = -1;
         }
 
         ImGui.End();

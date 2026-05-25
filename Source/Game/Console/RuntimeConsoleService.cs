@@ -16,7 +16,8 @@ public sealed class RuntimeConsoleService
         Func<string, ConsoleCommandResult> loadLevel,
         Func<ConsoleCommandResult> restartCurrentLevel,
         Func<ConsoleCommandResult> clearConsoleScrollback,
-        Func<string> getCurrentLevelPath)
+        Func<string> getCurrentLevelPath,
+        Func<ConsoleCommandResult> listPickups)
     {
         _output = output;
 
@@ -40,7 +41,8 @@ public sealed class RuntimeConsoleService
             RestartCurrentLevel = restartCurrentLevel,
             ClearConsoleScrollback = clearConsoleScrollback,
             GetAllCommands = () => _dispatcher.Commands,
-            GetCurrentLevelPath = getCurrentLevelPath
+            GetCurrentLevelPath = getCurrentLevelPath,
+            ListPickups = listPickups
         };
     }
 
@@ -93,8 +95,13 @@ public sealed class RuntimeConsoleService
     {
         if (tokenIndex == 1)
         {
-            if (string.Equals(command, "get", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(command, "set", StringComparison.OrdinalIgnoreCase)
+            if (string.Equals(command, "get", StringComparison.OrdinalIgnoreCase))
+            {
+                return _context.Variables.ListVariables(includeAll: true)
+                    .Append("pickups");
+            }
+
+            if (string.Equals(command, "set", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(command, "list-variables", StringComparison.OrdinalIgnoreCase))
             {
                 return _context.Variables.ListVariables(includeAll: true);

@@ -12,4 +12,5 @@ public static class GameTextureIndex
     public const int Door = 6;
     public const int EnemyGuard = 7;
     public const int Weapons = 8;
+    public const int Objects = 9;
 }

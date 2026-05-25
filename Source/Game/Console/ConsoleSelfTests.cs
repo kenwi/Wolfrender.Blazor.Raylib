@@ -80,8 +80,8 @@ public static class ConsoleSelfTests
             throw new InvalidOperationException("Runtime accessor failed to set Vector3.");
         if (!accessor.TryGetValue("Test.Position", out var position, out _))
             throw new InvalidOperationException("Runtime accessor failed to get Vector3.");
-        if (position != "4,5,6")
-            throw new InvalidOperationException("Runtime accessor vector roundtrip mismatch.");
+        if (position != "4,5,6 tile=(1,1)")
+            throw new InvalidOperationException($"Runtime accessor vector roundtrip mismatch: '{position}'.");
     }
 
     private sealed class TestTarget
