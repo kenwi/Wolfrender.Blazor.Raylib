@@ -191,6 +191,7 @@ public class World : IScene
         _player.Velocity = Vector3.Zero;
         _player.Health = _player.MaxHealth;
         _player.WeaponCooldownRemaining = 0f;
+        _player.ResetInventory();
 
         // CameraSystem forces camera.Position = player.Position every frame. If we leave
         // camera at a different point (old ctor did), the first frame after the console
@@ -281,6 +282,7 @@ public class World : IScene
                 _player.Velocity = _inputSystem.GetMoveDirection(_player) * _player.MoveSpeed;
                 _movementSystem.Update(_player, deltaTime);
                 _collisionSystem.Update(_player, deltaTime);
+                _pickupSystem.Update(_player);
                 _cameraSystem.Update(_player, _inputState.IsMouseFree, mouseDelta);
                 _doorSystem.Update(deltaTime, _inputState, _player.Position, _enemySystem.Enemies);
                 _animationSystem.Update(deltaTime);
@@ -426,6 +428,9 @@ public class World : IScene
         var healthLabel = $"HEALTH: {(int)_player.Health} / {(int)_player.MaxHealth}";
         DrawText(healthLabel, 10, 40, 20, _player.IsAlive ? Color.RayWhite : Color.Red);
 
+        if (_player.IsAlive)
+            DrawInventoryHud();
+
         if (_player.IsAlive && !_consoleOverlay.IsOpen)
             _animationSystem.RenderWeaponOverlay(GetScreenWidth(), GetScreenHeight());
 
@@ -451,6 +456,28 @@ public class World : IScene
         _consoleOverlay.Render();
         
         EndDrawing();
+    }
+
+    private void DrawInventoryHud()
+    {
+        const int fontSize = 18;
+        int y = 68;
+
+        string weaponLabel = _player.HasMachineGun ? "WEAPON: MACHINE GUN" : "WEAPON: PISTOL";
+        DrawText(weaponLabel, 10, y, fontSize, Color.RayWhite);
+        y += 24;
+
+        if (_player.HasMachineGun || _player.Ammo > 0)
+        {
+            DrawText($"AMMO: {_player.Ammo}", 10, y, fontSize, new Color(255, 220, 40, 255));
+            y += 24;
+        }
+
+        var goldColor = _player.HasGoldKey ? new Color(255, 210, 40, 255) : new Color(100, 90, 50, 255);
+        var silverColor = _player.HasSilverKey ? new Color(200, 220, 255, 255) : new Color(90, 95, 110, 255);
+        DrawText("KEYS:", 10, y, fontSize, Color.RayWhite);
+        DrawText(" GOLD", 58, y, fontSize, goldColor);
+        DrawText(" SILVER", 118, y, fontSize, silverColor);
     }
 
     private void DrawGameOverOverlay()

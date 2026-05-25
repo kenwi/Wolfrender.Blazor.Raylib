@@ -20,6 +20,19 @@ public class Player
     public float PistolCooldownSeconds { get; set; } = 0.35f;
     public float WeaponCooldownRemaining { get; set; }
 
+    public int Ammo { get; set; }
+    public bool HasMachineGun { get; set; }
+    public bool HasGoldKey { get; set; }
+    public bool HasSilverKey { get; set; }
+
+    public void ResetInventory()
+    {
+        Ammo = 0;
+        HasMachineGun = false;
+        HasGoldKey = false;
+        HasSilverKey = false;
+    }
+
     public void TakeDamage(float amount)
     {
         if (!IsAlive || amount <= 0f)

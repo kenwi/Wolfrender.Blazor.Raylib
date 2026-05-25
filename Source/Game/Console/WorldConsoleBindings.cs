@@ -55,7 +55,11 @@ public static class WorldConsoleBindings
                 {
                     "Player.MoveSpeed",
                     "Player.Position",
-                    "Player.CollisionRadius"
+                    "Player.CollisionRadius",
+                    "Player.Ammo",
+                    "Player.HasMachineGun",
+                    "Player.HasGoldKey",
+                    "Player.HasSilverKey"
                 },
                 DiscoveryFactory = () => DiscoverVariablesForInstance(player, "Player")
             },
@@ -119,6 +123,10 @@ public static class WorldConsoleBindings
             "Player.MoveSpeed",
             "Player.Position",
             "Player.CollisionRadius",
+            "Player.Ammo",
+            "Player.HasMachineGun",
+            "Player.HasGoldKey",
+            "Player.HasSilverKey",
             "Enemy[index].MoveSpeed",
             "Enemy[index].Position",
             "Enemy[index].Rotation",
