@@ -12,19 +12,19 @@ public static class PickupSprites
     public const int PlaceholderY = 35;
 
     public const int HealthX = 66;
-    public const int HealthY = 756;
+    public const int HealthY = 748;
 
     public const int AmmoX = 1;
-    public const int AmmoY = 829 + 5;
+    public const int AmmoY = 828;
 
     public const int MachineGunX = 66;
-    public const int MachineGunY = 829 + 5;
+    public const int MachineGunY = 828;
 
     public const int GoldKeyX = 1;
-    public const int GoldKeyY = 989 + 5;
+    public const int GoldKeyY = 988;
 
     public const int SilverKeyX = 66;
-    public const int SilverKeyY = 995;
+    public const int SilverKeyY = 988;
 
     public static Rectangle GetFrameRect(PickupType type) => type switch
     {

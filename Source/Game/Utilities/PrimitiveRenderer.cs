@@ -486,6 +486,7 @@ public static class PrimitiveRenderer
         float width = 4f,
         float height = 4f,
         float angle = 0f,
+        float heightOffset = 0.0f,
         Rectangle? frameRect = null,
         bool quantizeToEightDirections = true)
     {
@@ -565,19 +566,19 @@ public static class PrimitiveRenderer
 
         // Top-left (flip X texture coordinate to fix Y-axis flip)
         Rlgl.TexCoord2f(texRight, texTop);
-        Rlgl.Vertex3f(topLeft.X, topLeft.Y, topLeft.Z);
+        Rlgl.Vertex3f(topLeft.X, topLeft.Y + heightOffset, topLeft.Z);
 
         // Top-right
         Rlgl.TexCoord2f(texLeft, texTop);
-        Rlgl.Vertex3f(topRight.X, topRight.Y, topRight.Z);
+        Rlgl.Vertex3f(topRight.X, topRight.Y + heightOffset, topRight.Z);
 
         // Bottom-right
         Rlgl.TexCoord2f(texLeft, texBottom);
-        Rlgl.Vertex3f(bottomRight.X, bottomRight.Y, bottomRight.Z);
+        Rlgl.Vertex3f(bottomRight.X, bottomRight.Y + heightOffset, bottomRight.Z);
 
         // Bottom-left
         Rlgl.TexCoord2f(texRight, texBottom);
-        Rlgl.Vertex3f(bottomLeft.X, bottomLeft.Y, bottomLeft.Z);
+        Rlgl.Vertex3f(bottomLeft.X, bottomLeft.Y + heightOffset, bottomLeft.Z);
 
         Rlgl.End();
         Rlgl.SetTexture(0);

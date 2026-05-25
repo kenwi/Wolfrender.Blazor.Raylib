@@ -78,7 +78,8 @@ public class PickupSystem
                     cameraPosition,
                     Color.White,
                     frameRect: PickupSprites.GetFrameRect(pickup.Type),
-                    quantizeToEightDirections: false);
+                    quantizeToEightDirections: false,
+                    heightOffset: 0.5f);
             }
             else
             {
