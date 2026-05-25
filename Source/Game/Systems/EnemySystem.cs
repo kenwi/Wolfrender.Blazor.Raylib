@@ -145,7 +145,10 @@ public class EnemySystem
 
             case EnemyState.HIT:
                 if (enemy.StateTimer >= enemy.HitReactionDurationSeconds)
+                {
+                    OrientTowardPlayerAfterHit(enemy);
                     enemy.TransitionTo(SanitizeResumeStateAfterHit(enemy));
+                }
                 break;
 
             case EnemyState.DYING:
@@ -588,13 +591,29 @@ public class EnemySystem
     }
 
     /// <summary>
+    /// After a hit reaction, the enemy knows where the player is: face that direction immediately.
+    /// </summary>
+    private void OrientTowardPlayerAfterHit(Enemy enemy)
+    {
+        if (!_player.IsAlive)
+            return;
+
+        enemy.LastSeenPlayerPosition = _player.Position;
+        enemy.Rotation = GetFacingAngleToward(enemy.Position, _player.Position);
+    }
+
+    private static float GetFacingAngleToward(Vector3 from, Vector3 to)
+    {
+        Vector3 toTarget = to - from;
+        return MathF.Atan2(toTarget.X, -toTarget.Z) - MathF.PI / 2f;
+    }
+
+    /// <summary>
     /// Smoothly rotate the enemy to face the player's current position.
     /// </summary>
     private void RotateTowardPlayer(Enemy enemy, float deltaTime)
     {
-        Vector3 toPlayer = _player.Position - enemy.Position;
-        float targetAngle = MathF.Atan2(toPlayer.X, -toPlayer.Z) - MathF.PI / 2f;
-        RotateTowardAngle(enemy, targetAngle, deltaTime);
+        RotateTowardAngle(enemy, GetFacingAngleToward(enemy.Position, _player.Position), deltaTime);
     }
 
     private static void RotateTowardAngle(Enemy enemy, float targetAngle, float deltaTime)
