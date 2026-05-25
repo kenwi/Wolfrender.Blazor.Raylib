@@ -152,6 +152,12 @@ public class LevelEditorScene : IScene
                     ref _state.HoveredEnemyIndex, _state.SelectedEnemyIndex,
                     _state.IsEditingPatrolPath, _state.PatrolEditEnemyIndex, _state.PatrolPathInProgress);
             }
+            else if (layer.Name == EditorState.PickupsLayerName)
+            {
+                _mapRenderer.RenderPickupLayer(
+                    _state.Camera, _state.IsMouseOverUI,
+                    ref _state.HoveredPickupIndex, _state.SelectedPickupIndex);
+            }
             else if (_state.IsSimulating && layer.Name == "Doors")
             {
                 _mapRenderer.RenderLiveDoors(_state.DoorSystem, _state.Camera);
@@ -189,9 +195,11 @@ public class LevelEditorScene : IScene
         if (menuToggleSim) _state.ToggleSimulation();
         _gui.RenderFileDialogs(_state.RefreshLayerReferences);
         _gui.RenderLayerPanel(_state.Layers, ref _state.ActiveLayerIndex);
-        _gui.RenderTilePalette(_state.Layers, _state.ActiveLayerIndex, ref _state.SelectedTileId);
-        _gui.RenderInfoPanel(tileX, tileY, worldPos, tileInBounds, _state.CursorInfoFollowsMouse, _state.Layers, EditorState.EnemiesLayerName);
+        _gui.RenderTilePalette(_state.Layers, _state.ActiveLayerIndex, ref _state.SelectedTileId, ref _state.SelectedPickupType);
+        _gui.RenderPickupPalette(ref _state.SelectedPickupType);
+        _gui.RenderInfoPanel(tileX, tileY, worldPos, tileInBounds, _state.CursorInfoFollowsMouse, _state.Layers);
         _gui.RenderEnemyPropertiesPanel(ref _state.SelectedEnemyIndex, ref _state.IsEditingPatrolPath, ref _state.PatrolEditEnemyIndex, _state.PatrolPathInProgress);
+        _gui.RenderPickupPropertiesPanel(ref _state.SelectedPickupIndex);
         _gui.RenderDebugLogPanel();
         _gui.RenderPathfindingPanel(_state);
         rlImGui.End();
@@ -245,8 +253,8 @@ public class LevelEditorScene : IScene
     private void HandleTileAndEnemyInput(bool mouseOverUI)
     {
         bool isEnemyLayer = _state.IsOnEnemyLayer;
+        bool isPickupLayer = _state.IsOnPickupLayer;
 
-        // If clicking on a hovered enemy while another layer is active, auto-switch to enemy layer
         if (!mouseOverUI && !isEnemyLayer && _state.HoveredEnemyIndex >= 0 && IsMouseButtonPressed(MouseButton.Left))
         {
             _state.SwitchToEnemyLayer();
@@ -255,11 +263,22 @@ public class LevelEditorScene : IScene
             _state.IsDraggingEnemy = true;
         }
 
+        if (!mouseOverUI && !isPickupLayer && _state.HoveredPickupIndex >= 0 && IsMouseButtonPressed(MouseButton.Left))
+        {
+            _state.SwitchToPickupLayer();
+            isPickupLayer = true;
+            _state.SelectPickup(_state.HoveredPickupIndex);
+        }
+
         if (!mouseOverUI && isEnemyLayer)
         {
             HandleEnemyInput();
         }
-        else if (!mouseOverUI && IsMouseButtonDown(MouseButton.Left) && !isEnemyLayer)
+        else if (!mouseOverUI && isPickupLayer)
+        {
+            HandlePickupInput();
+        }
+        else if (!mouseOverUI && IsMouseButtonDown(MouseButton.Left) && !isEnemyLayer && !isPickupLayer)
         {
             var paintPos = _state.Camera.ScreenToWorld(GetMousePosition());
             int px = (int)MathF.Floor(paintPos.X);
@@ -267,12 +286,45 @@ public class LevelEditorScene : IScene
             _state.PaintTile(px, py);
         }
 
-        // Delete selected enemy with Delete key
         if (isEnemyLayer && _state.SelectedEnemyIndex >= 0 && _state.SelectedEnemyIndex < _state.MapData.Enemies.Count
             && IsKeyPressed(KeyboardKey.Delete))
         {
             _state.DeleteSelectedEnemy();
         }
+
+        if (isPickupLayer && _state.SelectedPickupIndex >= 0 && _state.SelectedPickupIndex < _state.MapData.Pickups.Count
+            && IsKeyPressed(KeyboardKey.Delete))
+        {
+            _state.DeleteSelectedPickup();
+        }
+    }
+
+    private void HandlePickupInput()
+    {
+        if (IsMouseButtonPressed(MouseButton.Left))
+        {
+            if (_state.HoveredPickupIndex >= 0)
+                _state.SelectPickup(_state.HoveredPickupIndex);
+            else
+            {
+                var paintPos = _state.Camera.ScreenToWorld(GetMousePosition());
+                int px = (int)MathF.Floor(paintPos.X);
+                int py = (int)MathF.Floor(paintPos.Y);
+                _state.PlacePickup(px, py);
+            }
+        }
+
+        if (_state.IsDraggingPickup && IsMouseButtonDown(MouseButton.Left)
+            && _state.SelectedPickupIndex >= 0 && _state.SelectedPickupIndex < _state.MapData.Pickups.Count)
+        {
+            var dragPos = _state.Camera.ScreenToWorld(GetMousePosition());
+            int dx = (int)MathF.Floor(dragPos.X);
+            int dy = (int)MathF.Floor(dragPos.Y);
+            _state.MovePickup(dx, dy);
+        }
+
+        if (IsMouseButtonReleased(MouseButton.Left))
+            _state.IsDraggingPickup = false;
     }
 
     private void HandleEnemyInput()

@@ -16498,5 +16498,12 @@
         }
       ]
     }
+  ],
+  "Pickups": [
+    { "TileX": 32, "TileY": 28, "Type": "Health", "Amount": 25 },
+    { "TileX": 28, "TileY": 28, "Type": "Ammo", "Amount": 30 },
+    { "TileX": 30, "TileY": 26, "Type": "GoldKey", "Amount": 0 },
+    { "TileX": 34, "TileY": 30, "Type": "SilverKey", "Amount": 0 },
+    { "TileX": 33, "TileY": 26, "Type": "MachineGun", "Amount": 30 }
   ]
 }

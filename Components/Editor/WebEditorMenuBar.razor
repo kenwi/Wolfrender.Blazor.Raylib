@@ -22,8 +22,10 @@
             <div class="menu-dropdown" @onclick:stopPropagation="true">
                 <div class="menu-option @(ShowLayers ? "checked" : "")" @onclick="ToggleLayers">Layers</div>
                 <div class="menu-option @(ShowTilePalette ? "checked" : "")" @onclick="ToggleTilePalette">Tile Palette</div>
+                <div class="menu-option @(ShowPickupPalette ? "checked" : "")" @onclick="TogglePickupPalette">Pickup Palette</div>
                 <div class="menu-option @(ShowCursorInfo ? "checked" : "")" @onclick="ToggleCursorInfo">Cursor Info</div>
                 <div class="menu-option @(ShowEnemyProperties ? "checked" : "")" @onclick="ToggleEnemyProps">Enemy Properties</div>
+                <div class="menu-option @(ShowPickupProperties ? "checked" : "")" @onclick="TogglePickupProps">Pickup Properties</div>
                 <div class="menu-option @(ShowDebugLog ? "checked" : "")" @onclick="ToggleDebugLog">Debug Log</div>
             </div>
         }
@@ -62,6 +64,10 @@
     [Parameter] public EventCallback<bool> ShowCursorInfoChanged { get; set; }
     [Parameter] public bool ShowEnemyProperties { get; set; }
     [Parameter] public EventCallback<bool> ShowEnemyPropertiesChanged { get; set; }
+    [Parameter] public bool ShowPickupPalette { get; set; }
+    [Parameter] public EventCallback<bool> ShowPickupPaletteChanged { get; set; }
+    [Parameter] public bool ShowPickupProperties { get; set; }
+    [Parameter] public EventCallback<bool> ShowPickupPropertiesChanged { get; set; }
     [Parameter] public bool ShowDebugLog { get; set; }
     [Parameter] public EventCallback<bool> ShowDebugLogChanged { get; set; }
 
@@ -88,6 +94,8 @@
     private void ToggleTilePalette() => ShowTilePaletteChanged.InvokeAsync(!ShowTilePalette);
     private void ToggleCursorInfo() => ShowCursorInfoChanged.InvokeAsync(!ShowCursorInfo);
     private void ToggleEnemyProps() => ShowEnemyPropertiesChanged.InvokeAsync(!ShowEnemyProperties);
+    private void TogglePickupPalette() => ShowPickupPaletteChanged.InvokeAsync(!ShowPickupPalette);
+    private void TogglePickupProps() => ShowPickupPropertiesChanged.InvokeAsync(!ShowPickupProperties);
     private void ToggleDebugLog() => ShowDebugLogChanged.InvokeAsync(!ShowDebugLog);
 
     private void OnPointerEnter() => State.IsMouseOverUI = true;

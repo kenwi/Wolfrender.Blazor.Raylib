@@ -1,6 +1,7 @@
 using System.Numerics;
 using Game.Entities;
 using Game.Systems;
+using Game.Utilities;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 using Color = Raylib_cs.Color;
@@ -235,6 +236,53 @@ public class EditorMapRenderer
         if (isSimulating && enemySystem.Enemies != null)
         {
             RenderLiveEnemies(enemySystem, camera, drawEnemyLineOfSight);
+        }
+    }
+
+    public void RenderPickupLayer(
+        EditorCamera camera,
+        bool isMouseOverUI,
+        ref int hoveredPickupIndex,
+        int selectedPickupIndex)
+    {
+        float tileSize = camera.TileSize;
+        var mouseScreen = GetMousePosition();
+        hoveredPickupIndex = -1;
+
+        float radius = tileSize * 0.32f;
+
+        for (int i = 0; i < _mapData.Pickups.Count; i++)
+        {
+            var pickup = _mapData.Pickups[i];
+            float centerX = (pickup.TileX + 0.5f) * tileSize + camera.Offset.X;
+            float centerY = (pickup.TileY + 0.5f) * tileSize + camera.Offset.Y;
+
+            if (!isMouseOverUI)
+            {
+                float dx = mouseScreen.X - centerX;
+                float dy = mouseScreen.Y - centerY;
+                if (dx * dx + dy * dy <= radius * radius)
+                    hoveredPickupIndex = i;
+            }
+
+            var color = PickupVisuals.GetColor(pickup.Type);
+            DrawCircle((int)centerX, (int)centerY, radius, color);
+            DrawCircleLines((int)centerX, (int)centerY, radius + 1f, Color.White);
+
+            if (i == hoveredPickupIndex)
+            {
+                DrawCircleLines((int)centerX, (int)centerY, radius + 3f, Color.Yellow);
+                DrawCircleLines((int)centerX, (int)centerY, radius + 4f, Color.Yellow);
+            }
+
+            if (i == selectedPickupIndex)
+            {
+                DrawCircleLines((int)centerX, (int)centerY, radius + 2f, Color.White);
+            }
+
+            string label = PickupVisuals.GetLabel(pickup.Type);
+            int labelW = MeasureText(label, 14);
+            DrawText(label, (int)(centerX - labelW / 2f), (int)(centerY - 6), 14, Color.White);
         }
     }
 

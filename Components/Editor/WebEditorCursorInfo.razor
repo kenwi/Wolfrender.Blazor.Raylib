@@ -27,6 +27,18 @@
                     <div class="tile-content-empty">&nbsp; @layer.Name: empty</div>
                 }
             }
+            else if (layer.Name == EditorState.PickupsLayerName)
+            {
+                var pickupHere = State.MapData.Pickups.FindIndex(p => p.TileX == TileX && p.TileY == TileY);
+                @if (pickupHere >= 0)
+                {
+                    <div class="tile-content-pickup">&nbsp; @layer.Name: @State.MapData.Pickups[pickupHere].Type (#@pickupHere)</div>
+                }
+                else
+                {
+                    <div class="tile-content-empty">&nbsp; @layer.Name: empty</div>
+                }
+            }
             else
             {
                 uint tileId = State.MapData.GetTile(layer.Tiles, TileX, TileY);
