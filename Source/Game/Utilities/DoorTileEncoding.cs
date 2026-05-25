@@ -21,6 +21,27 @@ public static class DoorTileEncoding
     public const uint HorizontalSilver = 11;
     public const uint VerticalSilver = 12;
 
+    public const string DoorTexturePath = "resources/door.png";
+
+    /// <summary>Index of <see cref="DoorTexturePath"/> in <see cref="MapData.Textures"/>.</summary>
+    public const int DoorTextureIndex = 6;
+
+    /// <summary>Column count for the door palette grid.</summary>
+    public const int PaletteColumns = 2;
+
+    public static readonly PaletteEntry[] PaletteEntries =
+    {
+        new(Horizontal, "Door H", "Normal door", false, DoorLockKind.None),
+        new(Vertical, "Door V", "Normal door rotated 90°", true, DoorLockKind.None),
+        new(HorizontalGold, "Gold H", "Door with G circle on top", false, DoorLockKind.Gold),
+        new(VerticalGold, "Gold V", "Door with G circle on top rotated 90°", true, DoorLockKind.Gold),
+        new(HorizontalSilver, "Silver H", "Door with S circle on top", false, DoorLockKind.Silver),
+        new(VerticalSilver, "Silver V", "Door with S circle on top rotated 90°", true, DoorLockKind.Silver),
+    };
+
+    public readonly record struct PaletteEntry(
+        uint Id, string ShortLabel, string Description, bool Vertical, DoorLockKind LockKind);
+
     public static bool IsDoorTile(uint value) => value > 0 && TryParse(value, out _, out _);
 
     public static bool TryParse(uint tileValue, out DoorRotation rotation, out DoorLockKind lockKind)
@@ -62,14 +83,23 @@ public static class DoorTileEncoding
         }
     }
 
-    public static string GetPaletteLabel(uint tileId) => tileId switch
+    public static string GetPaletteLabel(uint tileId)
     {
-        Horizontal => "Door H",
-        Vertical => "Door V",
-        HorizontalGold => "Gold H",
-        VerticalGold => "Gold V",
-        HorizontalSilver => "Silver H",
-        VerticalSilver => "Silver V",
-        _ => $"ID {tileId}"
-    };
+        foreach (var entry in PaletteEntries)
+        {
+            if (entry.Id == tileId)
+                return entry.ShortLabel;
+        }
+        return $"ID {tileId}";
+    }
+
+    public static string GetPaletteDescription(uint tileId)
+    {
+        foreach (var entry in PaletteEntries)
+        {
+            if (entry.Id == tileId)
+                return entry.Description;
+        }
+        return $"Tile ID {tileId}";
+    }
 }

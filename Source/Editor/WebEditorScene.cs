@@ -98,7 +98,7 @@ public class WebEditorScene : IScene
             {
                 _mapRenderer.RenderEnemyLayer(
                     State.Camera, State.EnemySystem, State.IsMouseOverUI,
-                    State.IsSimulating, State.DrawEnemyLineOfSight,
+                    State.IsSimulating, State.DrawEnemyLineOfSight, State.ShowPatrolPaths,
                     ref State.HoveredEnemyIndex, State.SelectedEnemyIndex,
                     State.IsEditingPatrolPath, State.PatrolEditEnemyIndex, State.PatrolPathInProgress);
             }
@@ -118,7 +118,8 @@ public class WebEditorScene : IScene
             }
         }
 
-        _mapRenderer.RenderPlayerIndicator(State.Player, State.Camera);
+        _mapRenderer.RenderPlayerIndicator(
+            State.Player, State.Camera, State.HoveredPlayer, State.IsDraggingPlayer);
 
         var mouseScreen = GetMousePosition();
         var worldPos = State.Camera.ScreenToWorld(mouseScreen);
@@ -126,7 +127,7 @@ public class WebEditorScene : IScene
         int tileY = (int)MathF.Floor(worldPos.Y);
         bool tileInBounds = tileX >= 0 && tileX < State.MapData.Width && tileY >= 0 && tileY < State.MapData.Height;
 
-        if (tileInBounds)
+        if (tileInBounds && State.ShouldShowTileHighlight())
         {
             _mapRenderer.DrawTileHighlight(tileX, tileY, State.Camera);
         }
@@ -171,8 +172,37 @@ public class WebEditorScene : IScene
             State.CancelPatrolPath();
     }
 
+    private void HandlePlayerInput()
+    {
+        if (State.IsSimulating) return;
+
+        var mouseScreen = GetMousePosition();
+        State.UpdatePlayerHover(State.Camera, mouseScreen, State.IsMouseOverUI);
+
+        if (!State.IsMouseOverUI && IsMouseButtonPressed(MouseButton.Left) && State.HoveredPlayer)
+            State.IsDraggingPlayer = true;
+
+        if (State.IsDraggingPlayer && IsMouseButtonDown(MouseButton.Left))
+        {
+            var dragPos = State.Camera.ScreenToWorld(GetMousePosition());
+            int tx = (int)MathF.Floor(dragPos.X);
+            int ty = (int)MathF.Floor(dragPos.Y);
+            if (tx >= 0 && tx < State.MapData.Width && ty >= 0 && ty < State.MapData.Height
+                && State.CanPlacePickupAt(tx, ty))
+            {
+                State.SyncPlayerToSpawnTile(tx, ty);
+            }
+        }
+
+        if (IsMouseButtonReleased(MouseButton.Left))
+            State.IsDraggingPlayer = false;
+    }
+
     private void HandleTileAndEnemyInput()
     {
+        if (!State.IsSimulating)
+            HandlePlayerInput();
+
         bool isEnemyLayer = State.IsOnEnemyLayer;
         bool isPickupLayer = State.IsOnPickupLayer;
 
@@ -180,8 +210,7 @@ public class WebEditorScene : IScene
         {
             State.SwitchToEnemyLayer();
             isEnemyLayer = true;
-            State.SelectedEnemyIndex = State.HoveredEnemyIndex;
-            State.IsDraggingEnemy = true;
+            State.SelectEnemy(State.HoveredEnemyIndex);
         }
 
         if (!State.IsMouseOverUI && !isPickupLayer && State.HoveredPickupIndex >= 0 && IsMouseButtonPressed(MouseButton.Left))
@@ -191,15 +220,40 @@ public class WebEditorScene : IScene
             State.SelectPickup(State.HoveredPickupIndex);
         }
 
-        if (!State.IsMouseOverUI && isEnemyLayer)
+        if (!State.IsMouseOverUI && isEnemyLayer && IsMouseButtonPressed(MouseButton.Left))
+        {
+            if (State.HoveredPickupIndex >= 0)
+            {
+                State.SwitchToPickupLayer();
+                isEnemyLayer = false;
+                isPickupLayer = true;
+                State.SelectPickup(State.HoveredPickupIndex);
+            }
+            else
+            {
+                var clickPos = State.Camera.ScreenToWorld(GetMousePosition());
+                int cx = (int)MathF.Floor(clickPos.X);
+                int cy = (int)MathF.Floor(clickPos.Y);
+                uint doorTile = State.GetDoorTileAt(cx, cy);
+                if (doorTile != 0)
+                {
+                    State.SwitchToDoorLayer();
+                    State.SelectedTileId = doorTile;
+                    isEnemyLayer = false;
+                }
+            }
+        }
+
+        if (!State.IsMouseOverUI && isEnemyLayer && !State.IsDraggingPlayer)
         {
             HandleEnemyInput();
         }
-        else if (!State.IsMouseOverUI && isPickupLayer)
+        else if (!State.IsMouseOverUI && isPickupLayer && !State.IsDraggingPlayer)
         {
             HandlePickupInput();
         }
-        else if (!State.IsMouseOverUI && IsMouseButtonDown(MouseButton.Left) && !isEnemyLayer && !isPickupLayer)
+        else if (!State.IsMouseOverUI && IsMouseButtonDown(MouseButton.Left) && !isEnemyLayer && !isPickupLayer
+                 && !State.IsDraggingPlayer)
         {
             var paintPos = State.Camera.ScreenToWorld(GetMousePosition());
             int px = (int)MathF.Floor(paintPos.X);
@@ -231,7 +285,8 @@ public class WebEditorScene : IScene
                 var paintPos = State.Camera.ScreenToWorld(GetMousePosition());
                 int px = (int)MathF.Floor(paintPos.X);
                 int py = (int)MathF.Floor(paintPos.Y);
-                State.PlacePickup(px, py);
+                if (!State.TrySwitchLayerFromPickupClick(px, py))
+                    State.PlacePickup(px, py);
             }
         }
 

@@ -222,7 +222,8 @@ public class World : IScene
 
     private void ResetPlayerToInitialSpawn()
     {
-        _player.Position = InitialPlayerPosition;
+        _player.Position = LevelData.GetTileAnchorWorld(
+            _mapData.PlayerSpawnTileX, _mapData.PlayerSpawnTileY, _mapData.PlayerSpawnWorldY);
         _player.OldPosition = _player.Position;
         _player.Velocity = Vector3.Zero;
         _player.Health = _player.MaxHealth;

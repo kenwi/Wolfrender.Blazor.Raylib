@@ -10,14 +10,24 @@
         Eraser (Empty)
     </button>
 
+    <div class="info-label" style="margin-top: 8px;">Doors:</div>
     <div class="door-palette-grid">
-        @foreach (var door in DoorEntries)
+        @foreach (var door in DoorTileEncoding.PaletteEntries)
         {
-            <button class="door-palette-btn @(State.SelectedTileId == door.Id ? "selected" : "")"
-                    title="Tile ID: @door.Id"
-                    @onclick="() => SelectTile(door.Id)">
-                <span class="door-palette-label">@door.Label</span>
-                <span class="door-palette-id">ID @door.Id</span>
+            var entry = door;
+            <button type="button"
+                    class="tile-btn @(State.SelectedTileId == entry.Id ? "selected" : "")"
+                    title="@($"{entry.ShortLabel} — {entry.Description} (ID {entry.Id})")"
+                    @onclick="() => SelectTile(entry.Id)">
+                <span class="door-palette-preview @(entry.Vertical ? "vertical" : "")">
+                    <img src="@DoorTileEncoding.DoorTexturePath" alt="@entry.ShortLabel" />
+                    @if (entry.LockKind != DoorLockKind.None)
+                    {
+                        <span class="door-lock-badge @(entry.LockKind == DoorLockKind.Gold ? "gold" : "silver")">
+                            @(entry.LockKind == DoorLockKind.Gold ? "G" : "S")
+                        </span>
+                    }
+                </span>
             </button>
         }
     </div>
@@ -31,19 +41,10 @@
     [Parameter] public EditorState State { get; set; } = default!;
     [Parameter] public EventCallback OnChanged { get; set; }
 
-    private static readonly (uint Id, string Label)[] DoorEntries =
-    {
-        (DoorTileEncoding.Horizontal, "Door H"),
-        (DoorTileEncoding.Vertical, "Door V"),
-        (DoorTileEncoding.HorizontalGold, "Gold H"),
-        (DoorTileEncoding.VerticalGold, "Gold V"),
-        (DoorTileEncoding.HorizontalSilver, "Silver H"),
-        (DoorTileEncoding.VerticalSilver, "Silver V"),
-    };
-
     private void SelectTile(uint tileId)
     {
         State.SelectedTileId = tileId;
+        State.SwitchToDoorLayer();
         OnChanged.InvokeAsync();
     }
 

@@ -28,6 +28,13 @@ public class PickupPlacementData
     public int Amount { get; set; }
 }
 
+public class PlayerSpawnData
+{
+    public int TileX { get; set; } = 30;
+    public int TileY { get; set; } = 28;
+    public float WorldY { get; set; } = 2f;
+}
+
 public class LevelFileData
 {
     public int Width { get; set; }
@@ -38,6 +45,7 @@ public class LevelFileData
     public uint[] Doors { get; set; } = Array.Empty<uint>();
     public List<EnemyPlacementData> Enemies { get; set; } = new();
     public List<PickupPlacementData> Pickups { get; set; } = new();
+    public PlayerSpawnData? PlayerSpawn { get; set; }
 }
 
 public enum BmpTileLayer { Floor, Walls, Ceiling, Doors }
@@ -121,7 +129,13 @@ public static class LevelSerializer
                 TileY = p.TileY,
                 Type = p.Type.ToString(),
                 Amount = p.Amount
-            }).ToList()
+            }).ToList(),
+            PlayerSpawn = new PlayerSpawnData
+            {
+                TileX = mapData.PlayerSpawnTileX,
+                TileY = mapData.PlayerSpawnTileY,
+                WorldY = mapData.PlayerSpawnWorldY
+            }
         };
 
         return JsonSerializer.Serialize(fileData, JsonOptions);
@@ -160,6 +174,13 @@ public static class LevelSerializer
             Type = ParsePickupType(p.Type),
             Amount = p.Amount
         }).ToList();
+
+        if (fileData.PlayerSpawn != null)
+        {
+            mapData.PlayerSpawnTileX = fileData.PlayerSpawn.TileX;
+            mapData.PlayerSpawnTileY = fileData.PlayerSpawn.TileY;
+            mapData.PlayerSpawnWorldY = fileData.PlayerSpawn.WorldY;
+        }
     }
 
     private static PickupType ParsePickupType(string type)
