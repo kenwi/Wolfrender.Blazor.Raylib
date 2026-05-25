@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <!-- Copy wwwroot/resources into output as resources/ (runtime path used by desktop + WASM VFS). -->
+  <ItemGroup>
+    <Content Include="wwwroot\resources\**\*"
+             Exclude="wwwroot\resources\**\*.tsx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>resources\%(RecursiveDir)%(Filename)%(Extension)</TargetPath>
+    </Content>
+  </ItemGroup>
+</Project>

@@ -1,41 +1,25 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Game",
-            "type": "coreclr",
-            "request": "launch",
-            "preLaunchTask": "build",
-            "program": "${workspaceFolder}/bin/Debug/net10.0/Wolfrender.Blazor.Raylib.Console.dll",
-            "args": [],
-            "cwd": "${workspaceFolder}/wwwroot",
-            "console": "internalConsole",
-            "stopAtEntry": false
-        },
-        {
-            "name": "Editor",
-            "type": "coreclr",
-            "request": "launch",
-            "preLaunchTask": "build-editor",
-            "program": "${workspaceFolder}/bin/Debug/net10.0/Wolfrender.Blazor.Raylib.Console.Editor.dll",
-            "args": [],
-            "cwd": "${workspaceFolder}/wwwroot",
-            "console": "integratedTerminal",
-            "stopAtEntry": false
-        },
-        {
-            "name": "Editor",
-            "type": "coreclr",
-            "request": "launch",
-            "preLaunchTask": "build-editor",
-            "program": "${workspaceFolder}/bin/Debug/net10.0/Wolfrender.Blazor.Raylib.Console.Editor.dll",
-            "args": [],
-            "cwd": "${workspaceFolder}/wwwroot",
-            "console": "integratedTerminal",
-            "stopAtEntry": false
-        }
-    ]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Desktop (Console)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-console",
+      "program": "${workspaceFolder}/bin/Debug/net10.0/Wolfrender.Blazor.Raylib.Console/Wolfrender.Blazor.Raylib.Console.dll",
+      "cwd": "${workspaceFolder}/bin/Debug/net10.0/Wolfrender.Blazor.Raylib.Console",
+      "console": "integratedTerminal",
+      "stopAtEntry": false
+    },
+    {
+      "name": "Desktop (Console Editor)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-console-editor",
+      "program": "${workspaceFolder}/bin/Debug/net10.0/Wolfrender.Blazor.Raylib.Console.Editor/Wolfrender.Blazor.Raylib.Console.Editor.dll",
+      "cwd": "${workspaceFolder}/bin/Debug/net10.0/Wolfrender.Blazor.Raylib.Console.Editor",
+      "console": "integratedTerminal",
+      "stopAtEntry": false
+    }
+  ]
 }

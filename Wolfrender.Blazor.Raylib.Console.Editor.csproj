@@ -7,6 +7,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <OutputPath>bin\$(Configuration)\$(TargetFramework)\$(MSBuildProjectName)\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <RunWorkingDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\$(OutputPath)'))</RunWorkingDirectory>
+    <DefineConstants>$(DefineConstants);CONSOLE_APP</DefineConstants>
+    <DefineConstants>$(DefineConstants);EDITOR</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,35 +25,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="wwwroot\resources\*">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="wwwroot\resources\shaders\lighting.vs">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="wwwroot\resources\debug.tmx">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-</ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="Library\rlImGui-cs\rlImGui\rlImGui.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Include="wwwroot\resources\shaders\transparency.fs">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
+  <Import Project="Desktop.assets.props" />
 
-  <ItemGroup>
-    <None Include="wwwroot\resources\shaders\lighting.fs">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-  
-  <PropertyGroup>
-    <DefineConstants>$(DefineConstants);CONSOLE_APP</DefineConstants>
-    <DefineConstants>$(DefineConstants);EDITOR</DefineConstants>
-  </PropertyGroup>
 </Project>
