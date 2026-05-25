@@ -11,6 +11,7 @@ public class EffectSystem
 
     private float _damageFlashRemaining;
     private float _reticleFireFlashRemaining;
+    private bool _deathOverlayActive;
 
     public void Update(float deltaTime)
     {
@@ -24,7 +25,10 @@ public class EffectSystem
     {
         _damageFlashRemaining = 0f;
         _reticleFireFlashRemaining = 0f;
+        _deathOverlayActive = false;
     }
+
+    public void EnableDeathOverlay() => _deathOverlayActive = true;
 
     public void TriggerDamageFlash() => _damageFlashRemaining = DamageFlashDuration;
 
@@ -39,6 +43,12 @@ public class EffectSystem
 
     public void RenderScreenOverlay(int screenWidth, int screenHeight)
     {
+        if (_deathOverlayActive)
+        {
+            DrawRectangle(0, 0, screenWidth, screenHeight, new Color((byte)200, (byte)20, (byte)20, (byte)115));
+            return;
+        }
+
         if (_damageFlashRemaining <= 0f)
             return;
 
