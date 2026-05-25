@@ -21,7 +21,7 @@ public class EnemySystem
     private const int FovRayCount = 48;
 
     // Movement / behavior constants
-    private const float ArrivalThreshold = 0.5f;
+    private const float ArrivalThreshold = 0.1f;
     private const float EnemyCollisionRadius = 1.0f;
     private const float TurnSpeed = 4f; // radians per second when facing player
     private const float NoticingDuration = 0.8f; // seconds before transitioning to ATTACKING
