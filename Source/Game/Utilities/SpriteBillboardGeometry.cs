@@ -8,6 +8,35 @@ namespace Game.Utilities;
 public static class SpriteBillboardGeometry
 {
     /// <summary>
+    /// Horizontal facing direction for a vertical billboard (Y-up, XZ plane).
+    /// When <paramref name="quantizeToEightDirections"/> is true, snaps to 45° steps (Wolfenstein-style).
+    /// </summary>
+    public static Vector3 ComputeBillboardFacingDirection(
+        Vector3 position,
+        Vector3 cameraPosition,
+        bool quantizeToEightDirections = true)
+    {
+        var directionToCamera = cameraPosition - position;
+        directionToCamera.Y = 0;
+
+        var dirLength = directionToCamera.Length();
+        if (dirLength < 0.001f)
+            directionToCamera = new Vector3(0, 0, 1);
+        else
+            directionToCamera /= dirLength;
+
+        if (!quantizeToEightDirections)
+            return directionToCamera;
+
+        float angleRad = MathF.Atan2(directionToCamera.X, directionToCamera.Z);
+        if (angleRad < 0)
+            angleRad += 2f * MathF.PI;
+
+        float quantizedAngleRad = MathF.Round(angleRad / (MathF.PI / 4f)) * (MathF.PI / 4f);
+        return new Vector3(MathF.Sin(quantizedAngleRad), 0, MathF.Cos(quantizedAngleRad));
+    }
+
+    /// <summary>
     /// Computes the four corners of a vertical billboard facing the camera (Y-up, XZ billboard plane).
     /// </summary>
     public static void ComputeBillboardQuad(
@@ -19,23 +48,11 @@ public static class SpriteBillboardGeometry
         out Vector3 topLeft,
         out Vector3 topRight,
         out Vector3 bottomRight,
-        out Vector3 bottomLeft)
+        out Vector3 bottomLeft,
+        bool quantizeToEightDirections = true)
     {
-        var directionToCamera = cameraPosition - position;
-        directionToCamera.Y = 0;
-
-        var dirLength = directionToCamera.Length();
-        if (dirLength < 0.001f)
-            directionToCamera = new Vector3(0, 0, 1);
-        else
-            directionToCamera /= dirLength;
-
-        float angleRad = MathF.Atan2(directionToCamera.X, directionToCamera.Z);
-        if (angleRad < 0)
-            angleRad += 2f * MathF.PI;
-
-        float quantizedAngleRad = MathF.Round(angleRad / (MathF.PI / 4f)) * (MathF.PI / 4f);
-        directionToCamera = new Vector3(MathF.Sin(quantizedAngleRad), 0, MathF.Cos(quantizedAngleRad));
+        var directionToCamera = ComputeBillboardFacingDirection(
+            position, cameraPosition, quantizeToEightDirections);
 
         var right = Vector3.Cross(directionToCamera, Vector3.UnitY);
         float rightLength = right.Length();

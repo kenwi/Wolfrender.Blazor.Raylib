@@ -733,8 +733,14 @@ public class EnemySystem
     /// </summary>
     private void UpdateSpriteFrame(Enemy enemy)
     {
-        if (enemy.EnemyState is EnemyState.DYING or EnemyState.CORPSE or EnemyState.HIT)
+        if (enemy.EnemyState is EnemyState.HIT)
             return;
+
+        if (enemy.EnemyState is EnemyState.DYING or EnemyState.CORPSE)
+        {
+            UpdateSpriteFrameFacingPlayer(enemy);
+            return;
+        }
 
         Vector2 playerEnemyVector = new Vector2(
             enemy.Position.X - _player.Position.X,
@@ -761,6 +767,28 @@ public class EnemySystem
         enemy.FrameColumnIndex = spriteIndex;
         enemy.AngleToPlayer = (float)rotatedAngle;
         enemy.DistanceFromPlayer = playerEnemyVector.Length() / LevelData.QuadSize;
+    }
+
+    /// <summary>
+    /// Death/corpse sprites use the sheet column that faces the player (not the enemy's last AI heading).
+    /// </summary>
+    private void UpdateSpriteFrameFacingPlayer(Enemy enemy)
+    {
+        Vector2 toPlayer = new Vector2(
+            _player.Position.X - enemy.Position.X,
+            _player.Position.Z - enemy.Position.Z);
+
+        float angleToPlayer = MathF.Atan2(toPlayer.X, toPlayer.Y);
+        if (angleToPlayer < 0)
+            angleToPlayer += 2f * MathF.PI;
+
+        float rotatedAngle = angleToPlayer + MathF.PI / 2f;
+        if (rotatedAngle >= 2f * MathF.PI)
+            rotatedAngle -= 2f * MathF.PI;
+
+        enemy.FrameColumnIndex = (int)MathF.Round(rotatedAngle / (MathF.PI * 2f) * 8f) % 8;
+        enemy.AngleToPlayer = rotatedAngle;
+        enemy.DistanceFromPlayer = toPlayer.Length() / LevelData.QuadSize;
     }
 
     /// <summary>

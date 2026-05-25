@@ -486,39 +486,11 @@ public static class PrimitiveRenderer
         float width = 4f,
         float height = 4f,
         float angle = 0f,
-        Rectangle? frameRect = null)
+        Rectangle? frameRect = null,
+        bool quantizeToEightDirections = true)
     {
-        // Calculate direction from sprite to camera (for billboard effect)
-        var directionToCamera = cameraPosition - position;
-        directionToCamera.Y = 0; // Keep sprite vertical (only rotate around Y-axis)
-        
-        // Normalize the direction
-        var dirLength = directionToCamera.Length();
-        if (dirLength < 0.001f)
-        {
-            directionToCamera = new Vector3(0, 0, 1); // Default forward if too close
-        }
-        else
-        {
-            directionToCamera = directionToCamera / dirLength;
-        }
-        
-        // Quantize direction to 8 discrete angles (0°, 45°, 90°, 135°, 180°, 225°, 270°, 315°)
-        // Calculate angle in XZ plane (0° = +Z, 90° = +X)
-        float angleRad = MathF.Atan2(directionToCamera.X, directionToCamera.Z);
-        
-        // Normalize angle to [0, 2π)
-        if (angleRad < 0) angleRad += 2 * MathF.PI;
-        
-        // Quantize to nearest of 8 directions (45° = π/4 intervals)
-        float quantizedAngleRad = MathF.Round(angleRad / (MathF.PI / 4.0f)) * (MathF.PI / 4.0f);
-        
-        // Reconstruct direction vector from quantized angle
-        directionToCamera = new Vector3(
-            MathF.Sin(quantizedAngleRad),
-            0,
-            MathF.Cos(quantizedAngleRad)
-        );
+        var directionToCamera = SpriteBillboardGeometry.ComputeBillboardFacingDirection(
+            position, cameraPosition, quantizeToEightDirections);
 
         // Calculate right and up vectors for the billboard
         var right = Vector3.Cross(directionToCamera, Vector3.UnitY);
