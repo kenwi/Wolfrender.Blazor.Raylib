@@ -8,6 +8,8 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <WasmGenerateAppBundle>true</WasmGenerateAppBundle>
     <RootNamespace>Wolfrender.Blazor.Raylib</RootNamespace>
+    <OutputPath>bin\$(Configuration)\$(TargetFramework)\$(MSBuildProjectName)\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>
 
   <PropertyGroup>
