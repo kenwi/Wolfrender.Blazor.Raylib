@@ -46,6 +46,7 @@ public class World : IScene
     private  RenderTexture2D _sceneRenderTexture;
     private InputState _inputState = new();
     private readonly EnemySystem _enemySystem;
+    private bool _deathHandled;
 
     public Player Player => _player;
     public EnemySystem EnemySystem => _enemySystem;
@@ -174,6 +175,8 @@ public class World : IScene
         _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
         _enemySystem.Rebuild(_mapData.Enemies, _mapData);
         _effectSystem.Clear();
+        _cameraSystem.ResetDeathFall();
+        _deathHandled = false;
     }
 
     private void ResetPlayerToInitialSpawn()
@@ -269,25 +272,62 @@ public class World : IScene
             _player.WeaponCooldownRemaining = MathF.Max(0f, _player.WeaponCooldownRemaining - deltaTime);
 
             if (_player.IsAlive)
-                _player.Velocity = _inputSystem.GetMoveDirection(_player) * _player.MoveSpeed;
-            else
-                _player.Velocity = Vector3.Zero;
-
-            _movementSystem.Update(_player, deltaTime);
-            _collisionSystem.Update(_player, deltaTime);
-            _cameraSystem.Update(_player, _inputState.IsMouseFree, mouseDelta);
-            _doorSystem.Update(deltaTime, _inputState, _player.Position, _enemySystem.Enemies);
-            _animationSystem.Update(deltaTime);
-            _enemySystem.Update(deltaTime);
-
-            if (_player.IsAlive
-                && _inputState.IsPrimaryFire
-                && _player.WeaponCooldownRemaining <= 0f
-                && !_inputState.IsMouseFree)
             {
-                TryPlayerFire();
+                _player.Velocity = _inputSystem.GetMoveDirection(_player) * _player.MoveSpeed;
+                _movementSystem.Update(_player, deltaTime);
+                _collisionSystem.Update(_player, deltaTime);
+                _cameraSystem.Update(_player, _inputState.IsMouseFree, mouseDelta);
+                _doorSystem.Update(deltaTime, _inputState, _player.Position, _enemySystem.Enemies);
+                _animationSystem.Update(deltaTime);
+                _enemySystem.Update(deltaTime);
+
+                if (_inputState.IsPrimaryFire
+                    && _player.WeaponCooldownRemaining <= 0f
+                    && !_inputState.IsMouseFree)
+                {
+                    TryPlayerFire();
+                }
+            }
+            else
+            {
+                HandlePlayerDeath();
+                _player.Velocity = Vector3.Zero;
+                _cameraSystem.UpdateDeathFall(_player, deltaTime);
+                _doorSystem.Update(deltaTime, _inputState, _player.Position, _enemySystem.Enemies);
+                _animationSystem.Update(deltaTime);
+                _enemySystem.Update(deltaTime);
+                TryRestartFromGameOver();
             }
         }
+    }
+
+    private void HandlePlayerDeath()
+    {
+        if (_deathHandled)
+            return;
+
+        _deathHandled = true;
+        _effectSystem.EnableDeathOverlay();
+        _inputSystem.EnableMouse();
+    }
+
+    private void TryRestartFromGameOver()
+    {
+        if (_consoleOverlay.IsOpen)
+            return;
+
+        bool restartPressed = IsKeyPressed(KeyboardKey.R)
+            || IsMouseButtonPressed(MouseButton.Left);
+
+        if (!restartPressed)
+            return;
+
+        RestartCurrentLevel();
+
+        if (OperatingSystem.IsBrowser())
+            _inputSystem.EnableMouse();
+        else
+            _inputSystem.DisableMouse();
     }
 
     public ConsoleCommandResult ExecuteConsoleLine(string line)
@@ -384,6 +424,9 @@ public class World : IScene
 
         _effectSystem.RenderScreenOverlay(GetScreenWidth(), GetScreenHeight());
 
+        if (!_player.IsAlive && !_consoleOverlay.IsOpen)
+            DrawGameOverOverlay();
+
         if (!_consoleOverlay.IsOpen && !_inputState.IsMouseFree && _player.IsAlive)
             DrawReticle();
         
@@ -401,6 +444,34 @@ public class World : IScene
         _consoleOverlay.Render();
         
         EndDrawing();
+    }
+
+    private void DrawGameOverOverlay()
+    {
+        int screenW = GetScreenWidth();
+        int screenH = GetScreenHeight();
+
+        const int panelW = 520;
+        const int panelH = 220;
+        int panelX = (screenW - panelW) / 2;
+        int panelY = (screenH - panelH) / 2;
+
+        DrawRectangle(panelX, panelY, panelW, panelH, new Color(0, 0, 0, 190));
+        DrawRectangleLines(panelX, panelY, panelW, panelH, new Color(220, 40, 40, 255));
+
+        const string title = "YOU DIED";
+        const int titleSize = 48;
+        int titleW = MeasureText(title, titleSize);
+        DrawText(title, (screenW - titleW) / 2, panelY + 28, titleSize, new Color(255, 60, 60, 255));
+
+        const string restartLine = "Press R or click to restart";
+        const int lineSize = 22;
+        int restartW = MeasureText(restartLine, lineSize);
+        DrawText(restartLine, (screenW - restartW) / 2, panelY + 100, lineSize, Color.RayWhite);
+
+        const string consoleLine = "Console: type  restart  (~ or . to open)";
+        int consoleW = MeasureText(consoleLine, 18);
+        DrawText(consoleLine, (screenW - consoleW) / 2, panelY + 150, 18, new Color(200, 200, 200, 255));
     }
 
     /// <summary>Screen-center crosshair aligned with the camera forward axis (hitscan origin).</summary>

@@ -8,9 +8,17 @@ namespace Game.Systems;
 
 public class CameraSystem
 {
+    private const float DeathFallDuration = 1.1f;
+    private const float DeathFloorEyeOffsetY = -1.55f;
+    private const float DeathLookDistance = 3f;
+
     private readonly CollisionSystem _collisionSystem;
     private readonly float _defaultMouseSensitivity = 0.003f;
     private float _mouseSensitivity;
+
+    private bool _deathFallActive;
+    private float _deathFallT;
+    private Vector3 _deathBaseForward = new(0f, 0f, -1f);
 
     public CameraSystem(CollisionSystem collisionSystem)
     {
@@ -21,6 +29,44 @@ public class CameraSystem
     public void SetMouseSensitivity(float sensitivity)
     {
         _mouseSensitivity = _defaultMouseSensitivity * sensitivity;
+    }
+
+    public void ResetDeathFall()
+    {
+        _deathFallActive = false;
+        _deathFallT = 0f;
+    }
+
+    /// <summary>Collapse the view toward the floor after the player dies.</summary>
+    public void UpdateDeathFall(Player player, float deltaTime)
+    {
+        if (!_deathFallActive)
+        {
+            _deathFallActive = true;
+            _deathFallT = 0f;
+
+            var cam = player.Camera;
+            Vector3 initialForward = cam.Target - cam.Position;
+            if (initialForward.LengthSquared() > 0.0001f)
+                _deathBaseForward = Vector3.Normalize(initialForward);
+        }
+
+        _deathFallT = MathF.Min(1f, _deathFallT + deltaTime / DeathFallDuration);
+        float t = 1f - (1f - _deathFallT) * (1f - _deathFallT);
+
+        Vector3 horizontal = new Vector3(_deathBaseForward.X, 0f, _deathBaseForward.Z);
+        if (horizontal.LengthSquared() < 0.0001f)
+            horizontal = new Vector3(0f, 0f, -1f);
+        else
+            horizontal = Vector3.Normalize(horizontal);
+
+        Vector3 lookForward = Vector3.Normalize(horizontal + new Vector3(0f, -2.5f * t, 0f));
+
+        var camera = player.Camera;
+        camera.Position = player.Position + new Vector3(0f, DeathFloorEyeOffsetY * t, 0f);
+        camera.Target = camera.Position + lookForward * DeathLookDistance;
+        camera.Up = Vector3.UnitY;
+        player.Camera = camera;
     }
 
     public void Update(Player player, bool isMouseFree, Vector2 mouseDelta)
