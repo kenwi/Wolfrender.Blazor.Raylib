@@ -260,8 +260,8 @@ public class EditorMapRenderer
                 float originScreenY = origin.Y * tileSize + camera.Offset.Y;
 
                 var fovFillColor = liveEnemy.CanSeePlayer
-                    ? new Color(255, 40, 40, 200)
-                    : new Color(255, 200, 0, 200);
+                    ? new Color(255, 40, 40, 50)
+                    : new Color(255, 200, 0, 50);
 
                 var fovEdgeColor = liveEnemy.CanSeePlayer
                     ? new Color(255, 80, 80, 180)
