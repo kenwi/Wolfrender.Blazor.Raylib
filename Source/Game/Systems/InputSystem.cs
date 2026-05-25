@@ -14,7 +14,7 @@ public class InputState
     public Vector2 MouseDelta { get; init; }
     public bool IsMouseFree { get; init; }
     public bool IsDebugEnabled { get; init; }
-    public bool IsGamePaused { get; init; }
+    public bool IsPaused { get; init; }
     public bool IsInteractPressed { get; init; }
     public bool IsChangeStatePressed { get; init; }
     public bool IsChangeAnimationPressed { get; set; }
@@ -25,7 +25,7 @@ public class InputState
 public class InputSystem
 {
     private bool _isMouseFree = true;
-    private bool _isGamePaused = true;
+    private bool _isPaused;
     private bool _isDebugEnabled = false;
     private bool _isMinimapEnabled = false;
 
@@ -54,7 +54,7 @@ public class InputSystem
 
         if (IsKeyPressed(KeyboardKey.P))
         {
-            _isGamePaused = !_isGamePaused;
+            _isPaused = !_isPaused;
             ToggleMouse();
         }
 
@@ -112,7 +112,7 @@ public class InputSystem
             MoveRight = IsKeyDown(KeyboardKey.D),
             MouseDelta = GetMouseDelta(),
             IsMouseFree = _isMouseFree,
-            IsGamePaused = _isGamePaused,
+            IsPaused = _isPaused,
             IsDebugEnabled = _isDebugEnabled,
             IsMinimapEnabled = _isMinimapEnabled,
             IsInteractPressed =  IsKeyPressed(KeyboardKey.E),

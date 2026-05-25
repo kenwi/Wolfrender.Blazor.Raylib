@@ -236,7 +236,7 @@ public class World : IScene
             SetResolutionDownScaleMultiplier(RenderData.ResolutionDownScaleMultiplier);
         }
         
-        if (_inputState.IsGamePaused)
+        if (!_inputState.IsPaused)
         {
             _effectSystem.Update(deltaTime);
             _player.WeaponCooldownRemaining = MathF.Max(0f, _player.WeaponCooldownRemaining - deltaTime);
