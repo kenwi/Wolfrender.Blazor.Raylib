@@ -43,8 +43,11 @@ public class PickupSystem
         if (!player.IsAlive || _pickupByTile.Length == 0)
             return;
 
-        int tileX = (int)(player.Position.X / LevelData.QuadSize + 0.5f);
-        int tileY = (int)(player.Position.Z / LevelData.QuadSize + 0.5f);
+        // Match DrawColoredBillboard anchor (stored tile-center position + halfTile on X/Z).
+        float halfTile = LevelData.QuadSize * 0.5f;
+        float invQuad = 1f / LevelData.QuadSize;
+        int tileX = (int)((player.Position.X - halfTile) * invQuad);
+        int tileY = (int)((player.Position.Z - halfTile) * invQuad);
         if (tileX < 0 || tileX >= _mapWidth || tileY < 0 || tileY >= _mapHeight)
             return;
 
