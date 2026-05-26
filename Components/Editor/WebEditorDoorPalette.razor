@@ -20,7 +20,9 @@
                     title="@($"{entry.ShortLabel} — {entry.Description} (ID {entry.Id})")"
                     @onclick="() => SelectTile(entry.Id)">
                 <span class="door-palette-preview @(entry.Vertical ? "vertical" : "")">
-                    <img src="@DoorTileEncoding.DoorTexturePath" alt="@entry.ShortLabel" />
+                    <span class="tile-palette-sprite-sheet"
+                          style="@TileSpriteSheet.GetPaletteSpriteSheetStyle(entry.TextureIndex)"
+                          aria-hidden="true"></span>
                     @if (entry.LockKind != DoorLockKind.None)
                     {
                         <span class="door-lock-badge @(entry.LockKind == DoorLockKind.Gold ? "gold" : "silver")">

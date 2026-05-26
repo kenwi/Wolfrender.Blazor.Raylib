@@ -97,13 +97,7 @@ public partial class ThreeDFirstPerson : IDisposable
         // Preload all resources into the Emscripten VFS before Raylib/File APIs can use them
         var resourceFiles = new[]
         {
-            "resources/greystone.png",
-            "resources/bluestone.png",
-            "resources/colorstone.png",
-            "resources/mossy.png",
-            "resources/redbrick.png",
-            "resources/wood.png",
-            "resources/door.png",
+            "resources/spritesheet_tiles.png",
             "resources/enemy_guard.png",
             "resources/weapons2.png",
             "resources/Objects.png",

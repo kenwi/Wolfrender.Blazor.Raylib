@@ -43,7 +43,7 @@ public class DoorSystem
         for (int index = 0; index < doorTiles.Length; index++)
         {
             var value = doorTiles[index];
-            if (!DoorTileEncoding.TryParse(value, out var rotation, out var lockKind))
+            if (!DoorTileEncoding.TryParse(value, out var doorInfo))
                 continue;
 
             var colRow = LevelData.GetColRow(index, mapWidth);
@@ -51,9 +51,10 @@ public class DoorSystem
             {
                 Position = new Vector2(colRow.col, colRow.row),
                 StartPosition = new Vector2(colRow.col, colRow.row),
-                DoorRotation = rotation,
-                RequiresGoldKey = lockKind == DoorLockKind.Gold,
-                RequiresSilverKey = lockKind == DoorLockKind.Silver,
+                DoorRotation = doorInfo.Rotation,
+                TextureIndex = doorInfo.TextureIndex,
+                RequiresGoldKey = doorInfo.LockKind == DoorLockKind.Gold,
+                RequiresSilverKey = doorInfo.LockKind == DoorLockKind.Silver,
                 DoorState = DoorState.CLOSED
             });
         }
@@ -65,11 +66,11 @@ public class DoorSystem
         {
             if (door.DoorRotation == DoorRotation.HORIZONTAL)
             {
-                PrimitiveRenderer.DrawDoorTextureH(_textures[6], new Vector3(door.Position.X * _quadSize, 2, (door.Position.Y - 1) * _quadSize), _quadSize, _quadSize, _quadSize, Raylib_cs.Color.White);
+                PrimitiveRenderer.DrawDoorTextureH(_textures[door.TextureIndex], new Vector3(door.Position.X * _quadSize, 2, (door.Position.Y - 1) * _quadSize), _quadSize, _quadSize, _quadSize, Raylib_cs.Color.White);
             }
             else
             {
-                PrimitiveRenderer.DrawDoorTextureV(_textures[6], new Vector3(door.Position.X * _quadSize, 2, door.Position.Y * _quadSize), _quadSize, _quadSize, _quadSize, Raylib_cs.Color.White);
+                PrimitiveRenderer.DrawDoorTextureV(_textures[door.TextureIndex], new Vector3(door.Position.X * _quadSize, 2, door.Position.Y * _quadSize), _quadSize, _quadSize, _quadSize, Raylib_cs.Color.White);
             }
         }
     }

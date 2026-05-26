@@ -70,21 +70,16 @@ public class Application
 
     public static MapData LoadMapData()
     {
-        var textures = new List<Texture2D>
+        var mapData = new MapData
         {
-            LoadTexture(Path("resources/greystone.png")),
-            LoadTexture(Path("resources/bluestone.png")),
-            LoadTexture(Path("resources/colorstone.png")),
-            LoadTexture(Path("resources/mossy.png")),
-            LoadTexture(Path("resources/redbrick.png")),
-            LoadTexture(Path("resources/wood.png")),
-            LoadTexture(Path("resources/door.png")),
-            LoadTexture(Path("resources/enemy_guard.png")),
-            LoadTexture(Path("resources/weapons2.png")),
-            LoadTexture(Path("resources/Objects.png"))
+            TileTextures = TileTextureAtlas.LoadFromSheet(Path(TileSpriteSheet.SheetPath)),
+            GameTextures = new List<Texture2D>
+            {
+                LoadTexture(Path("resources/enemy_guard.png")),
+                LoadTexture(Path("resources/weapons2.png")),
+                LoadTexture(Path("resources/Objects.png"))
+            }
         };
-
-        var mapData = new MapData { Textures = textures };
         Editor.LevelSerializer.LoadFromJson(mapData, Path(LevelCatalog.DefaultLevelPath));
 
         return mapData;

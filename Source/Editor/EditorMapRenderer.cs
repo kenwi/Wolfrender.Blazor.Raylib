@@ -73,16 +73,15 @@ public class EditorMapRenderer
                 float drawX = x * tileSize + camera.Offset.X;
                 float drawY = y * tileSize + camera.Offset.Y;
 
-                bool isDoorTile = DoorTileEncoding.TryParse(tileId, out var doorRotation, out var lockKind);
-                bool isVerticalDoor = doorRotation == DoorRotation.VERTICAL;
-                bool isHorizontalDoor = doorRotation == DoorRotation.HORIZONTAL;
+                bool isDoorTile = DoorTileEncoding.TryParse(tileId, out var doorInfo);
+                bool isVerticalDoor = isDoorTile && doorInfo.Rotation == DoorRotation.VERTICAL;
                 int textureIndex = isDoorTile
-                    ? (int)DoorRotation.HORIZONTAL - 1
+                    ? doorInfo.TextureIndex
                     : (int)tileId - 1;
 
-                if (textureIndex >= 0 && textureIndex < _mapData.Textures.Count)
+                if (textureIndex >= 0 && textureIndex < _mapData.TileTextures.Count)
                 {
-                    var texture = _mapData.Textures[textureIndex];
+                    var texture = _mapData.TileTextures[textureIndex];
                     float rotation = isVerticalDoor ? 90f : 0f;
                     var origin = isVerticalDoor
                         ? new Vector2(tileSize / 2f, tileSize / 2f)
@@ -99,12 +98,12 @@ public class EditorMapRenderer
                         Color.White
                     );
 
-                    if (lockKind != DoorLockKind.None)
+                    if (isDoorTile && doorInfo.LockKind != DoorLockKind.None)
                     {
-                        var lockColor = lockKind == DoorLockKind.Gold
+                        var lockColor = doorInfo.LockKind == DoorLockKind.Gold
                             ? new Color(255, 210, 40, 255)
                             : new Color(200, 220, 255, 255);
-                        string label = lockKind == DoorLockKind.Gold ? "G" : "S";
+                        string label = doorInfo.LockKind == DoorLockKind.Gold ? "G" : "S";
                         DrawCircle((int)(drawX + tileSize * 0.75f), (int)(drawY + tileSize * 0.25f), tileSize * 0.2f, lockColor);
                         DrawText(label, (int)(drawX + tileSize * 0.65f), (int)(drawY + tileSize * 0.12f), (int)(tileSize * 0.35f), Color.Black);
                     }
@@ -122,12 +121,12 @@ public class EditorMapRenderer
         if (doorSystem.Doors == null) return;
 
         float tileSize = camera.TileSize;
-        int doorTexIndex = (int)DoorRotation.HORIZONTAL - 1;
-        if (doorTexIndex < 0 || doorTexIndex >= _mapData.Textures.Count) return;
-        var texture = _mapData.Textures[doorTexIndex];
-
         foreach (var door in doorSystem.Doors)
         {
+            if (door.TextureIndex < 0 || door.TextureIndex >= _mapData.TileTextures.Count)
+                continue;
+
+            var texture = _mapData.TileTextures[door.TextureIndex];
             float drawX = door.Position.X * tileSize + camera.Offset.X;
             float drawY = door.Position.Y * tileSize + camera.Offset.Y;
 
@@ -286,8 +285,8 @@ public class EditorMapRenderer
         var mouseScreen = GetMousePosition();
         hoveredPickupIndex = -1;
 
-        var objectsTex = _mapData.Textures.Count > PickupSprites.ObjectsTextureIndex
-            ? _mapData.Textures[PickupSprites.ObjectsTextureIndex]
+        var objectsTex = _mapData.GameTextures.Count > PickupSprites.ObjectsTextureIndex
+            ? _mapData.GameTextures[PickupSprites.ObjectsTextureIndex]
             : default;
         bool hasSpriteSheet = objectsTex.Id != 0;
 
