@@ -1,6 +1,7 @@
 using System.Numerics;
 using System.Text;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using static Raylib_cs.Raylib;
 using Raylib_cs;
