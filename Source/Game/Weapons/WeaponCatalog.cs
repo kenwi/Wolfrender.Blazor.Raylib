@@ -27,7 +27,7 @@ public static class WeaponCatalog
             DisplayName = "PISTOL",
             Kind = WeaponKind.Hitscan,
             Damage = 15f,
-            CooldownSeconds = 0.35f,
+            CooldownSeconds = 0.45f,
             MaxRangeTiles = 48f,
             AmmoPerShot = 1,
             FireSoundPath = "resources/PistolFire.ogg",
@@ -44,10 +44,12 @@ public static class WeaponCatalog
             DisplayName = "MACHINE GUN",
             Kind = WeaponKind.Hitscan,
             Damage = 8f,
-            CooldownSeconds = 0.12f,
+            CooldownSeconds = 0.22f,
             MaxRangeTiles = 48f,
             AmmoPerShot = 1,
             HoldToFire = true,
+            LoopFireAnimation = true,
+            FireAnimationSpeed =1.5f,
             FireSoundPath = "resources/SmgFire.ogg",
             Sprite = new WeaponSpriteSpec
             {
