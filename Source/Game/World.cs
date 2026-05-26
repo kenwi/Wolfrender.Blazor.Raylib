@@ -374,6 +374,9 @@ public class World : IScene
 
     private void TryPlayerFire()
     {
+        if (_player.Ammo <= 0)
+            return;
+
         if (Hitscan.TryHitEnemyScreenRay(
                 _mapData,
                 _doorSystem.Doors,
@@ -394,6 +397,7 @@ public class World : IScene
         _effectSystem.TriggerReticleFireFlash();
         _animationSystem.PlayPistolFire();
         _soundSystem.PlayPistolFire();
+        _player.Ammo--;
     }
 
     public void Render()
@@ -500,7 +504,7 @@ public class World : IScene
         DrawText(weaponLabel, 10, y, fontSize, Color.RayWhite);
         y += 24;
 
-        if (_player.HasMachineGun || _player.Ammo > 0)
+        // if (_player.HasMachineGun || _player.Ammo > 0)
         {
             DrawText($"AMMO: {_player.Ammo}", 10, y, fontSize, new Color(255, 220, 40, 255));
             y += 24;
