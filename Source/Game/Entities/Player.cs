@@ -1,4 +1,5 @@
 using System.Numerics;
+using Game.Weapons;
 using Raylib_cs;
 
 namespace Game.Entities;
@@ -16,21 +17,42 @@ public class Player
     public float MaxHealth { get; set; } = 100f;
     public float Health { get; set; } = 100f;
     public bool IsAlive => Health > 0f;
-    public float PistolDamage { get; set; } = 15f;
-    public float PistolCooldownSeconds { get; set; } = 0.35f;
     public float WeaponCooldownRemaining { get; set; }
 
     public int Ammo { get; set; }
-    public bool HasMachineGun { get; set; }
     public bool HasGoldKey { get; set; }
     public bool HasSilverKey { get; set; }
+
+    public PlayerWeaponInventory Weapons { get; } = new();
+
+    /// <summary>Console / legacy pickup compatibility.</summary>
+    public bool HasMachineGun
+    {
+        get => Weapons.IsOwned(WeaponId.MachineGun);
+        set
+        {
+            if (value)
+                Weapons.Grant(WeaponId.MachineGun);
+        }
+    }
+
+    /// <summary>Console / legacy pickup compatibility.</summary>
+    public bool HasChainGun
+    {
+        get => Weapons.IsOwned(WeaponId.ChainGun);
+        set
+        {
+            if (value)
+                Weapons.Grant(WeaponId.ChainGun);
+        }
+    }
 
     public void ResetInventory()
     {
         Ammo = 0;
-        HasMachineGun = false;
         HasGoldKey = false;
         HasSilverKey = false;
+        Weapons.Reset();
     }
 
     public void TakeDamage(float amount)

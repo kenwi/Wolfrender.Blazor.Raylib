@@ -36,6 +36,10 @@ public static class PickupSprites
     public const int MachineGunX = 66;
     public const int MachineGunY = 828;
 
+    /// <summary>Floor pickup icon on <see cref="SheetPath"/> (placeholder column beside MG).</summary>
+    public const int ChainGunX = 131;
+    public const int ChainGunY = 828;
+
     public const int GoldKeyX = 1;
     public const int GoldKeyY = 988;
 
@@ -47,6 +51,7 @@ public static class PickupSprites
         PickupType.Health => new Rectangle(HealthX, HealthY, FrameSize, FrameSize),
         PickupType.Ammo => new Rectangle(AmmoX, AmmoY, FrameSize, FrameSize),
         PickupType.MachineGun => new Rectangle(MachineGunX, MachineGunY, FrameSize, FrameSize),
+        PickupType.ChainGun => new Rectangle(ChainGunX, ChainGunY, FrameSize, FrameSize),
         PickupType.GoldKey => new Rectangle(GoldKeyX, GoldKeyY, FrameSize, FrameSize),
         PickupType.SilverKey => new Rectangle(SilverKeyX, SilverKeyY, FrameSize, FrameSize),
         _ => new Rectangle(PlaceholderX, PlaceholderY, FrameSize, FrameSize)

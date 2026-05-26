@@ -1,6 +1,7 @@
 using System.Numerics;
 using Game.Entities;
 using Game.Utilities;
+using Game.Weapons;
 using Raylib_cs;
 
 namespace Game.Systems;
@@ -121,9 +122,16 @@ public class PickupSystem
                 Debug.Log($"Picked up ammo (+{amount}), total {player.Ammo}. {positions}");
                 break;
             case PickupType.MachineGun:
-                player.HasMachineGun = true;
+                player.Weapons.Grant(WeaponId.MachineGun);
                 player.Ammo += amount;
+                player.Weapons.TrySetActive(WeaponId.MachineGun);
                 Debug.Log($"Picked up machine gun (+{amount} ammo), total {player.Ammo}. {positions}");
+                break;
+            case PickupType.ChainGun:
+                player.Weapons.Grant(WeaponId.ChainGun);
+                player.Ammo += amount;
+                player.Weapons.TrySetActive(WeaponId.ChainGun);
+                Debug.Log($"Picked up chain gun (+{amount} ammo), total {player.Ammo}. {positions}");
                 break;
             case PickupType.GoldKey:
                 player.HasGoldKey = true;

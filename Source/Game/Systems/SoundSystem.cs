@@ -1,3 +1,4 @@
+using Game.Weapons;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 
@@ -9,8 +10,7 @@ public class SoundSystem
     private float _volume = 0.2f;
     private Sound? _enemyFireSound;
     private bool _enemyFireSoundReady;
-    private Sound? _pistolFireSound;
-    private bool _pistolFireSoundReady;
+    private readonly Dictionary<string, Sound> _weaponSoundsByPath = new();
 
     public SoundSystem(string musicPath)
     {
@@ -30,8 +30,8 @@ public class SoundSystem
         SetMusicVolume(_music, _volume);
         if (_enemyFireSound.HasValue)
             SetSoundVolume(_enemyFireSound.Value, _volume);
-        if (_pistolFireSound.HasValue)
-            SetSoundVolume(_pistolFireSound.Value, _volume);
+        foreach (var sound in _weaponSoundsByPath.Values)
+            SetSoundVolume(sound, _volume);
     }
 
     public float GetVolume() => _volume;
@@ -50,15 +50,21 @@ public class SoundSystem
     }
 
     /// <summary>Player pistol shot (<c>resources/PistolFire.ogg</c>).</summary>
-    public void PlayPistolFire()
+    public void PlayPistolFire() => PlayWeaponFire(WeaponId.Pistol);
+
+    public void PlayWeaponFire(WeaponId weaponId)
     {
-        if (!_pistolFireSoundReady)
+        string path = WeaponCatalog.Get(weaponId).FireSoundPath;
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+
+        if (!_weaponSoundsByPath.TryGetValue(path, out var sound))
         {
-            _pistolFireSound = LoadSound(Utilities.Res.Path("resources/PistolFire.ogg"));
-            SetSoundVolume(_pistolFireSound.Value, _volume);
-            _pistolFireSoundReady = true;
+            sound = LoadSound(Utilities.Res.Path(path));
+            SetSoundVolume(sound, _volume);
+            _weaponSoundsByPath[path] = sound;
         }
 
-        PlaySound(_pistolFireSound!.Value);
+        PlaySound(sound);
     }
 }

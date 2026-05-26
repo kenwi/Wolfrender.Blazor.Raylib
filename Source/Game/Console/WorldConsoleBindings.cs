@@ -58,7 +58,9 @@ public static class WorldConsoleBindings
                     "Player.Position",
                     "Player.CollisionRadius",
                     "Player.Ammo",
+                    "Player.Weapons.ActiveWeapon",
                     "Player.HasMachineGun",
+                    "Player.HasChainGun",
                     "Player.HasGoldKey",
                     "Player.HasSilverKey"
                 },
@@ -125,6 +127,7 @@ public static class WorldConsoleBindings
             "Player.Position",
             "Player.CollisionRadius",
             "Player.Ammo",
+            "Player.Weapons.ActiveWeapon",
             "Player.HasMachineGun",
             "Player.HasGoldKey",
             "Player.HasSilverKey",

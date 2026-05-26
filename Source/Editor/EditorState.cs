@@ -508,8 +508,8 @@ public class EditorState
     /// </summary>
     public void ApplyPlayerSpawnFromMap()
     {
-        SyncPlayerToSpawnTile(MapData.PlayerSpawnTileX, MapData.PlayerSpawnTileY);
-        ApplyPlayerSpawnRotation();
+        PlayerSpawn.ApplyFromMap(Player, MapData, PlayerSpawnApplyMode.PositionAndCameraOnly);
+        NotifyStateChanged();
     }
 
     public void SyncPlayerToSpawnTile(int tileX, int tileY)
@@ -519,9 +519,7 @@ public class EditorState
 
         MapData.PlayerSpawnTileX = tileX;
         MapData.PlayerSpawnTileY = tileY;
-        Player.Position = LevelData.GetTileAnchorWorld(tileX, tileY, MapData.PlayerSpawnWorldY);
-        Player.OldPosition = Player.Position;
-        ApplyPlayerSpawnRotation();
+        PlayerSpawn.ApplyFromMap(Player, MapData, PlayerSpawnApplyMode.PositionAndCameraOnly);
         NotifyStateChanged();
     }
 
@@ -529,24 +527,12 @@ public class EditorState
     {
         const float step = MathF.PI / 4f;
         MapData.PlayerSpawnRotation = Math.Clamp(rotIndex, 0, 7) * step;
-        ApplyPlayerSpawnRotation();
+        PlayerSpawn.ApplyCameraFromMap(Player, MapData);
         NotifyStateChanged();
     }
 
-    public void ApplyPlayerSpawnRotation()
-    {
-        float r = MapData.PlayerSpawnRotation;
-        var forward = new Vector3(MathF.Cos(r), 0f, MathF.Sin(r));
-
-        var cam = Player.Camera;
-        float lookDistance = (cam.Target - cam.Position).Length();
-        if (lookDistance < 0.0001f)
-            lookDistance = 1f;
-
-        cam.Position = Player.Position;
-        cam.Target = Player.Position + forward * lookDistance;
-        Player.Camera = cam;
-    }
+    public void ApplyPlayerSpawnRotation() =>
+        PlayerSpawn.ApplyCameraFromMap(Player, MapData);
 
     public static int GetSpawnRotationIndex(float rotationRadians)
     {
