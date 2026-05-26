@@ -362,6 +362,8 @@ public class World : IScene
 
         if (_player.IsAlive && !_consoleOverlay.IsOpen && _doorSystem.HasLockedHint)
             GameOverlayHud.DrawDoorLockedHint(_doorSystem, screenWidth, screenHeight);
+        else if (_player.IsAlive && !_consoleOverlay.IsOpen && _weaponSystem.HasNoAmmoHint)
+            GameOverlayHud.DrawNoAmmoHint(_weaponSystem, screenWidth, screenHeight);
 
         if (!_player.IsAlive && !_consoleOverlay.IsOpen)
             GameOverlayHud.DrawGameOver(screenWidth, screenHeight);

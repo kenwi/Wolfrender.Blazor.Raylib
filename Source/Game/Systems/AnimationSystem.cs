@@ -17,6 +17,7 @@ public class AnimationSystem
     private int _weaponFrameIndex;
     private bool _weaponAnimating;
     private float _weaponFrameTimer;
+    private bool _sustainedFireLoop;
 
     public AnimationSystem(
         Texture2D enemyTexture,
@@ -30,8 +31,21 @@ public class AnimationSystem
         _enemySystem = enemySystem;
     }
 
+    /// <summary>Hold-to-fire weapons with <see cref="WeaponDefinition.LoopFireAnimation"/> use this instead.</summary>
+    public void SetSustainedFireLoop(bool active) => _sustainedFireLoop = active;
+
     public void PlayWeaponFire(WeaponId weaponId)
     {
+        var def = WeaponCatalog.Get(weaponId);
+        if (def.LoopFireAnimation)
+        {
+            _overlayWeaponId = weaponId;
+            if (_weaponFrameIndex < 1)
+                _weaponFrameIndex = 1;
+            _weaponAnimating = true;
+            return;
+        }
+
         _overlayWeaponId = weaponId;
         _weaponFrameIndex = 1;
         _weaponAnimating = true;
@@ -57,6 +71,20 @@ public class AnimationSystem
 
     private void UpdatePlayerWeapon(float deltaTime)
     {
+        if (_sustainedFireLoop)
+        {
+            UpdateLoopingFireAnimation(deltaTime);
+            return;
+        }
+
+        if (_weaponAnimating && WeaponCatalog.Get(_overlayWeaponId).LoopFireAnimation)
+        {
+            _weaponAnimating = false;
+            _weaponFrameIndex = 0;
+            _weaponFrameTimer = 0f;
+            _overlayWeaponId = _player.Weapons.ActiveWeapon;
+        }
+
         if (!_weaponAnimating)
         {
             _overlayWeaponId = _player.Weapons.ActiveWeapon;
@@ -64,20 +92,42 @@ public class AnimationSystem
             return;
         }
 
-        var spec = WeaponCatalog.Get(_overlayWeaponId).Sprite;
-        float frameDuration = spec.FrameDurationSeconds;
+        var def = WeaponCatalog.Get(_overlayWeaponId);
+        float frameDuration = def.GetFireFrameDurationSeconds();
 
         _weaponFrameTimer += deltaTime;
         while (_weaponFrameTimer >= frameDuration && _weaponAnimating)
         {
             _weaponFrameTimer -= frameDuration;
             _weaponFrameIndex++;
-            if (_weaponFrameIndex >= spec.FrameCount)
+            if (_weaponFrameIndex >= def.Sprite.FrameCount)
             {
                 _weaponFrameIndex = 0;
                 _weaponAnimating = false;
                 _overlayWeaponId = _player.Weapons.ActiveWeapon;
             }
+        }
+    }
+
+    /// <summary>Frames 1..FrameCount-1 loop while fire is held (frame 0 = idle).</summary>
+    private void UpdateLoopingFireAnimation(float deltaTime)
+    {
+        var weaponId = _player.Weapons.ActiveWeapon;
+        var def = WeaponCatalog.Get(weaponId);
+        float frameDuration = def.GetFireFrameDurationSeconds();
+
+        _overlayWeaponId = weaponId;
+        _weaponAnimating = true;
+        if (_weaponFrameIndex < 1)
+            _weaponFrameIndex = 1;
+
+        _weaponFrameTimer += deltaTime;
+        while (_weaponFrameTimer >= frameDuration)
+        {
+            _weaponFrameTimer -= frameDuration;
+            _weaponFrameIndex++;
+            if (_weaponFrameIndex >= def.Sprite.FrameCount)
+                _weaponFrameIndex = 1;
         }
     }
 

@@ -8,6 +8,13 @@ namespace Game.Systems;
 
 public sealed class WeaponSystem
 {
+    private const float NoAmmoHintDurationSeconds = 2.5f;
+
+    private float _noAmmoHintRemaining;
+    private string _noAmmoHintTitle = string.Empty;
+
+    private static readonly Color NoAmmoBannerAccent = new(255, 220, 40, 255);
+
     private readonly MapData _mapData;
     private readonly DoorSystem _doorSystem;
     private readonly EnemySystem _enemySystem;
@@ -34,16 +41,46 @@ public sealed class WeaponSystem
         _animationSystem = animationSystem;
     }
 
+    public bool HasNoAmmoHint => _noAmmoHintRemaining > 0f;
+    public string NoAmmoHintSubtitle => "NO AMMO";
+    public string NoAmmoHintTitle => _noAmmoHintTitle;
+    public Color NoAmmoHintColor => NoAmmoBannerAccent;
+
+    public void Update(float deltaTime)
+    {
+        if (_noAmmoHintRemaining > 0f)
+            _noAmmoHintRemaining = MathF.Max(0f, _noAmmoHintRemaining - deltaTime);
+    }
+
     public void TrySwitchToSlot(Player player, int slot)
     {
         var weaponId = WeaponCatalog.GetWeaponForSlot(slot);
         if (weaponId is null)
             return;
 
-        if (!player.Weapons.TrySetActive(weaponId.Value))
+        if (!player.Weapons.IsOwned(weaponId.Value))
             return;
 
+        var def = WeaponCatalog.Get(weaponId.Value);
+        if (def.UsesAmmo && player.Ammo < def.AmmoPerShot)
+        {
+            ShowNoAmmoHint(weaponId.Value);
+            return;
+        }
+
+        if (player.Weapons.ActiveWeapon == weaponId.Value)
+            return;
+
+        player.Weapons.TrySetActive(weaponId.Value);
         _animationSystem.ResetWeaponOverlayToIdle();
+    }
+
+    private void ShowNoAmmoHint(WeaponId weaponId)
+    {
+        var def = WeaponCatalog.Get(weaponId);
+        _noAmmoHintTitle = $"CANNOT SWITCH TO {def.DisplayName}";
+        _noAmmoHintRemaining = NoAmmoHintDurationSeconds;
+        Debug.Log($"{_noAmmoHintTitle} (out of ammo).");
     }
 
     public bool CanFire(Player player)

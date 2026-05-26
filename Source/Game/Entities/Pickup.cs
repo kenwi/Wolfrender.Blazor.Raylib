@@ -7,6 +7,7 @@ public enum PickupType
     Health,
     Ammo,
     MachineGun,
+    ChainGun,
     GoldKey,
     SilverKey
 }

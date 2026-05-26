@@ -21,6 +21,9 @@ public class InputState
     public bool IsMinimapEnabled { get; set; }
     public bool IsPrimaryFire { get; init; }
 
+    /// <summary>Primary fire button held (not only pressed this frame).</summary>
+    public bool IsPrimaryFireHeld { get; init; }
+
     /// <summary>1–4 when a weapon slot key was pressed this frame; 0 otherwise.</summary>
     public int WeaponSlotPressed { get; init; }
 }
@@ -122,6 +125,7 @@ public class InputSystem
             IsChangeStatePressed = IsKeyPressed(KeyboardKey.C),
             IsChangeAnimationPressed = IsKeyPressed(KeyboardKey.V),
             IsPrimaryFire = !_isMouseFree && IsMouseButtonPressed(MouseButton.Left),
+            IsPrimaryFireHeld = !_isMouseFree && IsMouseButtonDown(MouseButton.Left),
             WeaponSlotPressed = ReadWeaponSlotPressed(),
         };
     }

@@ -28,15 +28,34 @@ public static class GameOverlayHud
         DrawText(" SILVER", 118, y, fontSize, silverColor);
 
         y += 24;
-        DrawText("1 KNIFE  2 PISTOL  3 MG", 10, y, 14, new Color(180, 180, 180, 255));
+        DrawText("1 KNIFE  2 PISTOL  3 MG  4 CG", 10, y, 14, new Color(180, 180, 180, 255));
     }
 
-    public static void DrawDoorLockedHint(DoorSystem doorSystem, int screenWidth, int screenHeight)
+    public static void DrawDoorLockedHint(DoorSystem doorSystem, int screenWidth, int screenHeight) =>
+        DrawCenterBanner(
+            "DOOR LOCKED",
+            doorSystem.LockedHintOverlayText,
+            doorSystem.LockedHintColor,
+            screenWidth,
+            screenHeight);
+
+    public static void DrawNoAmmoHint(WeaponSystem weaponSystem, int screenWidth, int screenHeight) =>
+        DrawCenterBanner(
+            weaponSystem.NoAmmoHintSubtitle,
+            weaponSystem.NoAmmoHintTitle,
+            weaponSystem.NoAmmoHintColor,
+            screenWidth,
+            screenHeight);
+
+    public static void DrawCenterBanner(
+        string subtitle,
+        string title,
+        Color accentColor,
+        int screenWidth,
+        int screenHeight)
     {
-        const string subtitle = "DOOR LOCKED";
         const int subtitleSize = 28;
         const int titleSize = 52;
-        string title = doorSystem.LockedHintOverlayText;
 
         int titleW = MeasureText(title, titleSize);
         int subtitleW = MeasureText(subtitle, subtitleSize);
@@ -46,10 +65,10 @@ public static class GameOverlayHud
         int panelY = (screenHeight - panelH) / 2;
 
         DrawRectangle(panelX, panelY, panelW, panelH, new Color(0, 0, 0, 200));
-        DrawRectangleLines(panelX, panelY, panelW, panelH, doorSystem.LockedHintColor);
+        DrawRectangleLines(panelX, panelY, panelW, panelH, accentColor);
 
         DrawText(subtitle, (screenWidth - subtitleW) / 2, panelY + 16, subtitleSize, new Color(220, 220, 220, 255));
-        DrawText(title, (screenWidth - titleW) / 2, panelY + 56, titleSize, doorSystem.LockedHintColor);
+        DrawText(title, (screenWidth - titleW) / 2, panelY + 56, titleSize, accentColor);
     }
 
     public static void DrawGameOver(int screenWidth, int screenHeight)

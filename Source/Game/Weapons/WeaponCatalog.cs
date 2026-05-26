@@ -47,6 +47,7 @@ public static class WeaponCatalog
             CooldownSeconds = 0.12f,
             MaxRangeTiles = 48f,
             AmmoPerShot = 1,
+            HoldToFire = true,
             FireSoundPath = "resources/SmgFire.ogg",
             Sprite = new WeaponSpriteSpec
             {
@@ -55,15 +56,35 @@ public static class WeaponCatalog
                 FrameCount = PlayerWeaponSpriteLayout.FireFrameCount,
             },
         },
+        new()
+        {
+            Id = WeaponId.ChainGun,
+            DisplayName = "CHAIN GUN",
+            Kind = WeaponKind.Hitscan,
+            Damage = 10f,
+            CooldownSeconds = 0.075f,
+            MaxRangeTiles = 48f,
+            AmmoPerShot = 1,
+            HoldToFire = true,
+            LoopFireAnimation = true,
+            FireAnimationSpeed = 2f,
+            FireSoundPath = "resources/ChaingunFire.ogg",
+            Sprite = new WeaponSpriteSpec
+            {
+                OriginX = PlayerWeaponSpriteLayout.ChainGunOriginX,
+                OriginY = PlayerWeaponSpriteLayout.ChainGunRowY,
+                FrameCount = PlayerWeaponSpriteLayout.FireFrameCount,
+            },
+        },
     ];
 
-    /// <summary>Weapon bound to number keys 1–4 (slot 4 reserved).</summary>
+    /// <summary>Weapon bound to number keys 1–4.</summary>
     public static readonly WeaponId?[] SlotWeapons =
     [
         WeaponId.Knife,
         WeaponId.Pistol,
         WeaponId.MachineGun,
-        null,
+        WeaponId.ChainGun,
     ];
 
     public static WeaponDefinition Get(WeaponId id) =>
@@ -106,6 +127,12 @@ public static class PlayerWeaponSpriteLayout
 
     /// <summary>Origin Y coordinate for the machine gun viewmodel.</summary>
     public const int MachineGunRowY = 176;
+
+    /// <summary>Origin X coordinate for the chain gun viewmodel.</summary>
+    public const int ChainGunOriginX = 1;
+
+    /// <summary>Origin Y coordinate for the chain gun viewmodel.</summary>
+    public const int ChainGunRowY = 256;
 
     /// <summary>Fire animation length (idle + fire frames) for all viewmodels on the sheet.</summary>
     public const int FireFrameCount = 5;

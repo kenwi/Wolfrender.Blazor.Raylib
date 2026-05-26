@@ -5,4 +5,5 @@ public enum WeaponId
     Knife,
     Pistol,
     MachineGun,
+    ChainGun,
 }

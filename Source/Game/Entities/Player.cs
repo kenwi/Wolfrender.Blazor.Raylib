@@ -36,6 +36,17 @@ public class Player
         }
     }
 
+    /// <summary>Console / legacy pickup compatibility.</summary>
+    public bool HasChainGun
+    {
+        get => Weapons.IsOwned(WeaponId.ChainGun);
+        set
+        {
+            if (value)
+                Weapons.Grant(WeaponId.ChainGun);
+        }
+    }
+
     public void ResetInventory()
     {
         Ammo = 0;

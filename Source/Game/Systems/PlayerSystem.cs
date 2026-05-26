@@ -1,6 +1,7 @@
 using System.Numerics;
 using Game.Entities;
 using Game.Utilities;
+using Game.Weapons;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 
@@ -74,6 +75,7 @@ public sealed class PlayerSystem
 
     public void UpdateAlive(float deltaTime, InputState input, Vector2 mouseDelta, int screenWidth, int screenHeight)
     {
+        _weaponSystem.Update(deltaTime);
         _player.WeaponCooldownRemaining = MathF.Max(0f, _player.WeaponCooldownRemaining - deltaTime);
 
         _player.Velocity = _inputSystem.GetMoveDirection(_player) * _player.MoveSpeed;
@@ -82,12 +84,16 @@ public sealed class PlayerSystem
         _pickupSystem.Update(_player);
         _cameraSystem.Update(_player, input.IsMouseFree, mouseDelta);
         _doorSystem.Update(deltaTime, input, _player, _enemySystem.Enemies);
+
+        bool wantsFire = !input.IsMouseFree && WantsPrimaryFire(input, _player);
+        var activeDef = WeaponCatalog.Get(_player.Weapons.ActiveWeapon);
+        _animationSystem.SetSustainedFireLoop(wantsFire && activeDef.LoopFireAnimation);
         _animationSystem.Update(deltaTime);
 
         if (input.WeaponSlotPressed > 0)
             _weaponSystem.TrySwitchToSlot(_player, input.WeaponSlotPressed);
 
-        if (input.IsPrimaryFire && !input.IsMouseFree)
+        if (wantsFire)
             _weaponSystem.TryFire(_player, screenWidth, screenHeight);
     }
 
@@ -132,5 +138,11 @@ public sealed class PlayerSystem
             _inputSystem.EnableMouse();
         else
             _inputSystem.DisableMouse();
+    }
+
+    private static bool WantsPrimaryFire(InputState input, Player player)
+    {
+        var def = WeaponCatalog.Get(player.Weapons.ActiveWeapon);
+        return def.HoldToFire ? input.IsPrimaryFireHeld : input.IsPrimaryFire;
     }
 }

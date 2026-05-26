@@ -60,6 +60,7 @@ public static class WorldConsoleBindings
                     "Player.Ammo",
                     "Player.Weapons.ActiveWeapon",
                     "Player.HasMachineGun",
+                    "Player.HasChainGun",
                     "Player.HasGoldKey",
                     "Player.HasSilverKey"
                 },
