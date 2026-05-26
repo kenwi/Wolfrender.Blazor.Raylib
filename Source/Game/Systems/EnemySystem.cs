@@ -24,7 +24,7 @@ public class EnemySystem
     private const float ArrivalThreshold = 0.1f;
     private const float EnemyCollisionRadius = 1.0f;
     private const float TurnSpeed = 4f; // radians per second when facing player
-    private const float NoticingDuration = 0.8f; // seconds before transitioning to ATTACKING
+    private const float NoticingDuration = 0.5f; // seconds before transitioning to ATTACKING
 
     private const float EnemyFireInterval = 0.85f;
     private const float EnemyFireAimTolerance = 0.42f; // radians (~24°)
