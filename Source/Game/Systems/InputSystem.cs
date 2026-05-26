@@ -20,6 +20,9 @@ public class InputState
     public bool IsChangeAnimationPressed { get; set; }
     public bool IsMinimapEnabled { get; set; }
     public bool IsPrimaryFire { get; init; }
+
+    /// <summary>1–4 when a weapon slot key was pressed this frame; 0 otherwise.</summary>
+    public int WeaponSlotPressed { get; init; }
 }
 
 public class InputSystem
@@ -119,7 +122,21 @@ public class InputSystem
             IsChangeStatePressed = IsKeyPressed(KeyboardKey.C),
             IsChangeAnimationPressed = IsKeyPressed(KeyboardKey.V),
             IsPrimaryFire = !_isMouseFree && IsMouseButtonPressed(MouseButton.Left),
+            WeaponSlotPressed = ReadWeaponSlotPressed(),
         };
+    }
+
+    private static int ReadWeaponSlotPressed()
+    {
+        if (IsKeyPressed(KeyboardKey.One))
+            return 1;
+        if (IsKeyPressed(KeyboardKey.Two))
+            return 2;
+        if (IsKeyPressed(KeyboardKey.Three))
+            return 3;
+        if (IsKeyPressed(KeyboardKey.Four))
+            return 4;
+        return 0;
     }
 
     public Vector3 GetMoveDirection(Player player)

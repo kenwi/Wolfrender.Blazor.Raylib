@@ -1,6 +1,7 @@
 using System.Numerics;
 using Game.Entities;
 using Game.Utilities;
+using Game.Weapons;
 using Raylib_cs;
 
 namespace Game.Systems;
@@ -12,10 +13,10 @@ public class AnimationSystem
     private readonly Player _player;
     private readonly EnemySystem _enemySystem;
 
-    private int _pistolFrameIndex;
-    private bool _pistolAnimating;
-    private float _pistolFrameTimer;
-    private const float PistolFrameDuration = 0.07f;
+    private WeaponId _overlayWeaponId = WeaponId.Knife;
+    private int _weaponFrameIndex;
+    private bool _weaponAnimating;
+    private float _weaponFrameTimer;
 
     public AnimationSystem(
         Texture2D enemyTexture,
@@ -29,12 +30,23 @@ public class AnimationSystem
         _enemySystem = enemySystem;
     }
 
-    /// <summary>Start the pistol fire cycle (frames 1–4, then return to idle frame 0).</summary>
-    public void PlayPistolFire()
+    public void PlayWeaponFire(WeaponId weaponId)
     {
-        _pistolFrameIndex = 1;
-        _pistolAnimating = true;
-        _pistolFrameTimer = 0f;
+        _overlayWeaponId = weaponId;
+        _weaponFrameIndex = 1;
+        _weaponAnimating = true;
+        _weaponFrameTimer = 0f;
+    }
+
+    /// <summary>Legacy alias.</summary>
+    public void PlayPistolFire() => PlayWeaponFire(WeaponId.Pistol);
+
+    public void ResetWeaponOverlayToIdle()
+    {
+        _overlayWeaponId = _player.Weapons.ActiveWeapon;
+        _weaponFrameIndex = 0;
+        _weaponAnimating = false;
+        _weaponFrameTimer = 0f;
     }
 
     public void Update(float deltaTime)
@@ -45,21 +57,26 @@ public class AnimationSystem
 
     private void UpdatePlayerWeapon(float deltaTime)
     {
-        if (!_pistolAnimating)
+        if (!_weaponAnimating)
         {
-            _pistolFrameIndex = 0;
+            _overlayWeaponId = _player.Weapons.ActiveWeapon;
+            _weaponFrameIndex = 0;
             return;
         }
 
-        _pistolFrameTimer += deltaTime;
-        while (_pistolFrameTimer >= PistolFrameDuration && _pistolAnimating)
+        var spec = WeaponCatalog.Get(_overlayWeaponId).Sprite;
+        float frameDuration = spec.FrameDurationSeconds;
+
+        _weaponFrameTimer += deltaTime;
+        while (_weaponFrameTimer >= frameDuration && _weaponAnimating)
         {
-            _pistolFrameTimer -= PistolFrameDuration;
-            _pistolFrameIndex++;
-            if (_pistolFrameIndex >= PlayerWeaponSprites.PistolFrameCount)
+            _weaponFrameTimer -= frameDuration;
+            _weaponFrameIndex++;
+            if (_weaponFrameIndex >= spec.FrameCount)
             {
-                _pistolFrameIndex = 0;
-                _pistolAnimating = false;
+                _weaponFrameIndex = 0;
+                _weaponAnimating = false;
+                _overlayWeaponId = _player.Weapons.ActiveWeapon;
             }
         }
     }
@@ -140,7 +157,6 @@ public class AnimationSystem
         }
     }
 
-    /// <summary>Billboard enemy sprites in the 3D scene.</summary>
     public void Render()
     {
         foreach (var enemy in _enemySystem.Enemies)
@@ -155,11 +171,10 @@ public class AnimationSystem
         }
     }
 
-    /// <summary>First-person weapon overlay drawn in screen space after the 3D view.</summary>
     public void RenderWeaponOverlay(int screenWidth, int screenHeight)
     {
-        var src = PlayerWeaponSprites.PistolFrameRect(_pistolFrameIndex);
-        float scale = PlayerWeaponSprites.ScreenOverlayScale;
+        var src = WeaponSprites.GetFrameRect(_overlayWeaponId, _weaponFrameIndex);
+        float scale = PlayerWeaponSpriteLayout.ScreenOverlayScale;
         var pixelSize = screenWidth / 64 / 1.33f;
 
         float destW = screenWidth * scale / 1.33f;
