@@ -116,6 +116,7 @@ public partial class ThreeDFirstPerson : IDisposable
             "resources/PistolFire.ogg",
             "resources/SmgFire.ogg",
             "resources/EnemyPistolFire.ogg",
+            "resources/ChainGunFire.ogg"
         };
 
         await Task.WhenAll(resourceFiles.Select(
