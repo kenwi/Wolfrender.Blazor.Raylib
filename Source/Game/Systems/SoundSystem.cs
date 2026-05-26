@@ -55,6 +55,9 @@ public class SoundSystem
     public void PlayWeaponFire(WeaponId weaponId)
     {
         string path = WeaponCatalog.Get(weaponId).FireSoundPath;
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+
         if (!_weaponSoundsByPath.TryGetValue(path, out var sound))
         {
             sound = LoadSound(Utilities.Res.Path(path));

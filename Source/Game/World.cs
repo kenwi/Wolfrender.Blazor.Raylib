@@ -4,7 +4,6 @@ using Game.Editor;
 using Game.Entities;
 using Game.Systems;
 using Game.Utilities;
-using Game.Weapons;
 using ImGuiNET;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
@@ -40,7 +39,6 @@ public class World : IScene
 
     private RenderTexture2D _sceneRenderTexture;
     private InputState _inputState = new();
-    private bool _deathHandled;
 
     public Player Player => _player;
     public PlayerSystem PlayerSystem => _playerSystem;
@@ -99,10 +97,12 @@ public class World : IScene
             _weaponSystem,
             _effectSystem);
 
-        _playerSystem.ResetFromMap(_mapData);
-
         _consoleOverlay = new ConsoleOverlay();
         _runtimeConsole = WorldConsoleBindings.CreateConsole(this, _player, _enemySystem, _consoleOverlay);
+        _playerSystem.ConfigureLifecycle(
+            () => _consoleOverlay.IsOpen,
+            () => _ = RestartCurrentLevel());
+        _playerSystem.ResetForLevelLoad(_mapData);
 
         _sceneRenderTexture = LoadRenderTexture(screenWidth, screenHeight);
         Debug.Setup(_doorSystem.Doors, _player, _animationSystem, _enemySystem);
@@ -216,13 +216,11 @@ public class World : IScene
 
     private void ResetLevelState()
     {
-        _playerSystem.ResetFromMap(_mapData);
+        _playerSystem.ResetForLevelLoad(_mapData);
         _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
         _enemySystem.Rebuild(_mapData.Enemies, _mapData);
         _pickupSystem.Rebuild(_mapData.Pickups, _mapData);
         _effectSystem.Clear();
-        _cameraSystem.ResetDeathFall();
-        _deathHandled = false;
     }
 
     public void OnExit()
@@ -295,31 +293,10 @@ public class World : IScene
             }
             else
             {
-                _playerSystem.HandleDeathOnce(ref _deathHandled, _inputSystem);
                 _playerSystem.UpdateDead(deltaTime, _inputState, mouseDelta);
                 _enemySystem.Update(deltaTime);
-                TryRestartFromGameOver();
             }
         }
-    }
-
-    private void TryRestartFromGameOver()
-    {
-        if (_consoleOverlay.IsOpen)
-            return;
-
-        bool restartPressed = IsKeyPressed(KeyboardKey.R)
-            || IsMouseButtonPressed(MouseButton.Left);
-
-        if (!restartPressed)
-            return;
-
-        RestartCurrentLevel();
-
-        if (OperatingSystem.IsBrowser())
-            _inputSystem.EnableMouse();
-        else
-            _inputSystem.DisableMouse();
     }
 
     public ConsoleCommandResult ExecuteConsoleLine(string line)
@@ -372,22 +349,25 @@ public class World : IScene
         var healthLabel = $"HEALTH: {(int)_player.Health} / {(int)_player.MaxHealth}";
         DrawText(healthLabel, 10, 40, 20, _player.IsAlive ? Color.RayWhite : Color.Red);
 
+        int screenWidth = GetScreenWidth();
+        int screenHeight = GetScreenHeight();
+
         if (_player.IsAlive)
-            DrawInventoryHud();
+            GameOverlayHud.DrawInventory(_player);
 
         if (_player.IsAlive && !_consoleOverlay.IsOpen)
-            _animationSystem.RenderWeaponOverlay(GetScreenWidth(), GetScreenHeight());
+            _animationSystem.RenderWeaponOverlay(screenWidth, screenHeight);
 
-        _effectSystem.RenderScreenOverlay(GetScreenWidth(), GetScreenHeight());
+        _effectSystem.RenderScreenOverlay(screenWidth, screenHeight);
 
         if (_player.IsAlive && !_consoleOverlay.IsOpen && _doorSystem.HasLockedHint)
-            DrawDoorLockedHint();
+            GameOverlayHud.DrawDoorLockedHint(_doorSystem, screenWidth, screenHeight);
 
         if (!_player.IsAlive && !_consoleOverlay.IsOpen)
-            DrawGameOverOverlay();
+            GameOverlayHud.DrawGameOver(screenWidth, screenHeight);
 
         if (!_consoleOverlay.IsOpen && !_inputState.IsMouseFree && _player.IsAlive)
-            DrawReticle();
+            GameOverlayHud.DrawReticle(_effectSystem, screenWidth, screenHeight);
 
         if (_inputState.IsMinimapEnabled)
             _minimapSystem.Render(_player);
@@ -399,98 +379,5 @@ public class World : IScene
         _consoleOverlay.Render();
 
         EndDrawing();
-    }
-
-    private void DrawInventoryHud()
-    {
-        const int fontSize = 18;
-        int y = 68;
-
-        var active = WeaponCatalog.Get(_player.Weapons.ActiveWeapon);
-        DrawText($"WEAPON: {active.DisplayName}", 10, y, fontSize, Color.RayWhite);
-        y += 24;
-
-        DrawText($"AMMO: {_player.Ammo}", 10, y, fontSize, new Color(255, 220, 40, 255));
-        y += 24;
-
-        var goldColor = _player.HasGoldKey ? new Color(255, 210, 40, 255) : new Color(100, 90, 50, 255);
-        var silverColor = _player.HasSilverKey ? new Color(200, 220, 255, 255) : new Color(90, 95, 110, 255);
-        DrawText("KEYS:", 10, y, fontSize, Color.RayWhite);
-        DrawText(" GOLD", 58, y, fontSize, goldColor);
-        DrawText(" SILVER", 118, y, fontSize, silverColor);
-    }
-
-    private void DrawDoorLockedHint()
-    {
-        int screenW = GetScreenWidth();
-        int screenH = GetScreenHeight();
-
-        const string subtitle = "DOOR LOCKED";
-        const int subtitleSize = 28;
-        const int titleSize = 52;
-        string title = _doorSystem.LockedHintOverlayText;
-
-        int titleW = MeasureText(title, titleSize);
-        int subtitleW = MeasureText(subtitle, subtitleSize);
-        int panelW = Math.Max(titleW, subtitleW) + 80;
-        int panelH = 140;
-        int panelX = (screenW - panelW) / 2;
-        int panelY = (screenH - panelH) / 2;
-
-        DrawRectangle(panelX, panelY, panelW, panelH, new Color(0, 0, 0, 200));
-        DrawRectangleLines(panelX, panelY, panelW, panelH, _doorSystem.LockedHintColor);
-
-        DrawText(subtitle, (screenW - subtitleW) / 2, panelY + 16, subtitleSize, new Color(220, 220, 220, 255));
-        DrawText(title, (screenW - titleW) / 2, panelY + 56, titleSize, _doorSystem.LockedHintColor);
-    }
-
-    private void DrawGameOverOverlay()
-    {
-        int screenW = GetScreenWidth();
-        int screenH = GetScreenHeight();
-
-        const int panelW = 520;
-        const int panelH = 220;
-        int panelX = (screenW - panelW) / 2;
-        int panelY = (screenH - panelH) / 2;
-
-        DrawRectangle(panelX, panelY, panelW, panelH, new Color(0, 0, 0, 190));
-        DrawRectangleLines(panelX, panelY, panelW, panelH, new Color(220, 40, 40, 255));
-
-        const string title = "YOU DIED";
-        const int titleSize = 48;
-        int titleW = MeasureText(title, titleSize);
-        DrawText(title, (screenW - titleW) / 2, panelY + 28, titleSize, new Color(255, 60, 60, 255));
-
-        const string restartLine = "Press R or click to restart";
-        const int lineSize = 22;
-        int restartW = MeasureText(restartLine, lineSize);
-        DrawText(restartLine, (screenW - restartW) / 2, panelY + 100, lineSize, Color.RayWhite);
-
-        const string consoleLine = "Console: type  restart  (~ or . to open)";
-        int consoleW = MeasureText(consoleLine, 18);
-        DrawText(consoleLine, (screenW - consoleW) / 2, panelY + 150, 18, new Color(200, 200, 200, 255));
-    }
-
-    private void DrawReticle()
-    {
-        int cx = GetScreenWidth() / 2;
-        int cy = GetScreenHeight() / 2;
-        const float arm = 10f;
-        const float gap = 5f;
-        const float thick = 2f;
-        var outline = new Color(0, 0, 0, 220);
-        var fill = _effectSystem.GetReticleColor();
-
-        void Stroke(float x1, float y1, float x2, float y2)
-        {
-            DrawLineEx(new Vector2(x1, y1), new Vector2(x2, y2), thick + 1f, outline);
-            DrawLineEx(new Vector2(x1, y1), new Vector2(x2, y2), thick, fill);
-        }
-
-        Stroke(cx - gap - arm, cy, cx - gap, cy);
-        Stroke(cx + gap, cy, cx + gap + arm, cy);
-        Stroke(cx, cy - gap - arm, cx, cy - gap);
-        Stroke(cx, cy + gap, cx, cy + gap + arm);
     }
 }

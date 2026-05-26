@@ -61,8 +61,34 @@ public sealed class WeaponSystem
     public void TryFire(Player player, int screenWidth, int screenHeight)
     {
         if (!CanFire(player))
+        {
+            if (TrySwitchToKnifeForEmptyGun(player))
+                ExecuteFire(player, screenWidth, screenHeight);
             return;
+        }
 
+        ExecuteFire(player, screenWidth, screenHeight);
+    }
+
+    /// <summary>Wolf-style: empty gun + fire attempts melee with knife.</summary>
+    private bool TrySwitchToKnifeForEmptyGun(Player player)
+    {
+        var active = WeaponCatalog.Get(player.Weapons.ActiveWeapon);
+        if (!active.UsesAmmo || player.Ammo >= active.AmmoPerShot)
+            return false;
+
+        if (player.Weapons.ActiveWeapon == WeaponId.Knife)
+            return false;
+
+        if (!player.Weapons.TrySetActive(WeaponId.Knife))
+            return false;
+
+        _animationSystem.ResetWeaponOverlayToIdle();
+        return CanFire(player);
+    }
+
+    private void ExecuteFire(Player player, int screenWidth, int screenHeight)
+    {
         var def = WeaponCatalog.Get(player.Weapons.ActiveWeapon);
         Enemy? hit = null;
 

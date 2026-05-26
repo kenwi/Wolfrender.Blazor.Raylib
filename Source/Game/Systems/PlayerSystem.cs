@@ -2,6 +2,7 @@ using System.Numerics;
 using Game.Entities;
 using Game.Utilities;
 using Raylib_cs;
+using static Raylib_cs.Raylib;
 
 namespace Game.Systems;
 
@@ -22,6 +23,10 @@ public sealed class PlayerSystem
     private readonly EnemySystem _enemySystem;
     private readonly WeaponSystem _weaponSystem;
     private readonly EffectSystem _effectSystem;
+
+    private bool _deathHandled;
+    private Func<bool> _isConsoleOpen = () => false;
+    private Action? _restartLevel;
 
     public PlayerSystem(
         Player player,
@@ -51,8 +56,21 @@ public sealed class PlayerSystem
 
     public Player Player => _player;
 
-    public void ResetFromMap(MapData mapData) =>
+    public void ConfigureLifecycle(Func<bool> isConsoleOpen, Action restartLevel)
+    {
+        _isConsoleOpen = isConsoleOpen;
+        _restartLevel = restartLevel;
+    }
+
+    public void ResetForLevelLoad(MapData mapData)
+    {
         PlayerSpawn.ApplyFromMap(_player, mapData, PlayerSpawnApplyMode.FullReset);
+        _deathHandled = false;
+        _cameraSystem.ResetDeathFall();
+    }
+
+    public void ResetFromMap(MapData mapData) =>
+        ResetForLevelLoad(mapData);
 
     public void UpdateAlive(float deltaTime, InputState input, Vector2 mouseDelta, int screenWidth, int screenHeight)
     {
@@ -75,19 +93,44 @@ public sealed class PlayerSystem
 
     public void UpdateDead(float deltaTime, InputState input, Vector2 mouseDelta)
     {
+        HandleDeathOnce();
         _player.Velocity = Vector3.Zero;
         _cameraSystem.UpdateDeathFall(_player, deltaTime);
         _doorSystem.Update(deltaTime, input, _player, _enemySystem.Enemies);
         _animationSystem.Update(deltaTime);
+        TryRestartFromGameOver();
     }
 
-    public void HandleDeathOnce(ref bool deathHandled, InputSystem inputSystem)
+    private void HandleDeathOnce()
     {
-        if (deathHandled)
+        if (_deathHandled)
             return;
 
-        deathHandled = true;
+        _deathHandled = true;
         _effectSystem.EnableDeathOverlay();
-        inputSystem.EnableMouse();
+        _inputSystem.EnableMouse();
+    }
+
+    private void TryRestartFromGameOver()
+    {
+        if (_isConsoleOpen())
+            return;
+
+        bool restartPressed = IsKeyPressed(KeyboardKey.R)
+            || IsMouseButtonPressed(MouseButton.Left);
+
+        if (!restartPressed)
+            return;
+
+        _restartLevel?.Invoke();
+        ApplyMouseCaptureAfterRestart();
+    }
+
+    private void ApplyMouseCaptureAfterRestart()
+    {
+        if (OperatingSystem.IsBrowser())
+            _inputSystem.EnableMouse();
+        else
+            _inputSystem.DisableMouse();
     }
 }

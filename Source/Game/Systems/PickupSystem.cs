@@ -124,6 +124,7 @@ public class PickupSystem
             case PickupType.MachineGun:
                 player.Weapons.Grant(WeaponId.MachineGun);
                 player.Ammo += amount;
+                player.Weapons.TrySetActive(WeaponId.MachineGun);
                 Debug.Log($"Picked up machine gun (+{amount} ammo), total {player.Ammo}. {positions}");
                 break;
             case PickupType.GoldKey:

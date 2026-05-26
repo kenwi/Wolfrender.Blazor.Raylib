@@ -114,6 +114,7 @@ public partial class ThreeDFirstPerson : IDisposable
             "resources/shaders/lighting.fs",
             "resources/03.mp3",
             "resources/PistolFire.ogg",
+            "resources/SmgFire.ogg",
             "resources/EnemyPistolFire.ogg",
         };
 

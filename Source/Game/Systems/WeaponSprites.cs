@@ -10,7 +10,7 @@ public static class WeaponSprites
         var spec = WeaponCatalog.Get(weaponId).Sprite;
         frameIndex = Math.Clamp(frameIndex, 0, spec.FrameCount - 1);
         return new Rectangle(
-            spec.OriginX + frameIndex * (PlayerWeaponSpriteLayout.FrameSize + 1),
+            spec.OriginX + frameIndex * PlayerWeaponSpriteLayout.FrameStride,
             spec.OriginY,
             PlayerWeaponSpriteLayout.FrameSize,
             PlayerWeaponSpriteLayout.FrameSize);

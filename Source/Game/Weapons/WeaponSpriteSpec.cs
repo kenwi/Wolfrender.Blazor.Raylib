@@ -1,6 +1,6 @@
 namespace Game.Weapons;
 
-/// <summary>Viewmodel sprite row on <c>weapons2.png</c> (64×64 cells, 1px column gap).</summary>
+/// <summary>Viewmodel sprite row on <c>weapons2.png</c>; stride from <see cref="PlayerWeaponSpriteLayout"/>.</summary>
 public sealed class WeaponSpriteSpec
 {
     public required int OriginX { get; init; }
