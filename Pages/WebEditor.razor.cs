@@ -53,13 +53,7 @@ public partial class WebEditor : IDisposable
     {
         var resourceFiles = new[]
         {
-            "resources/greystone.png",
-            "resources/bluestone.png",
-            "resources/colorstone.png",
-            "resources/mossy.png",
-            "resources/redbrick.png",
-            "resources/wood.png",
-            "resources/door.png",
+            "resources/spritesheet_tiles.png",
             "resources/enemy_guard.png",
             "resources/Objects.png",
             "resources/level.json",

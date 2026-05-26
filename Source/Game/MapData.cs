@@ -47,7 +47,11 @@ public class MapData
     public float PlayerSpawnWorldY { get; set; } = 2f;
     /// <summary>Spawn facing in radians, snapped to 45° steps (same convention as <see cref="EnemyPlacement.Rotation"/>).</summary>
     public float PlayerSpawnRotation { get; set; } = -MathF.PI / 2f;
-    public List<Texture2D> Textures { get; set; } = new();
+    /// <summary>64 baked tiles from <see cref="Utilities.TileSpriteSheet"/> (index 0 = tile ID 1).</summary>
+    public List<Texture2D> TileTextures { get; set; } = new();
+
+    /// <summary>Enemy, weapons, pickups, and other non-level-tile textures.</summary>
+    public List<Texture2D> GameTextures { get; set; } = new();
     public int Width { get; set; }
     public int Height { get; set; }
 

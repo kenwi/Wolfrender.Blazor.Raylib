@@ -4,8 +4,8 @@ namespace Game.Entities;
 
 public enum DoorRotation
 {
-    HORIZONTAL = 7, // corresponds with texture id
-    VERTICAL = 8
+    HORIZONTAL,
+    VERTICAL
 }
 
 public enum DoorState
@@ -22,6 +22,8 @@ public class Door
     public Vector2 Position { get; set; }
     public DoorState DoorState { get; set; }
     public DoorRotation DoorRotation { get; set; }
+    /// <summary>0-based index into <see cref="MapData.TileTextures"/> for this door's sprite.</summary>
+    public int TextureIndex { get; set; }
     public bool RequiresGoldKey { get; set; }
     public bool RequiresSilverKey { get; set; }
     public float TimeDoorHasBeenOpen { get; set; }

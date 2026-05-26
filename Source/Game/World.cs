@@ -20,7 +20,8 @@ public class World : IScene
     private readonly CombatFeedback _combatFeedback;
     private readonly MapData _mapData;
     private readonly LevelData _level;
-    private readonly List<Texture2D> _textures;
+    private readonly List<Texture2D> _tileTextures;
+    private readonly List<Texture2D> _gameTextures;
     private readonly InputSystem _inputSystem;
     private readonly MovementSystem _movementSystem;
     private readonly CollisionSystem _collisionSystem;
@@ -53,7 +54,8 @@ public class World : IScene
 
         _mapData = mapData;
         _level = new LevelData(mapData);
-        _textures = mapData.Textures;
+        _tileTextures = mapData.TileTextures;
+        _gameTextures = mapData.GameTextures;
         _player = new Player();
 
         _soundSystem = new SoundSystem(Utilities.Res.Path("resources/03.mp3"));
@@ -61,26 +63,26 @@ public class World : IScene
         _combatFeedback = new CombatFeedback(_soundSystem, _effectSystem);
         _inputSystem = new InputSystem();
         _movementSystem = new MovementSystem();
-        _doorSystem = new DoorSystem(mapData.Doors, mapData.Width, _textures);
+        _doorSystem = new DoorSystem(mapData.Doors, mapData.Width, _tileTextures);
         _collisionSystem = new CollisionSystem(_level, _doorSystem);
         _cameraSystem = new CameraSystem(_collisionSystem);
-        _renderSystem = new RenderSystem(_level, _textures);
+        _renderSystem = new RenderSystem(_level, _tileTextures);
         _hudSystem = new HudSystem(screenWidth, screenHeight);
         _minimapSystem = new MinimapSystem(_level, _renderSystem);
         _pickupSystem = new PickupSystem();
         _enemySystem = new EnemySystem(_player, _inputSystem, _collisionSystem, _doorSystem, _combatFeedback, _pickupSystem);
-        _pickupSystem.SetObjectsTexture(_textures[GameTextureIndex.Objects]);
+        _pickupSystem.SetObjectsTexture(_gameTextures[GameTextureIndex.Objects]);
         _pickupSystem.Rebuild(_mapData.Pickups, _mapData);
         _animationSystem = new AnimationSystem(
-            _textures[GameTextureIndex.EnemyGuard],
-            _textures[GameTextureIndex.Weapons],
+            _gameTextures[GameTextureIndex.EnemyGuard],
+            _gameTextures[GameTextureIndex.Weapons],
             _player,
             _enemySystem);
         _weaponSystem = new WeaponSystem(
             _mapData,
             _doorSystem,
             _enemySystem,
-            _textures[GameTextureIndex.EnemyGuard],
+            _gameTextures[GameTextureIndex.EnemyGuard],
             _effectSystem,
             _soundSystem,
             _animationSystem);

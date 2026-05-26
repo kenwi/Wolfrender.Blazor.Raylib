@@ -18,8 +18,8 @@ public static class PickupSprites
     public const int SheetHeight = 1053;
     public const string SheetPath = "resources/Objects.png";
 
-    /// <summary>Index of <see cref="SheetPath"/> in <see cref="MapData.Textures"/>.</summary>
-    public const int ObjectsTextureIndex = 9;
+    /// <summary>Index of <see cref="SheetPath"/> in <see cref="MapData.GameTextures"/> (<see cref="Game.GameTextureIndex.Objects"/>).</summary>
+    public const int ObjectsTextureIndex = Game.GameTextureIndex.Objects;
 
     /// <summary>Matches <see cref="PrimitiveRenderer.SpriteTransparencyKey"/> (#980088).</summary>
     public const string TransparencyKeyHex = "#980088";

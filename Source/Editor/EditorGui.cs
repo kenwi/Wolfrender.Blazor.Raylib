@@ -34,9 +34,6 @@ public class EditorGui
     private string _statusMessage = "";
     private float _statusTimer;
 
-    // Pre-rendered rotated door texture for palette display
-    private RenderTexture2D _rotatedDoorTexture;
-
     // Pickup palette icons (color-keyed on black)
     private Dictionary<PickupType, RenderTexture2D>? _pickupPaletteIcons;
 
@@ -63,24 +60,6 @@ public class EditorGui
     public EditorGui(MapData mapData)
     {
         _mapData = mapData;
-
-        // Pre-render the door texture rotated 90 degrees for the tile palette (vertical door, ID 8)
-        if (mapData.Textures.Count > 6)
-        {
-            var doorTex = mapData.Textures[6];
-            _rotatedDoorTexture = LoadRenderTexture(doorTex.Width, doorTex.Height);
-            BeginTextureMode(_rotatedDoorTexture);
-            ClearBackground(Raylib_cs.Color.Blank);
-            DrawTexturePro(
-                doorTex,
-                new Rectangle(0, 0, doorTex.Width, doorTex.Height),
-                new Rectangle(doorTex.Width / 2f, doorTex.Height / 2f, doorTex.Width, doorTex.Height),
-                new Vector2(doorTex.Width / 2f, doorTex.Height / 2f),
-                90f,
-                Raylib_cs.Color.White
-            );
-            EndTextureMode();
-        }
     }
 
     /// <summary>
@@ -547,11 +526,11 @@ public class EditorGui
         ImGui.Separator();
         ImGui.Text("Tiles:");
 
-        int columns = PickupSprites.PaletteColumns;
-        for (int i = 0; i < _mapData.Textures.Count; i++)
+        int columns = TileSpriteSheet.PaletteColumns;
+        for (int i = 0; i < TileSpriteSheet.TileCount && i < _mapData.TileTextures.Count; i++)
         {
             uint tileId = (uint)(i + 1);
-            var texture = _mapData.Textures[i];
+            var texture = _mapData.TileTextures[i];
 
             if (i % columns != 0)
                 ImGui.SameLine();
@@ -566,18 +545,9 @@ public class EditorGui
                 ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 3f);
             }
 
-            IntPtr texId;
-            if (tileId == 8 && _rotatedDoorTexture.Texture.Id != 0)
-            {
-                texId = new IntPtr(_rotatedDoorTexture.Texture.Id);
-            }
-            else
-            {
-                texId = new IntPtr(texture.Id);
-            }
-
-            var uv0 = (tileId == 8) ? new Vector2(0, 1) : new Vector2(0, 0);
-            var uv1 = (tileId == 8) ? new Vector2(1, 0) : new Vector2(1, 1);
+            var texId = new IntPtr(texture.Id);
+            var uv0 = new Vector2(0, 0);
+            var uv1 = new Vector2(1, 1);
 
             if (ImGui.ImageButton($"tile_{i}", texId, new Vector2(buttonSize, buttonSize), uv0, uv1))
             {
@@ -607,15 +577,16 @@ public class EditorGui
     private void EnsureDoorPaletteIcons()
     {
         if (_doorPaletteIcons != null) return;
-        if (_mapData.Textures.Count <= DoorTileEncoding.DoorTextureIndex) return;
-
-        var doorTex = _mapData.Textures[DoorTileEncoding.DoorTextureIndex];
-        if (doorTex.Id == 0) return;
-
         int size = PickupSprites.PaletteIconSize;
         _doorPaletteIcons = new Dictionary<uint, RenderTexture2D>();
         foreach (var entry in DoorTileEncoding.PaletteEntries)
         {
+            if (entry.TextureIndex < 0 || entry.TextureIndex >= _mapData.TileTextures.Count)
+                continue;
+
+            var doorTex = _mapData.TileTextures[entry.TextureIndex];
+            if (doorTex.Id == 0) continue;
+
             var rt = LoadRenderTexture(size, size);
             BeginTextureMode(rt);
             ClearBackground(Color.Black);
@@ -753,9 +724,9 @@ public class EditorGui
     private void EnsurePickupPaletteIcons()
     {
         if (_pickupPaletteIcons != null) return;
-        if (_mapData.Textures.Count <= PickupSprites.ObjectsTextureIndex) return;
+        if (_mapData.GameTextures.Count <= PickupSprites.ObjectsTextureIndex) return;
 
-        var objectsTex = _mapData.Textures[PickupSprites.ObjectsTextureIndex];
+        var objectsTex = _mapData.GameTextures[PickupSprites.ObjectsTextureIndex];
         if (objectsTex.Id == 0) return;
 
         _pickupPaletteIcons = new Dictionary<PickupType, RenderTexture2D>();
