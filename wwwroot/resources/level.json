@@ -13926,7 +13926,7 @@
     0,
     0,
     0,
-    9,
+    7,
     0,
     0,
     0,
@@ -14050,7 +14050,7 @@
     0,
     0,
     0,
-    8,
+    10,
     0,
     0,
     0,
@@ -14122,7 +14122,7 @@
     0,
     0,
     0,
-    8,
+    12,
     0,
     0,
     0,
@@ -16401,38 +16401,35 @@
       "EnemyType": "Guard",
       "PatrolPath": [
         {
-          "TileX": 23,
-          "TileY": 27
+          "TileX": 27,
+          "TileY": 26
         },
         {
-          "TileX": 30,
+          "TileX": 33,
+          "TileY": 26
+        },
+        {
+          "TileX": 33,
+          "TileY": 29
+        },
+        {
+          "TileX": 27,
+          "TileY": 29
+        },
+        {
+          "TileX": 27,
           "TileY": 27
         }
-      ]
+      ],
+      "StartsAsCorpse": false
     },
     {
       "TileX": 30,
       "TileY": 32,
-      "Rotation": 0,
+      "Rotation": 4.712389,
       "EnemyType": "Guard",
-      "PatrolPath": [
-        {
-          "TileX": 30,
-          "TileY": 22
-        },
-        {
-          "TileX": 30,
-          "TileY": 28
-        },
-        {
-          "TileX": 36,
-          "TileY": 28
-        },
-        {
-          "TileX": 30,
-          "TileY": 28
-        }
-      ]
+      "PatrolPath": [],
+      "StartsAsCorpse": false
     },
     {
       "TileX": 23,
@@ -16442,93 +16439,130 @@
       "PatrolPath": [
         {
           "TileX": 23,
-          "TileY": 26
-        },
-        {
-          "TileX": 24,
-          "TileY": 27
-        },
-        {
-          "TileX": 27,
-          "TileY": 27
-        },
-        {
-          "TileX": 29,
-          "TileY": 28
-        },
-        {
-          "TileX": 30,
-          "TileY": 25
-        },
-        {
-          "TileX": 30,
-          "TileY": 23
-        },
-        {
-          "TileX": 31,
-          "TileY": 23
-        },
-        {
-          "TileX": 31,
-          "TileY": 22
-        },
-        {
-          "TileX": 30,
-          "TileY": 22
-        },
-        {
-          "TileX": 30,
-          "TileY": 25
-        },
-        {
-          "TileX": 30,
-          "TileY": 26
-        },
-        {
-          "TileX": 26,
-          "TileY": 27
-        },
-        {
-          "TileX": 24,
-          "TileY": 27
+          "TileY": 29
         },
         {
           "TileX": 23,
-          "TileY": 26
+          "TileY": 22
         }
-      ]
+      ],
+      "StartsAsCorpse": false
+    },
+    {
+      "TileX": 30,
+      "TileY": 24,
+      "Rotation": 1.5707964,
+      "EnemyType": "Guard",
+      "PatrolPath": [],
+      "StartsAsCorpse": true
+    },
+    {
+      "TileX": 37,
+      "TileY": 26,
+      "Rotation": 2.3561945,
+      "EnemyType": "Guard",
+      "PatrolPath": [],
+      "StartsAsCorpse": false
+    },
+    {
+      "TileX": 37,
+      "TileY": 29,
+      "Rotation": 1.5707964,
+      "EnemyType": "Guard",
+      "PatrolPath": [
+        {
+          "TileX": 37,
+          "TileY": 22
+        },
+        {
+          "TileX": 37,
+          "TileY": 29
+        }
+      ],
+      "StartsAsCorpse": false
+    },
+    {
+      "TileX": 37,
+      "TileY": 22,
+      "Rotation": 0,
+      "EnemyType": "Guard",
+      "PatrolPath": [
+        {
+          "TileX": 37,
+          "TileY": 28
+        },
+        {
+          "TileX": 37,
+          "TileY": 22
+        }
+      ],
+      "StartsAsCorpse": false
+    },
+    {
+      "TileX": 30,
+      "TileY": 29,
+      "Rotation": 4.712389,
+      "EnemyType": "Guard",
+      "PatrolPath": [],
+      "StartsAsCorpse": false
+    },
+    {
+      "TileX": 29,
+      "TileY": 32,
+      "Rotation": 5.4977875,
+      "EnemyType": "Guard",
+      "PatrolPath": [],
+      "StartsAsCorpse": false
     }
   ],
   "Pickups": [
     {
-      "TileX": 32,
-      "TileY": 28,
-      "Type": "Health",
-      "Amount": 25
-    },
-    {
-      "TileX": 28,
-      "TileY": 28,
+      "TileX": 30,
+      "TileY": 24,
       "Type": "Ammo",
       "Amount": 30
     },
     {
-      "TileX": 30,
-      "TileY": 26,
-      "Type": "GoldKey",
-      "Amount": 0
-    },
-    {
-      "TileX": 34,
-      "TileY": 30,
+      "TileX": 32,
+      "TileY": 32,
       "Type": "SilverKey",
       "Amount": 0
     },
     {
-      "TileX": 33,
+      "TileX": 37,
+      "TileY": 22,
+      "Type": "GoldKey",
+      "Amount": 0
+    },
+    {
+      "TileX": 35,
       "TileY": 26,
+      "Type": "Health",
+      "Amount": 0
+    },
+    {
+      "TileX": 33,
+      "TileY": 27,
+      "Type": "Ammo",
+      "Amount": 0
+    },
+    {
+      "TileX": 32,
+      "TileY": 23,
       "Type": "MachineGun",
-      "Amount": 30
+      "Amount": 0
+    },
+    {
+      "TileX": 32,
+      "TileY": 24,
+      "Type": "ChainGun",
+      "Amount": 0
     }
-  ]
+  ],
+  "PlayerSpawn": {
+    "TileX": 30,
+    "TileY": 22,
+    "WorldY": 2,
+    "Rotation": 1.5707964
+  }
 }
