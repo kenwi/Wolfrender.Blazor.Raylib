@@ -33,6 +33,11 @@
             <span>Corpse (dead on spawn)</span>
         </label>
 
+        <label class="editor-checkbox-row" style="margin-top: 6px; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" checked="@enemy.DropsAmmo" @onchange="e => ToggleDropsAmmo(enemy, e)" />
+            <span>Drops ammo on death</span>
+        </label>
+
         <h3 style="margin-top: 10px;">Patrol Path</h3>
 
         @if (State.IsEditingPatrolPath && State.PatrolEditEnemyIndex == State.SelectedEnemyIndex)
@@ -125,6 +130,13 @@
     private void ToggleCorpse(EnemyPlacement enemy, ChangeEventArgs e)
     {
         enemy.StartsAsCorpse = e.Value is bool b && b;
+        State.OnEnemyPlacementEdited();
+        OnChanged.InvokeAsync();
+    }
+
+    private void ToggleDropsAmmo(EnemyPlacement enemy, ChangeEventArgs e)
+    {
+        enemy.DropsAmmo = e.Value is bool b && b;
         State.OnEnemyPlacementEdited();
         OnChanged.InvokeAsync();
     }

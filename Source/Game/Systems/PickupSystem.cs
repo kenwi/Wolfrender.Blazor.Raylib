@@ -67,6 +67,37 @@ public class PickupSystem
         _activePickups.Remove(pickup);
     }
 
+    /// <summary>
+    /// Spawns an ammo pickup at the tile under <paramref name="worldPosition"/> (e.g. enemy death).
+    /// Skips if that tile already has a pickup.
+    /// </summary>
+    public bool TrySpawnDroppedPickup(PickupType type, Vector3 worldPosition, int amount = 0)
+    {
+        if (_pickupByTile.Length == 0)
+            return false;
+
+        var (tileX, tileY) = LevelData.GetTileFromWorld(worldPosition.X, worldPosition.Z);
+        if (tileX < 0 || tileX >= _mapWidth || tileY < 0 || tileY >= _mapHeight)
+            return false;
+
+        int idx = TileIndex(tileX, tileY);
+        if (_pickupByTile[idx] is not null)
+            return false;
+
+        var pickup = new Pickup
+        {
+            Type = type,
+            TileX = tileX,
+            TileY = tileY,
+            Amount = PickupDefaults.GetAmount(type, amount),
+            Position = LevelData.GetTileAnchorWorld(tileX, tileY, 1.5f)
+        };
+
+        _pickupByTile[idx] = pickup;
+        _activePickups.Add(pickup);
+        return true;
+    }
+
     public void Render(Vector3 cameraPosition)
     {
         foreach (var pickup in _activePickups)

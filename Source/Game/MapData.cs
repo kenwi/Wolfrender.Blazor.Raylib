@@ -25,6 +25,9 @@ public class EnemyPlacement
     public bool ShowPatrolPath { get; set; } = true;
     /// <summary>When true, the enemy spawns already in <see cref="Entities.EnemyState.CORPSE"/>.</summary>
     public bool StartsAsCorpse { get; set; }
+
+    /// <summary>When true, killing this enemy spawns an ammo pickup at its death tile.</summary>
+    public bool DropsAmmo { get; set; }
 }
 
 /// <summary>

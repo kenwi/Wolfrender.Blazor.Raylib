@@ -19,6 +19,7 @@ public class EnemyPlacementData
     public string EnemyType { get; set; } = "Guard";
     public List<PatrolWaypointData> PatrolPath { get; set; } = new();
     public bool StartsAsCorpse { get; set; }
+    public bool DropsAmmo { get; set; }
 }
 
 public class PickupPlacementData
@@ -124,7 +125,8 @@ public static class LevelSerializer
                     TileX = w.TileX,
                     TileY = w.TileY
                 }).ToList(),
-                StartsAsCorpse = e.StartsAsCorpse
+                StartsAsCorpse = e.StartsAsCorpse,
+                DropsAmmo = e.DropsAmmo
             }).ToList(),
             Pickups = mapData.Pickups.Select(p => new PickupPlacementData
             {
@@ -170,7 +172,8 @@ public static class LevelSerializer
                 TileX = w.TileX,
                 TileY = w.TileY
             }).ToList(),
-            StartsAsCorpse = e.StartsAsCorpse
+            StartsAsCorpse = e.StartsAsCorpse,
+            DropsAmmo = e.DropsAmmo
         }).ToList();
         mapData.Pickups = (fileData.Pickups ?? new List<PickupPlacementData>()).Select(p => new PickupPlacement
         {

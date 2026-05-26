@@ -12,6 +12,7 @@ public class EnemySystem
     private readonly CollisionSystem _collisionSystem;
     private readonly DoorSystem _doorSystem;
     private readonly ICombatFeedback _combatFeedback;
+    private readonly PickupSystem? _pickupSystem;
     private readonly Random _rng = new();
     private MapData _mapData = null!;
 
@@ -42,13 +43,15 @@ public class EnemySystem
         InputSystem inputSystem,
         CollisionSystem collisionSystem,
         DoorSystem doorSystem,
-        ICombatFeedback combatFeedback)
+        ICombatFeedback combatFeedback,
+        PickupSystem? pickupSystem = null)
     {
         _inputSystem = inputSystem;
         _player = player;
         _collisionSystem = collisionSystem;
         _doorSystem = doorSystem;
         _combatFeedback = combatFeedback;
+        _pickupSystem = pickupSystem;
         _enemies = new List<Enemy>();
     }
 
@@ -87,6 +90,7 @@ public class EnemySystem
                 Rotation = placement.Rotation,
                 MoveSpeed = 2f,
                 CurrentWaypointIndex = 0,
+                DropsAmmoOnDeath = placement.DropsAmmo,
                 PatrolPath = placement.PatrolPath.Select(wp =>
                     LevelData.GetTileAnchorWorld(wp.TileX, wp.TileY, 2f)).ToList()
             };
@@ -107,6 +111,7 @@ public class EnemySystem
 
         foreach (var enemy in _enemies)
         {
+            TrySpawnAmmoDrop(enemy);
             UpdateBehavior(enemy, deltaTime);
             UpdateSpriteFrame(enemy);
         }
@@ -454,6 +459,15 @@ public class EnemySystem
         _player.TakeDamage(EnemyShotDamage);
         if (_player.Health < healthBefore)
             _combatFeedback.OnPlayerDamaged(EnemyShotDamage);
+    }
+
+    private void TrySpawnAmmoDrop(Enemy enemy)
+    {
+        if (!enemy.PendingAmmoDrop || _pickupSystem is null)
+            return;
+
+        enemy.PendingAmmoDrop = false;
+        _pickupSystem.TrySpawnDroppedPickup(PickupType.Ammo, enemy.Position);
     }
 
     private void RemoveDeadEnemies()

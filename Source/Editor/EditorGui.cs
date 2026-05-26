@@ -1101,6 +1101,14 @@ public class EditorGui
                 state.EnemySystem.Rebuild(state.MapData.Enemies, state.MapData);
         }
 
+        bool dropsAmmo = enemy.DropsAmmo;
+        if (ImGui.Checkbox("Drops ammo on death", ref dropsAmmo))
+        {
+            enemy.DropsAmmo = dropsAmmo;
+            if (state.IsSimulating)
+                state.EnemySystem.Rebuild(state.MapData.Enemies, state.MapData);
+        }
+
         ImGui.Spacing();
         ImGui.Separator();
 

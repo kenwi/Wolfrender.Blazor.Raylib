@@ -66,6 +66,12 @@ public class Enemy
     /// <summary>How long <see cref="EnemyState.HIT"/> lasts before resuming <see cref="ResumeStateAfterHit"/>.</summary>
     public float HitReactionDurationSeconds { get; set; } = 0.4f;
 
+    /// <summary>When true, an ammo pickup is spawned at this enemy's position when they die.</summary>
+    public bool DropsAmmoOnDeath { get; set; }
+
+    /// <summary>Set on lethal hit; consumed by <see cref="Systems.EnemySystem"/> to spawn the drop once.</summary>
+    public bool PendingAmmoDrop { get; set; }
+
     /// <summary>
     /// Transition to a new state and reset the state timer.
     /// </summary>
@@ -99,6 +105,8 @@ public class Enemy
         Health = MathF.Max(0f, Health - amount);
         if (Health <= 0f)
         {
+            if (DropsAmmoOnDeath)
+                PendingAmmoDrop = true;
             DyingAnimationIndex = 0;
             AnimationTimer = 0f;
             TransitionTo(EnemyState.DYING);
