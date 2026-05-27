@@ -27,6 +27,10 @@ public sealed class ScoreSystem
     public float SecretRatio =>
         TotalSecrets > 0 ? 100f * SecretsFound / TotalSecrets : 100f;
 
+    public int CompletionBonus { get; private set; }
+    public int FinalScore { get; private set; }
+    public bool IsFinalized { get; private set; }
+
     public void ResetForLevel(MapData mapData, LevelScoringMetadata? metadata = null)
     {
         _metadata = metadata ?? LevelScoringMetadata.Default;
@@ -36,6 +40,9 @@ public sealed class ScoreSystem
         TreasuresCollected = 0;
         SecretsFound = 0;
         ElapsedActiveSeconds = 0f;
+        CompletionBonus = 0;
+        FinalScore = 0;
+        IsFinalized = false;
 
         TotalKillableEnemies = mapData.Enemies.Count(e => !e.StartsAsCorpse);
         TotalTreasures = mapData.Pickups.Count(p => TreasureScoreCatalog.IsTreasure(p.Type));
@@ -67,6 +74,16 @@ public sealed class ScoreSystem
     public void OnSecretFound()
     {
         SecretsFound++;
+    }
+
+    public void FinalizeLevel()
+    {
+        if (IsFinalized)
+            return;
+
+        CompletionBonus = ComputeCompletionBonuses();
+        FinalScore = LevelScore + CompletionBonus;
+        IsFinalized = true;
     }
 
     /// <summary>Completion bonuses at level exit (Phase 2).</summary>

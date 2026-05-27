@@ -24,8 +24,10 @@ public sealed class PlayerSystem
     private readonly EnemySystem _enemySystem;
     private readonly WeaponSystem _weaponSystem;
     private readonly EffectSystem _effectSystem;
+    private readonly ExitSystem _exitSystem;
 
     private bool _deathHandled;
+    private bool _levelCompleteHandled;
     private Func<bool> _isConsoleOpen = () => false;
     private Action? _restartLevel;
 
@@ -40,7 +42,8 @@ public sealed class PlayerSystem
         AnimationSystem animationSystem,
         EnemySystem enemySystem,
         WeaponSystem weaponSystem,
-        EffectSystem effectSystem)
+        EffectSystem effectSystem,
+        ExitSystem exitSystem)
     {
         _player = player;
         _inputSystem = inputSystem;
@@ -53,6 +56,7 @@ public sealed class PlayerSystem
         _enemySystem = enemySystem;
         _weaponSystem = weaponSystem;
         _effectSystem = effectSystem;
+        _exitSystem = exitSystem;
     }
 
     public Player Player => _player;
@@ -67,6 +71,7 @@ public sealed class PlayerSystem
     {
         PlayerSpawn.ApplyFromMap(_player, mapData, PlayerSpawnApplyMode.FullReset);
         _deathHandled = false;
+        _levelCompleteHandled = false;
         _cameraSystem.ResetDeathFall();
     }
 
@@ -75,6 +80,19 @@ public sealed class PlayerSystem
 
     public void UpdateAlive(float deltaTime, InputState input, Vector2 mouseDelta, int screenWidth, int screenHeight)
     {
+        if (_exitSystem.IsLevelComplete)
+        {
+            HandleLevelCompleteOnce();
+            TryRestartFromLevelComplete();
+            return;
+        }
+
+        bool exitConsumedInteract = _exitSystem.Update(deltaTime, input, _player);
+        if (_exitSystem.IsBlockingGameplay)
+            return;
+
+        var doorInput = exitConsumedInteract ? input.WithoutInteract() : input;
+
         _weaponSystem.Update(deltaTime);
         _player.WeaponCooldownRemaining = MathF.Max(0f, _player.WeaponCooldownRemaining - deltaTime);
 
@@ -83,7 +101,7 @@ public sealed class PlayerSystem
         _collisionSystem.Update(_player, deltaTime);
         _pickupSystem.Update(_player);
         _cameraSystem.Update(_player, input.IsMouseFree, mouseDelta);
-        _doorSystem.Update(deltaTime, input, _player, _enemySystem.Enemies);
+        _doorSystem.Update(deltaTime, doorInput, _player, _enemySystem.Enemies);
 
         bool wantsFire = !input.IsMouseFree && WantsPrimaryFire(input, _player);
         var activeDef = WeaponCatalog.Get(_player.Weapons.ActiveWeapon);
@@ -118,6 +136,30 @@ public sealed class PlayerSystem
     }
 
     private void TryRestartFromGameOver()
+    {
+        if (_isConsoleOpen())
+            return;
+
+        bool restartPressed = IsKeyPressed(KeyboardKey.R)
+            || IsMouseButtonPressed(MouseButton.Left);
+
+        if (!restartPressed)
+            return;
+
+        _restartLevel?.Invoke();
+        ApplyMouseCaptureAfterRestart();
+    }
+
+    private void HandleLevelCompleteOnce()
+    {
+        if (_levelCompleteHandled)
+            return;
+
+        _levelCompleteHandled = true;
+        _inputSystem.EnableMouse();
+    }
+
+    private void TryRestartFromLevelComplete()
     {
         if (_isConsoleOpen())
             return;

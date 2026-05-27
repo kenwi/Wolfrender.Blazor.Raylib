@@ -38,6 +38,7 @@ public class World : IScene
     private readonly WeaponSystem _weaponSystem;
     private readonly PlayerSystem _playerSystem;
     private readonly ScoreSystem _scoreSystem;
+    private readonly ExitSystem _exitSystem;
 
     private RenderTexture2D _sceneRenderTexture;
     private InputState _inputState = new();
@@ -47,6 +48,7 @@ public class World : IScene
     public EnemySystem EnemySystem => _enemySystem;
     public DoorSystem DoorSystem => _doorSystem;
     public ScoreSystem ScoreSystem => _scoreSystem;
+    public ExitSystem ExitSystem => _exitSystem;
     public string CurrentLevelPath => _currentLevelPath;
 
     public World(MapData mapData)
@@ -72,6 +74,7 @@ public class World : IScene
         _hudSystem = new HudSystem(screenWidth, screenHeight);
         _minimapSystem = new MinimapSystem(_level, _renderSystem);
         _scoreSystem = new ScoreSystem();
+        _exitSystem = new ExitSystem(_scoreSystem);
         _pickupSystem = new PickupSystem(_scoreSystem);
         _enemySystem = new EnemySystem(
             _player, _inputSystem, _collisionSystem, _doorSystem, _combatFeedback, _pickupSystem, _scoreSystem);
@@ -101,7 +104,8 @@ public class World : IScene
             _animationSystem,
             _enemySystem,
             _weaponSystem,
-            _effectSystem);
+            _effectSystem,
+            _exitSystem);
 
         _consoleOverlay = new ConsoleOverlay();
         _runtimeConsole = WorldConsoleBindings.CreateConsole(this, _player, _enemySystem, _scoreSystem, _consoleOverlay);
@@ -109,6 +113,7 @@ public class World : IScene
             () => _consoleOverlay.IsOpen,
             () => _ = RestartCurrentLevel());
         _playerSystem.ResetForLevelLoad(_mapData);
+        _exitSystem.Rebuild(_mapData);
 
         _sceneRenderTexture = LoadRenderTexture(screenWidth, screenHeight);
         Debug.Setup(_doorSystem.Doors, _player, _animationSystem, _enemySystem);
@@ -148,6 +153,7 @@ public class World : IScene
         _enemySystem.Rebuild(_mapData.Enemies, _mapData);
         _pickupSystem.Rebuild(_mapData.Pickups, _mapData);
         _scoreSystem.ResetForLevel(_mapData);
+        _exitSystem.Rebuild(_mapData);
 
         if (OperatingSystem.IsBrowser())
             _inputSystem.EnableMouse();
@@ -228,6 +234,7 @@ public class World : IScene
         _enemySystem.Rebuild(_mapData.Enemies, _mapData);
         _pickupSystem.Rebuild(_mapData.Pickups, _mapData);
         _scoreSystem.ResetForLevel(_mapData);
+        _exitSystem.Rebuild(_mapData);
         _effectSystem.Clear();
     }
 
@@ -289,7 +296,9 @@ public class World : IScene
 
         if (!_inputState.IsPaused)
         {
-            _scoreSystem.Tick(deltaTime);
+            if (!_exitSystem.IsBlockingGameplay)
+                _scoreSystem.Tick(deltaTime);
+
             _effectSystem.Update(deltaTime);
 
             int screenWidth = GetScreenWidth();
@@ -298,7 +307,8 @@ public class World : IScene
             if (_player.IsAlive)
             {
                 _playerSystem.UpdateAlive(deltaTime, _inputState, mouseDelta, screenWidth, screenHeight);
-                _enemySystem.Update(deltaTime);
+                if (!_exitSystem.IsBlockingGameplay)
+                    _enemySystem.Update(deltaTime);
             }
             else
             {
@@ -361,18 +371,22 @@ public class World : IScene
         int screenWidth = GetScreenWidth();
         int screenHeight = GetScreenHeight();
 
-        if (_player.IsAlive)
+        if (_player.IsAlive && !_exitSystem.IsLevelComplete)
             GameOverlayHud.DrawScore(_scoreSystem, screenWidth);
 
-        if (_player.IsAlive)
+        if (_player.IsAlive && !_exitSystem.IsLevelComplete)
             GameOverlayHud.DrawInventory(_player);
 
-        if (_player.IsAlive && !_consoleOverlay.IsOpen)
+        if (_player.IsAlive && !_consoleOverlay.IsOpen && !_exitSystem.IsBlockingGameplay)
             _animationSystem.RenderWeaponOverlay(screenWidth, screenHeight);
 
         _effectSystem.RenderScreenOverlay(screenWidth, screenHeight);
 
-        if (_player.IsAlive && !_consoleOverlay.IsOpen && _doorSystem.HasLockedHint)
+        if (_exitSystem.IsLevelComplete && !_consoleOverlay.IsOpen)
+            GameOverlayHud.DrawLevelComplete(_scoreSystem, screenWidth, screenHeight);
+        else if (_exitSystem.IsExitPending && !_consoleOverlay.IsOpen)
+            GameOverlayHud.DrawExitCountdown(_exitSystem.ExitCountdownRemaining, screenWidth, screenHeight);
+        else if (_player.IsAlive && !_consoleOverlay.IsOpen && _doorSystem.HasLockedHint)
             GameOverlayHud.DrawDoorLockedHint(_doorSystem, screenWidth, screenHeight);
         else if (_player.IsAlive && !_consoleOverlay.IsOpen && _weaponSystem.HasNoAmmoHint)
             GameOverlayHud.DrawNoAmmoHint(_weaponSystem, screenWidth, screenHeight);
@@ -380,7 +394,7 @@ public class World : IScene
         if (!_player.IsAlive && !_consoleOverlay.IsOpen)
             GameOverlayHud.DrawGameOver(screenWidth, screenHeight);
 
-        if (!_consoleOverlay.IsOpen && !_inputState.IsMouseFree && _player.IsAlive)
+        if (!_consoleOverlay.IsOpen && !_inputState.IsMouseFree && _player.IsAlive && !_exitSystem.IsBlockingGameplay)
             GameOverlayHud.DrawReticle(_effectSystem, screenWidth, screenHeight);
 
         if (_inputState.IsMinimapEnabled)
