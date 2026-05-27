@@ -1,5 +1,6 @@
 using System.Numerics;
 using Game.Entities;
+using Game.Scoring;
 using Game.Utilities;
 
 namespace Game.Systems;
@@ -13,6 +14,7 @@ public class EnemySystem
     private readonly DoorSystem _doorSystem;
     private readonly ICombatFeedback _combatFeedback;
     private readonly PickupSystem? _pickupSystem;
+    private readonly ScoreSystem? _scoreSystem;
     private readonly Random _rng = new();
     private MapData _mapData = null!;
 
@@ -44,7 +46,8 @@ public class EnemySystem
         CollisionSystem collisionSystem,
         DoorSystem doorSystem,
         ICombatFeedback combatFeedback,
-        PickupSystem? pickupSystem = null)
+        PickupSystem? pickupSystem = null,
+        ScoreSystem? scoreSystem = null)
     {
         _inputSystem = inputSystem;
         _player = player;
@@ -52,6 +55,7 @@ public class EnemySystem
         _doorSystem = doorSystem;
         _combatFeedback = combatFeedback;
         _pickupSystem = pickupSystem;
+        _scoreSystem = scoreSystem;
         _enemies = new List<Enemy>();
     }
 
@@ -91,6 +95,7 @@ public class EnemySystem
                 MoveSpeed = 2f,
                 CurrentWaypointIndex = 0,
                 DropsAmmoOnDeath = placement.DropsAmmo,
+                ScoreKind = EnemyScoreCatalog.ParseKind(placement.EnemyType),
                 PatrolPath = placement.PatrolPath.Select(wp =>
                     LevelData.GetTileAnchorWorld(wp.TileX, wp.TileY, 2f)).ToList()
             };
@@ -111,6 +116,7 @@ public class EnemySystem
 
         foreach (var enemy in _enemies)
         {
+            TryAwardKillPoints(enemy);
             TrySpawnAmmoDrop(enemy);
             UpdateBehavior(enemy, deltaTime);
             UpdateSpriteFrame(enemy);
@@ -459,6 +465,15 @@ public class EnemySystem
         _player.TakeDamage(EnemyShotDamage);
         if (_player.Health < healthBefore)
             _combatFeedback.OnPlayerDamaged(EnemyShotDamage);
+    }
+
+    private void TryAwardKillPoints(Enemy enemy)
+    {
+        if (enemy.EnemyState != EnemyState.DYING || enemy.KillPointsAwarded)
+            return;
+
+        enemy.KillPointsAwarded = true;
+        _scoreSystem?.OnEnemyKilled(enemy.ScoreKind);
     }
 
     private void TrySpawnAmmoDrop(Enemy enemy)

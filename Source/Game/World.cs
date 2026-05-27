@@ -37,6 +37,7 @@ public class World : IScene
     private readonly PickupSystem _pickupSystem;
     private readonly WeaponSystem _weaponSystem;
     private readonly PlayerSystem _playerSystem;
+    private readonly ScoreSystem _scoreSystem;
 
     private RenderTexture2D _sceneRenderTexture;
     private InputState _inputState = new();
@@ -45,6 +46,7 @@ public class World : IScene
     public PlayerSystem PlayerSystem => _playerSystem;
     public EnemySystem EnemySystem => _enemySystem;
     public DoorSystem DoorSystem => _doorSystem;
+    public ScoreSystem ScoreSystem => _scoreSystem;
     public string CurrentLevelPath => _currentLevelPath;
 
     public World(MapData mapData)
@@ -69,8 +71,10 @@ public class World : IScene
         _renderSystem = new RenderSystem(_level, _tileTextures);
         _hudSystem = new HudSystem(screenWidth, screenHeight);
         _minimapSystem = new MinimapSystem(_level, _renderSystem);
+        _scoreSystem = new ScoreSystem();
         _pickupSystem = new PickupSystem();
-        _enemySystem = new EnemySystem(_player, _inputSystem, _collisionSystem, _doorSystem, _combatFeedback, _pickupSystem);
+        _enemySystem = new EnemySystem(
+            _player, _inputSystem, _collisionSystem, _doorSystem, _combatFeedback, _pickupSystem, _scoreSystem);
         _pickupSystem.SetObjectsTexture(_gameTextures[GameTextureIndex.Objects]);
         _pickupSystem.Rebuild(_mapData.Pickups, _mapData);
         _animationSystem = new AnimationSystem(
@@ -100,7 +104,7 @@ public class World : IScene
             _effectSystem);
 
         _consoleOverlay = new ConsoleOverlay();
-        _runtimeConsole = WorldConsoleBindings.CreateConsole(this, _player, _enemySystem, _consoleOverlay);
+        _runtimeConsole = WorldConsoleBindings.CreateConsole(this, _player, _enemySystem, _scoreSystem, _consoleOverlay);
         _playerSystem.ConfigureLifecycle(
             () => _consoleOverlay.IsOpen,
             () => _ = RestartCurrentLevel());
@@ -143,6 +147,7 @@ public class World : IScene
         _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
         _enemySystem.Rebuild(_mapData.Enemies, _mapData);
         _pickupSystem.Rebuild(_mapData.Pickups, _mapData);
+        _scoreSystem.ResetForLevel(_mapData);
 
         if (OperatingSystem.IsBrowser())
             _inputSystem.EnableMouse();
@@ -222,6 +227,7 @@ public class World : IScene
         _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
         _enemySystem.Rebuild(_mapData.Enemies, _mapData);
         _pickupSystem.Rebuild(_mapData.Pickups, _mapData);
+        _scoreSystem.ResetForLevel(_mapData);
         _effectSystem.Clear();
     }
 
@@ -283,6 +289,7 @@ public class World : IScene
 
         if (!_inputState.IsPaused)
         {
+            _scoreSystem.Tick(deltaTime);
             _effectSystem.Update(deltaTime);
 
             int screenWidth = GetScreenWidth();
@@ -353,6 +360,9 @@ public class World : IScene
 
         int screenWidth = GetScreenWidth();
         int screenHeight = GetScreenHeight();
+
+        if (_player.IsAlive)
+            GameOverlayHud.DrawScore(_scoreSystem, screenWidth);
 
         if (_player.IsAlive)
             GameOverlayHud.DrawInventory(_player);

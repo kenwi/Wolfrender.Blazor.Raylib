@@ -9,7 +9,11 @@ public enum PickupType
     MachineGun,
     ChainGun,
     GoldKey,
-    SilverKey
+    SilverKey,
+    TreasureCross,
+    TreasureChalice,
+    TreasureChest,
+    TreasureCrown
 }
 
 /// <summary>Authoring / serialization record for a pickup on the tile grid.</summary>

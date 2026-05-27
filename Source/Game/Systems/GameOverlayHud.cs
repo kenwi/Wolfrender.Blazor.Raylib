@@ -9,6 +9,14 @@ namespace Game.Systems;
 /// <summary>Screen-space HUD overlays drawn after the 3D scene composite.</summary>
 public static class GameOverlayHud
 {
+    public static void DrawScore(ScoreSystem score, int screenWidth)
+    {
+        const int fontSize = 20;
+        var label = $"SCORE: {score.LevelScore}";
+        int labelWidth = MeasureText(label, fontSize);
+        DrawText(label, screenWidth - labelWidth - 10, 40, fontSize, new Color(255, 220, 40, 255));
+    }
+
     public static void DrawInventory(Player player)
     {
         const int fontSize = 18;
