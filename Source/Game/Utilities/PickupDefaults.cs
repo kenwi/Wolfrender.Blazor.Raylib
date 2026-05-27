@@ -20,6 +20,10 @@ public static class PickupDefaults
         PickupType.ChainGun => ChainGunAmmoAmount,
         PickupType.GoldKey => 0,
         PickupType.SilverKey => 0,
+        PickupType.TreasureCross => 0,
+        PickupType.TreasureChalice => 0,
+        PickupType.TreasureChest => 0,
+        PickupType.TreasureCrown => 0,
         _ => 0
     };
 }

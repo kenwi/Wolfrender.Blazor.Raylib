@@ -72,7 +72,7 @@ public class World : IScene
         _hudSystem = new HudSystem(screenWidth, screenHeight);
         _minimapSystem = new MinimapSystem(_level, _renderSystem);
         _scoreSystem = new ScoreSystem();
-        _pickupSystem = new PickupSystem();
+        _pickupSystem = new PickupSystem(_scoreSystem);
         _enemySystem = new EnemySystem(
             _player, _inputSystem, _collisionSystem, _doorSystem, _combatFeedback, _pickupSystem, _scoreSystem);
         _pickupSystem.SetObjectsTexture(_gameTextures[GameTextureIndex.Objects]);
