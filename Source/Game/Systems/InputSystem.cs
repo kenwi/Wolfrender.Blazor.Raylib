@@ -26,6 +26,25 @@ public class InputState
 
     /// <summary>1–4 when a weapon slot key was pressed this frame; 0 otherwise.</summary>
     public int WeaponSlotPressed { get; init; }
+
+    public InputState WithoutInteract() => new()
+    {
+        MoveForward = MoveForward,
+        MoveBackward = MoveBackward,
+        MoveLeft = MoveLeft,
+        MoveRight = MoveRight,
+        MouseDelta = MouseDelta,
+        IsMouseFree = IsMouseFree,
+        IsDebugEnabled = IsDebugEnabled,
+        IsPaused = IsPaused,
+        IsInteractPressed = false,
+        IsChangeStatePressed = IsChangeStatePressed,
+        IsChangeAnimationPressed = IsChangeAnimationPressed,
+        IsMinimapEnabled = IsMinimapEnabled,
+        IsPrimaryFire = IsPrimaryFire,
+        IsPrimaryFireHeld = IsPrimaryFireHeld,
+        WeaponSlotPressed = WeaponSlotPressed
+    };
 }
 
 public class InputSystem

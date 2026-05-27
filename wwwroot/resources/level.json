@@ -5346,7 +5346,7 @@
     48,
     48,
     48,
-    48,
+    44,
     48,
     48,
     48,
@@ -16565,6 +16565,30 @@
       "TileX": 32,
       "TileY": 24,
       "Type": "ChainGun",
+      "Amount": 0
+    },
+    {
+      "TileX": 33,
+      "TileY": 21,
+      "Type": "TreasureCross",
+      "Amount": 0
+    },
+    {
+      "TileX": 33,
+      "TileY": 22,
+      "Type": "TreasureChalice",
+      "Amount": 0
+    },
+    {
+      "TileX": 33,
+      "TileY": 23,
+      "Type": "TreasureChest",
+      "Amount": 0
+    },
+    {
+      "TileX": 33,
+      "TileY": 20,
+      "Type": "TreasureCrown",
       "Amount": 0
     }
   ],

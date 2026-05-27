@@ -1,5 +1,6 @@
 using System.Numerics;
 using Game.Entities;
+using Game.Scoring;
 using Game.Utilities;
 using Game.Weapons;
 using Raylib_cs;
@@ -15,6 +16,7 @@ public class PickupSystem
     private static float CollectTileOffsetZ => LevelData.QuadSize * 0.5f;
 
     private Texture2D _objectsTexture;
+    private readonly ScoreSystem? _scoreSystem;
 
     private readonly List<Pickup> _activePickups = new();
     private Pickup?[] _pickupByTile = Array.Empty<Pickup?>();
@@ -22,6 +24,8 @@ public class PickupSystem
     private int _mapHeight;
 
     public IReadOnlyList<Pickup> ActivePickups => _activePickups;
+
+    public PickupSystem(ScoreSystem? scoreSystem = null) => _scoreSystem = scoreSystem;
 
     public void SetObjectsTexture(Texture2D texture) => _objectsTexture = texture;
 
@@ -65,6 +69,53 @@ public class PickupSystem
         ApplyPickup(player, pickup);
         _pickupByTile[idx] = null;
         _activePickups.Remove(pickup);
+    }
+
+    private void ApplyPickup(Player player, Pickup pickup)
+    {
+        string positions = FormatPickupPositions(player, pickup);
+
+        if (TreasureScoreCatalog.IsTreasure(pickup.Type))
+        {
+            int points = TreasureScoreCatalog.GetPoints(pickup.Type);
+            _scoreSystem?.OnTreasureCollected(pickup.Type);
+            Debug.Log($"Picked up {pickup.Type} (+{points} score, total {_scoreSystem?.LevelScore ?? points}). {positions}");
+            return;
+        }
+
+        int amount = pickup.Amount;
+
+        switch (pickup.Type)
+        {
+            case PickupType.Health:
+                player.Health = MathF.Min(player.MaxHealth, player.Health + amount);
+                Debug.Log($"Picked up health (+{amount}), HP {(int)player.Health}/{(int)player.MaxHealth}. {positions}");
+                break;
+            case PickupType.Ammo:
+                player.Ammo += amount;
+                Debug.Log($"Picked up ammo (+{amount}), total {player.Ammo}. {positions}");
+                break;
+            case PickupType.MachineGun:
+                player.Weapons.Grant(WeaponId.MachineGun);
+                player.Ammo += amount;
+                player.Weapons.TrySetActive(WeaponId.MachineGun);
+                Debug.Log($"Picked up machine gun (+{amount} ammo), total {player.Ammo}. {positions}");
+                break;
+            case PickupType.ChainGun:
+                player.Weapons.Grant(WeaponId.ChainGun);
+                player.Ammo += amount;
+                player.Weapons.TrySetActive(WeaponId.ChainGun);
+                Debug.Log($"Picked up chain gun (+{amount} ammo), total {player.Ammo}. {positions}");
+                break;
+            case PickupType.GoldKey:
+                player.HasGoldKey = true;
+                Debug.Log($"Picked up gold key. {positions}");
+                break;
+            case PickupType.SilverKey:
+                player.HasSilverKey = true;
+                Debug.Log($"Picked up silver key. {positions}");
+                break;
+        }
     }
 
     /// <summary>
@@ -136,44 +187,6 @@ public class PickupSystem
     }
 
     private int TileIndex(int tileX, int tileY) => _mapWidth * tileY + tileX;
-
-    private static void ApplyPickup(Player player, Pickup pickup)
-    {
-        int amount = pickup.Amount;
-        string positions = FormatPickupPositions(player, pickup);
-
-        switch (pickup.Type)
-        {
-            case PickupType.Health:
-                player.Health = MathF.Min(player.MaxHealth, player.Health + amount);
-                Debug.Log($"Picked up health (+{amount}), HP {(int)player.Health}/{(int)player.MaxHealth}. {positions}");
-                break;
-            case PickupType.Ammo:
-                player.Ammo += amount;
-                Debug.Log($"Picked up ammo (+{amount}), total {player.Ammo}. {positions}");
-                break;
-            case PickupType.MachineGun:
-                player.Weapons.Grant(WeaponId.MachineGun);
-                player.Ammo += amount;
-                player.Weapons.TrySetActive(WeaponId.MachineGun);
-                Debug.Log($"Picked up machine gun (+{amount} ammo), total {player.Ammo}. {positions}");
-                break;
-            case PickupType.ChainGun:
-                player.Weapons.Grant(WeaponId.ChainGun);
-                player.Ammo += amount;
-                player.Weapons.TrySetActive(WeaponId.ChainGun);
-                Debug.Log($"Picked up chain gun (+{amount} ammo), total {player.Ammo}. {positions}");
-                break;
-            case PickupType.GoldKey:
-                player.HasGoldKey = true;
-                Debug.Log($"Picked up gold key. {positions}");
-                break;
-            case PickupType.SilverKey:
-                player.HasSilverKey = true;
-                Debug.Log($"Picked up silver key. {positions}");
-                break;
-        }
-    }
 
     private static string FormatPickupPositions(Player player, Pickup pickup)
     {

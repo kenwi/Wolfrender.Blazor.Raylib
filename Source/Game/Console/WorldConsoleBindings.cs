@@ -11,10 +11,11 @@ public static class WorldConsoleBindings
         World world,
         Player player,
         EnemySystem enemySystem,
+        ScoreSystem scoreSystem,
         ConsoleOverlay overlay)
     {
         var runtimeAccessor = new RuntimeVariableAccessor(
-            CreateRoots(world, player, enemySystem),
+            CreateRoots(world, player, enemySystem, scoreSystem),
             CreateWritableWhitelist());
         var stringStore = new StringVariableStore();
         var variables = new CompositeVariableAccessor(runtimeAccessor, stringStore);
@@ -39,13 +40,33 @@ public static class WorldConsoleBindings
             world.ListPickupsForConsole);
     }
 
-    private static IReadOnlyList<RootBinding> CreateRoots(World world, Player player, EnemySystem enemySystem)
+    private static IReadOnlyList<RootBinding> CreateRoots(
+        World world,
+        Player player,
+        EnemySystem enemySystem,
+        ScoreSystem scoreSystem)
     {
         var graphics = new GraphicsConsoleSettings(world);
         var audio = new AudioConsoleSettings(world);
 
         return new RootBinding[]
         {
+            new()
+            {
+                Name = "Score",
+                Resolver = index => index.HasValue
+                    ? ResolveResult.Fail("Score root does not support indexing.")
+                    : ResolveResult.Ok(scoreSystem),
+                CuratedListFactory = () => new[]
+                {
+                    "Score.LevelScore",
+                    "Score.Kills",
+                    "Score.TotalKillableEnemies",
+                    "Score.TreasuresCollected",
+                    "Score.ElapsedActiveSeconds"
+                },
+                DiscoveryFactory = () => DiscoverVariablesForInstance(scoreSystem, "Score")
+            },
             new()
             {
                 Name = "Player",

@@ -1,6 +1,8 @@
 using System.Numerics;
 using Raylib_cs;
 
+using Game.Scoring;
+
 namespace Game.Entities;
 
 public enum EnemyState
@@ -71,6 +73,12 @@ public class Enemy
 
     /// <summary>Set on lethal hit; consumed by <see cref="Systems.EnemySystem"/> to spawn the drop once.</summary>
     public bool PendingAmmoDrop { get; set; }
+
+    /// <summary>Score table id for this enemy (from level JSON <c>EnemyType</c>).</summary>
+    public EnemyKind ScoreKind { get; set; } = EnemyKind.Guard;
+
+    /// <summary>True after kill points were awarded for entering <see cref="EnemyState.DYING"/>.</summary>
+    public bool KillPointsAwarded { get; set; }
 
     /// <summary>
     /// Transition to a new state and reset the state timer.

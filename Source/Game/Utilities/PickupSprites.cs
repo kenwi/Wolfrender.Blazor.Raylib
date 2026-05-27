@@ -46,6 +46,12 @@ public static class PickupSprites
     public const int SilverKeyX = 66;
     public const int SilverKeyY = 988;
 
+    public const int TreasureCrossX = 1;
+    public const int TreasureChaliceX = 66;
+    public const int TreasureChestX = 131;
+    public const int TreasureCrownX = 196;
+    public const int TreasureRowY = 908;
+
     public static Rectangle GetFrameRect(PickupType type) => type switch
     {
         PickupType.Health => new Rectangle(HealthX, HealthY, FrameSize, FrameSize),
@@ -54,6 +60,10 @@ public static class PickupSprites
         PickupType.ChainGun => new Rectangle(ChainGunX, ChainGunY, FrameSize, FrameSize),
         PickupType.GoldKey => new Rectangle(GoldKeyX, GoldKeyY, FrameSize, FrameSize),
         PickupType.SilverKey => new Rectangle(SilverKeyX, SilverKeyY, FrameSize, FrameSize),
+        PickupType.TreasureCross => new Rectangle(TreasureCrossX, TreasureRowY, FrameSize, FrameSize),
+        PickupType.TreasureChalice => new Rectangle(TreasureChaliceX, TreasureRowY, FrameSize, FrameSize),
+        PickupType.TreasureChest => new Rectangle(TreasureChestX, TreasureRowY, FrameSize, FrameSize),
+        PickupType.TreasureCrown => new Rectangle(TreasureCrownX, TreasureRowY, FrameSize, FrameSize),
         _ => new Rectangle(PlaceholderX, PlaceholderY, FrameSize, FrameSize)
     };
 
