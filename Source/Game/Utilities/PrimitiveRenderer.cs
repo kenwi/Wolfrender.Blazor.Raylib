@@ -19,6 +19,10 @@ public static class PrimitiveRenderer
     private static int _lightingShaderMinBrightnessLoc;
     private static float _maxLightDistance = 1.0f; // Maximum distance for full brightness
     private static float _minBrightness = 0.0f; // Minimum brightness at max distance
+
+    // rlgl texture coordinates use a different V origin than DrawTexturePro.
+    // Flip V for world polygon rendering so in-game orientation matches the editor preview.
+    private static void TexCoordFlippedY(float u, float v) => Rlgl.TexCoord2f(u, 1.0f - v);
     
     private static void EnsureColorKeyShader()
     {
@@ -155,13 +159,13 @@ public static class PrimitiveRenderer
             {
                 // Front Face
                 Rlgl.Normal3f(0.0f, 0.0f, 1.0f);
-                Rlgl.TexCoord2f(0.0f, 0.0f);
+                TexCoordFlippedY(0.0f, 0.0f);
                 Rlgl.Vertex3f(x - width / 2, y - height / 2, z + length / 2);
-                Rlgl.TexCoord2f(1.0f, 0.0f);
+                TexCoordFlippedY(1.0f, 0.0f);
                 Rlgl.Vertex3f(x + width / 2, y - height / 2, z + length / 2);
-                Rlgl.TexCoord2f(1.0f, 1.0f);
+                TexCoordFlippedY(1.0f, 1.0f);
                 Rlgl.Vertex3f(x + width / 2, y + height / 2, z + length / 2);
-                Rlgl.TexCoord2f(0.0f, 1.0f);
+                TexCoordFlippedY(0.0f, 1.0f);
                 Rlgl.Vertex3f(x - width / 2, y + height / 2, z + length / 2);
                 quadsDrawn++;
             }
@@ -169,13 +173,13 @@ public static class PrimitiveRenderer
             {
                 // Back Face
                 Rlgl.Normal3f(0.0f, 0.0f, -1.0f);
-                Rlgl.TexCoord2f(1.0f, 0.0f);
+                TexCoordFlippedY(1.0f, 0.0f);
                 Rlgl.Vertex3f(x - width / 2, y - height / 2, z - length / 2);
-                Rlgl.TexCoord2f(1.0f, 1.0f);
+                TexCoordFlippedY(1.0f, 1.0f);
                 Rlgl.Vertex3f(x - width / 2, y + height / 2, z - length / 2);
-                Rlgl.TexCoord2f(0.0f, 1.0f);
+                TexCoordFlippedY(0.0f, 1.0f);
                 Rlgl.Vertex3f(x + width / 2, y + height / 2, z - length / 2);
-                Rlgl.TexCoord2f(0.0f, 0.0f);
+                TexCoordFlippedY(0.0f, 0.0f);
                 Rlgl.Vertex3f(x + width / 2, y - height / 2, z - length / 2);
                 quadsDrawn++;
             }
@@ -183,13 +187,13 @@ public static class PrimitiveRenderer
             {
                 // Right face
                 Rlgl.Normal3f(1.0f, 0.0f, 0.0f);
-                Rlgl.TexCoord2f(1.0f, 0.0f);
+                TexCoordFlippedY(1.0f, 0.0f);
                 Rlgl.Vertex3f(x + width / 2, y - height / 2, z - length / 2);
-                Rlgl.TexCoord2f(1.0f, 1.0f);
+                TexCoordFlippedY(1.0f, 1.0f);
                 Rlgl.Vertex3f(x + width / 2, y + height / 2, z - length / 2);
-                Rlgl.TexCoord2f(0.0f, 1.0f);
+                TexCoordFlippedY(0.0f, 1.0f);
                 Rlgl.Vertex3f(x + width / 2, y + height / 2, z + length / 2);
-                Rlgl.TexCoord2f(0.0f, 0.0f);
+                TexCoordFlippedY(0.0f, 0.0f);
                 Rlgl.Vertex3f(x + width / 2, y - height / 2, z + length / 2);
                 quadsDrawn++;
             }
@@ -197,13 +201,13 @@ public static class PrimitiveRenderer
             {
                 // Left Face
                 Rlgl.Normal3f(-1.0f, 0.0f, 0.0f);
-                Rlgl.TexCoord2f(0.0f, 0.0f);
+                TexCoordFlippedY(0.0f, 0.0f);
                 Rlgl.Vertex3f(x - width / 2, y - height / 2, z - length / 2);
-                Rlgl.TexCoord2f(1.0f, 0.0f);
+                TexCoordFlippedY(1.0f, 0.0f);
                 Rlgl.Vertex3f(x - width / 2, y - height / 2, z + length / 2);
-                Rlgl.TexCoord2f(1.0f, 1.0f);
+                TexCoordFlippedY(1.0f, 1.0f);
                 Rlgl.Vertex3f(x - width / 2, y + height / 2, z + length / 2);
-                Rlgl.TexCoord2f(0.0f, 1.0f);
+                TexCoordFlippedY(0.0f, 1.0f);
                 Rlgl.Vertex3f(x - width / 2, y + height / 2, z - length / 2);
                 quadsDrawn++;
             }
@@ -233,24 +237,24 @@ public static class PrimitiveRenderer
 
         // Front Face
         Rlgl.Normal3f(0.0f, 0.0f, 1.0f);
-        Rlgl.TexCoord2f(0.0f, 0.0f);
+        TexCoordFlippedY(0.0f, 0.0f);
         Rlgl.Vertex3f(x - width / 2, y - height / 2, z + length / 2);
-        Rlgl.TexCoord2f(1.0f, 0.0f);
+        TexCoordFlippedY(1.0f, 0.0f);
         Rlgl.Vertex3f(x + width / 2, y - height / 2, z + length / 2);
-        Rlgl.TexCoord2f(1.0f, 1.0f);
+        TexCoordFlippedY(1.0f, 1.0f);
         Rlgl.Vertex3f(x + width / 2, y + height / 2, z + length / 2);
-        Rlgl.TexCoord2f(0.0f, 1.0f);
+        TexCoordFlippedY(0.0f, 1.0f);
         Rlgl.Vertex3f(x - width / 2, y + height / 2, z + length / 2);
 
         // Back Face
         Rlgl.Normal3f(0.0f, 0.0f, -1.0f);
-        Rlgl.TexCoord2f(1.0f, 0.0f);
+        TexCoordFlippedY(1.0f, 0.0f);
         Rlgl.Vertex3f(x - width / 2, y - height / 2, z - length / 2);
-        Rlgl.TexCoord2f(1.0f, 1.0f);
+        TexCoordFlippedY(1.0f, 1.0f);
         Rlgl.Vertex3f(x - width / 2, y + height / 2, z - length / 2);
-        Rlgl.TexCoord2f(0.0f, 1.0f);
+        TexCoordFlippedY(0.0f, 1.0f);
         Rlgl.Vertex3f(x + width / 2, y + height / 2, z - length / 2);
-        Rlgl.TexCoord2f(0.0f, 0.0f);
+        TexCoordFlippedY(0.0f, 0.0f);
         Rlgl.Vertex3f(x + width / 2, y - height / 2, z - length / 2);
 
         // // Top Face
@@ -277,24 +281,24 @@ public static class PrimitiveRenderer
 
         // Right face
         Rlgl.Normal3f(1.0f, 0.0f, 0.0f);
-        Rlgl.TexCoord2f(1.0f, 0.0f);
+        TexCoordFlippedY(1.0f, 0.0f);
         Rlgl.Vertex3f(x + width / 2, y - height / 2, z - length / 2);
-        Rlgl.TexCoord2f(1.0f, 1.0f);
+        TexCoordFlippedY(1.0f, 1.0f);
         Rlgl.Vertex3f(x + width / 2, y + height / 2, z - length / 2);
-        Rlgl.TexCoord2f(0.0f, 1.0f);
+        TexCoordFlippedY(0.0f, 1.0f);
         Rlgl.Vertex3f(x + width / 2, y + height / 2, z + length / 2);
-        Rlgl.TexCoord2f(0.0f, 0.0f);
+        TexCoordFlippedY(0.0f, 0.0f);
         Rlgl.Vertex3f(x + width / 2, y - height / 2, z + length / 2);
 
         // Left Face
         Rlgl.Normal3f(-1.0f, 0.0f, 0.0f);
-        Rlgl.TexCoord2f(0.0f, 0.0f);
+        TexCoordFlippedY(0.0f, 0.0f);
         Rlgl.Vertex3f(x - width / 2, y - height / 2, z - length / 2);
-        Rlgl.TexCoord2f(1.0f, 0.0f);
+        TexCoordFlippedY(1.0f, 0.0f);
         Rlgl.Vertex3f(x - width / 2, y - height / 2, z + length / 2);
-        Rlgl.TexCoord2f(1.0f, 1.0f);
+        TexCoordFlippedY(1.0f, 1.0f);
         Rlgl.Vertex3f(x - width / 2, y + height / 2, z + length / 2);
-        Rlgl.TexCoord2f(0.0f, 1.0f);
+        TexCoordFlippedY(0.0f, 1.0f);
         Rlgl.Vertex3f(x - width / 2, y + height / 2, z - length / 2);
 
         Rlgl.End();
@@ -319,13 +323,13 @@ public static class PrimitiveRenderer
 
         // Top Face
         Rlgl.Normal3f(0.0f, 1.0f, 0.0f);
-        Rlgl.TexCoord2f(0.0f, 1.0f);
+        TexCoordFlippedY(0.0f, 1.0f);
         Rlgl.Vertex3f(x - width / 2, y + height / 2, z - length / 2);
-        Rlgl.TexCoord2f(0.0f, 0.0f);
+        TexCoordFlippedY(0.0f, 0.0f);
         Rlgl.Vertex3f(x - width / 2, y + height / 2, z + length / 2);
-        Rlgl.TexCoord2f(1.0f, 0.0f);
+        TexCoordFlippedY(1.0f, 0.0f);
         Rlgl.Vertex3f(x + width / 2, y + height / 2, z + length / 2);
-        Rlgl.TexCoord2f(1.0f, 1.0f);
+        TexCoordFlippedY(1.0f, 1.0f);
         Rlgl.Vertex3f(x + width / 2, y + height / 2, z - length / 2);
 
         Rlgl.End();
@@ -352,13 +356,13 @@ public static class PrimitiveRenderer
 
         // Bottom Face
         Rlgl.Normal3f(0.0f, -1.0f, 0.0f);
-        Rlgl.TexCoord2f(1.0f, 1.0f);
+        TexCoordFlippedY(1.0f, 1.0f);
         Rlgl.Vertex3f(x - width / 2, y - height / 2, z - length / 2);
-        Rlgl.TexCoord2f(0.0f, 1.0f);
+        TexCoordFlippedY(0.0f, 1.0f);
         Rlgl.Vertex3f(x + width / 2, y - height / 2, z - length / 2);
-        Rlgl.TexCoord2f(0.0f, 0.0f);
+        TexCoordFlippedY(0.0f, 0.0f);
         Rlgl.Vertex3f(x + width / 2, y - height / 2, z + length / 2);
-        Rlgl.TexCoord2f(1.0f, 0.0f);
+        TexCoordFlippedY(1.0f, 0.0f);
         Rlgl.Vertex3f(x - width / 2, y - height / 2, z + length / 2);
 
         Rlgl.End();
@@ -385,24 +389,24 @@ public static class PrimitiveRenderer
 
         // Front Face
         Rlgl.Normal3f(0.0f, 0.0f, 1.0f);
-        Rlgl.TexCoord2f(0.0f, 0.0f);
+        TexCoordFlippedY(0.0f, 0.0f);
         Rlgl.Vertex3f(x - width / 2, y - height / 2, z + length / 2);
-        Rlgl.TexCoord2f(1.0f, 0.0f);
+        TexCoordFlippedY(1.0f, 0.0f);
         Rlgl.Vertex3f(x + width / 2, y - height / 2, z + length / 2);
-        Rlgl.TexCoord2f(1.0f, 1.0f);
+        TexCoordFlippedY(1.0f, 1.0f);
         Rlgl.Vertex3f(x + width / 2, y + height / 2, z + length / 2);
-        Rlgl.TexCoord2f(0.0f, 1.0f);
+        TexCoordFlippedY(0.0f, 1.0f);
         Rlgl.Vertex3f(x - width / 2, y + height / 2, z + length / 2);
 
         // Back Face
         Rlgl.Normal3f(0.0f, 0.0f, -1.0f);
-        Rlgl.TexCoord2f(1.0f, 0.0f);
+        TexCoordFlippedY(1.0f, 0.0f);
         Rlgl.Vertex3f(x - width / 2, y - height / 2, z + length / 2);
-        Rlgl.TexCoord2f(1.0f, 1.0f);
+        TexCoordFlippedY(1.0f, 1.0f);
         Rlgl.Vertex3f(x - width / 2, y + height / 2, z + length / 2);
-        Rlgl.TexCoord2f(0.0f, 1.0f);
+        TexCoordFlippedY(0.0f, 1.0f);
         Rlgl.Vertex3f(x + width / 2, y + height / 2, z + length / 2);
-        Rlgl.TexCoord2f(0.0f, 0.0f);
+        TexCoordFlippedY(0.0f, 0.0f);
         Rlgl.Vertex3f(x + width / 2, y - height / 2, z + length / 2);
 
         Rlgl.End();
@@ -430,24 +434,24 @@ public static class PrimitiveRenderer
 
         // Right face
         Rlgl.Normal3f(1.0f, 0.0f, 0.0f);
-        Rlgl.TexCoord2f(1.0f, 0.0f);
+        TexCoordFlippedY(1.0f, 0.0f);
         Rlgl.Vertex3f(x + width / 2, y - height / 2, z - length / 2);
-        Rlgl.TexCoord2f(1.0f, 1.0f);
+        TexCoordFlippedY(1.0f, 1.0f);
         Rlgl.Vertex3f(x + width / 2, y + height / 2, z - length / 2);
-        Rlgl.TexCoord2f(0.0f, 1.0f);
+        TexCoordFlippedY(0.0f, 1.0f);
         Rlgl.Vertex3f(x + width / 2, y + height / 2, z + length / 2);
-        Rlgl.TexCoord2f(0.0f, 0.0f);
+        TexCoordFlippedY(0.0f, 0.0f);
         Rlgl.Vertex3f(x + width / 2, y - height / 2, z + length / 2);
 
         // // Left Face
         Rlgl.Normal3f(-1.0f, 0.0f, 0.0f);
-        Rlgl.TexCoord2f(0.0f, 0.0f);
+        TexCoordFlippedY(0.0f, 0.0f);
         Rlgl.Vertex3f(x + width / 2, y - height / 2, z - length / 2);
-        Rlgl.TexCoord2f(1.0f, 0.0f);
+        TexCoordFlippedY(1.0f, 0.0f);
         Rlgl.Vertex3f(x + width / 2, y - height / 2, z + length / 2);
-        Rlgl.TexCoord2f(1.0f, 1.0f);
+        TexCoordFlippedY(1.0f, 1.0f);
         Rlgl.Vertex3f(x + width / 2, y + height / 2, z + length / 2);
-        Rlgl.TexCoord2f(0.0f, 1.0f);
+        TexCoordFlippedY(0.0f, 1.0f);
         Rlgl.Vertex3f(x + width / 2, y + height / 2, z - length / 2);
 
         // // Front Face
