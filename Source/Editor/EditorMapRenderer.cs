@@ -275,6 +275,44 @@ public class EditorMapRenderer
         }
     }
 
+    public void RenderObjectLayer(EditorCamera camera)
+    {
+        float tileSize = camera.TileSize;
+        int screenW = GetScreenWidth();
+        int screenH = GetScreenHeight();
+
+        int startX = Math.Max(0, (int)((-camera.Offset.X) / tileSize));
+        int startY = Math.Max(0, (int)((-camera.Offset.Y) / tileSize));
+        int endX = Math.Min(_mapData.Width - 1, (int)((screenW - camera.Offset.X) / tileSize) + 1);
+        int endY = Math.Min(_mapData.Height - 1, (int)((screenH - camera.Offset.Y) / tileSize) + 1);
+
+        var objectsTex = _mapData.GameTextures.Count > PickupSprites.ObjectsTextureIndex
+            ? _mapData.GameTextures[PickupSprites.ObjectsTextureIndex]
+            : default;
+        if (objectsTex.Id == 0)
+            return;
+
+        for (int y = startY; y <= endY; y++)
+        {
+            for (int x = startX; x <= endX; x++)
+            {
+                uint objectId = _mapData.Objects[_mapData.Width * y + x];
+                if (!ObjectSprites.IsValidObjectId(objectId))
+                    continue;
+
+                float drawX = x * tileSize + camera.Offset.X;
+                float drawY = y * tileSize + camera.Offset.Y;
+                float visualY = drawY - tileSize * 0.5f;
+                var dest = new Rectangle(drawX, visualY, tileSize, tileSize);
+                PrimitiveRenderer.DrawScreenSprite(
+                    objectsTex,
+                    ObjectSprites.GetFrameRectForObjectId(objectId),
+                    dest,
+                    Color.White);
+            }
+        }
+    }
+
     public void RenderPickupLayer(
         EditorCamera camera,
         bool isMouseOverUI,

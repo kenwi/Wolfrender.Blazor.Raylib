@@ -108,6 +108,10 @@ public class WebEditorScene : IScene
                     State.Camera, State.IsMouseOverUI,
                     ref State.HoveredPickupIndex, State.SelectedPickupIndex);
             }
+            else if (layer.Name == EditorState.ObjectsLayerName)
+            {
+                _mapRenderer.RenderObjectLayer(State.Camera);
+            }
             else if (State.IsSimulating && layer.Name == EditorState.DoorsLayerName)
             {
                 _mapRenderer.RenderLiveDoors(State.DoorSystem, State.Camera);

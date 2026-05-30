@@ -40,6 +40,9 @@ public class EditorGui
     // Door palette icons (door texture + optional lock badge)
     private Dictionary<uint, RenderTexture2D>? _doorPaletteIcons;
 
+    // Blocking object palette icons (Objects.png upper grid)
+    private RenderTexture2D[]? _objectPaletteIcons;
+
     // Window visibility toggles
     private bool _showLayers = true;
     private bool _showTilePalette = true;
@@ -514,6 +517,15 @@ public class EditorGui
             ImGui.PopStyleColor(2);
         }
 
+        if (layers[activeLayerIndex].Name == EditorState.ObjectsLayerName)
+        {
+            RenderObjectPaletteButtons(editorState, ref selectedTileId, buttonSize);
+            ImGui.Separator();
+            ImGui.Text($"Selected: {(selectedTileId == 0 ? "Eraser" : $"Object {selectedTileId}")}");
+            ImGui.End();
+            return;
+        }
+
         if (layers[activeLayerIndex].Name == EditorState.DoorsLayerName)
         {
             RenderDoorPaletteButtons(editorState, ref selectedTileId, buttonSize);
@@ -636,6 +648,85 @@ public class EditorGui
         DrawCircle((int)cx, (int)cy, radius, lockColor);
         int fontSize = (int)(tileSize * 0.35f);
         DrawText(label, (int)(tileSize * 0.65f), (int)(tileSize * 0.12f), fontSize, Color.Black);
+    }
+
+    private void EnsureObjectPaletteIcons()
+    {
+        if (_objectPaletteIcons != null) return;
+        if (_mapData.GameTextures.Count <= PickupSprites.ObjectsTextureIndex) return;
+
+        var objectsTex = _mapData.GameTextures[PickupSprites.ObjectsTextureIndex];
+        if (objectsTex.Id == 0) return;
+
+        int size = ObjectSprites.PaletteIconSize;
+        _objectPaletteIcons = new RenderTexture2D[ObjectSprites.ObjectCount];
+        for (int i = 0; i < ObjectSprites.ObjectCount; i++)
+        {
+            var rt = LoadRenderTexture(size, size);
+            BeginTextureMode(rt);
+            ClearBackground(Color.Black);
+            PrimitiveRenderer.DrawScreenSprite(
+                objectsTex,
+                ObjectSprites.GetFrameRect(i),
+                new Rectangle(0, 0, size, size),
+                Color.White);
+            EndTextureMode();
+            _objectPaletteIcons[i] = rt;
+        }
+    }
+
+    private void RenderObjectPaletteButtons(EditorState editorState, ref uint selectedTileId, float buttonSize)
+    {
+        EnsureObjectPaletteIcons();
+        bool hasIcons = _objectPaletteIcons != null;
+        int columns = ObjectSprites.PaletteColumns;
+
+        for (int i = 0; i < ObjectSprites.ObjectCount; i++)
+        {
+            if (i % columns != 0)
+                ImGui.SameLine();
+
+            uint objectId = (uint)(i + 1);
+            ImGui.PushID(i + 700);
+
+            bool selected = selectedTileId == objectId;
+            if (selected)
+            {
+                ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.2f, 0.5f, 0.8f, 1f));
+                ImGui.PushStyleColor(ImGuiCol.Border, new Vector4(1f, 1f, 0f, 1f));
+                ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 3f);
+            }
+
+            bool picked = false;
+            if (hasIcons && _objectPaletteIcons![i].Texture.Id != 0)
+            {
+                var texId = new IntPtr(_objectPaletteIcons[i].Texture.Id);
+                if (ImGui.ImageButton($"object_{objectId}", texId, new Vector2(buttonSize, buttonSize),
+                        new Vector2(0, 1), new Vector2(1, 0)))
+                    picked = true;
+            }
+            else if (ImGui.Button($"Obj {objectId}", new Vector2(buttonSize, buttonSize)))
+            {
+                picked = true;
+            }
+
+            if (picked)
+            {
+                selectedTileId = objectId;
+                editorState.SwitchToObjectLayer();
+            }
+
+            if (selected)
+            {
+                ImGui.PopStyleVar();
+                ImGui.PopStyleColor(2);
+            }
+
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip($"Object ID: {objectId}");
+
+            ImGui.PopID();
+        }
     }
 
     private void RenderDoorPaletteButtons(EditorState editorState, ref uint selectedTileId, float buttonSize)

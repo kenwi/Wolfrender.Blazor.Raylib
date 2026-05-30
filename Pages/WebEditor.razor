@@ -27,7 +27,11 @@
 
         @if (_showTilePalette)
         {
-            @if (_editorScene.State.IsOnDoorLayer)
+            @if (_editorScene.State.IsOnObjectLayer)
+            {
+                <WebEditorObjectPalette State="_editorScene.State" OnChanged="Refresh" />
+            }
+            else if (_editorScene.State.IsOnDoorLayer)
             {
                 <WebEditorDoorPalette State="_editorScene.State" OnChanged="Refresh" />
             }
