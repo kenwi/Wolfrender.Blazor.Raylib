@@ -64,4 +64,8 @@ public class LevelData
     public uint GetFloorTile(int x, int y) => _mapData.GetTile(_mapData.Floor, x, y);
 
     public uint GetCeilingTile(int x, int y) => _mapData.GetTile(_mapData.Ceiling, x, y);
+
+    public uint GetObjectTile(int x, int y) => _mapData.GetTile(_mapData.Objects, x, y);
+
+    public bool HasObjectAt(int x, int y) => GetObjectTile(x, y) > 0;
 }

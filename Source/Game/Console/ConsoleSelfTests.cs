@@ -17,6 +17,7 @@ public static class ConsoleSelfTests
         TestStringVariableStore();
         TestRuntimeAccessorGetSet();
         TestLevelCatalogNormalizePath();
+        TestObjectSpritesLayout();
     }
 
     private static void TestParserQuotedArgs()
@@ -82,6 +83,21 @@ public static class ConsoleSelfTests
             throw new InvalidOperationException("Runtime accessor failed to get Vector3.");
         if (position != "4,5,6 tile=(1,1)")
             throw new InvalidOperationException($"Runtime accessor vector roundtrip mismatch: '{position}'.");
+    }
+
+    private static void TestObjectSpritesLayout()
+    {
+        var rect = ObjectSprites.GetFrameRect(0);
+        if (rect.X != ObjectSprites.OriginX || rect.Y != ObjectSprites.OriginY
+            || rect.Width != ObjectSprites.FrameSize || rect.Height != ObjectSprites.FrameSize)
+            throw new InvalidOperationException("ObjectSprites.GetFrameRect(0) layout mismatch.");
+
+        if (ObjectSprites.ObjectCount != 20)
+            throw new InvalidOperationException("ObjectSprites.ObjectCount should be 20.");
+
+        if (!ObjectSprites.IsValidObjectId(1) || !ObjectSprites.IsValidObjectId(20)
+            || ObjectSprites.IsValidObjectId(0) || ObjectSprites.IsValidObjectId(21))
+            throw new InvalidOperationException("ObjectSprites.IsValidObjectId range mismatch.");
     }
 
     private sealed class TestTarget

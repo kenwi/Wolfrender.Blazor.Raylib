@@ -46,6 +46,7 @@ public class LevelFileData
     public uint[] Walls { get; set; } = Array.Empty<uint>();
     public uint[] Ceiling { get; set; } = Array.Empty<uint>();
     public uint[] Doors { get; set; } = Array.Empty<uint>();
+    public uint[] Objects { get; set; } = Array.Empty<uint>();
     public List<EnemyPlacementData> Enemies { get; set; } = new();
     public List<PickupPlacementData> Pickups { get; set; } = new();
     public PlayerSpawnData? PlayerSpawn { get; set; }
@@ -114,6 +115,7 @@ public static class LevelSerializer
             Walls = mapData.Walls,
             Ceiling = mapData.Ceiling,
             Doors = mapData.Doors,
+            Objects = mapData.Objects,
             Enemies = mapData.Enemies.Select(e => new EnemyPlacementData
             {
                 TileX = e.TileX,
@@ -161,6 +163,7 @@ public static class LevelSerializer
         mapData.Walls = fileData.Walls;
         mapData.Ceiling = fileData.Ceiling;
         mapData.Doors = fileData.Doors;
+        mapData.Objects = NormalizeTileLayer(fileData.Objects, fileData.Width, fileData.Height);
         mapData.Enemies = fileData.Enemies.Select(e => new EnemyPlacement
         {
             TileX = e.TileX,
@@ -199,6 +202,16 @@ public static class LevelSerializer
             : PickupType.Health;
     }
 
+    /// <summary>Returns the layer array when length matches the map, otherwise a zero-filled array.</summary>
+    private static uint[] NormalizeTileLayer(uint[]? layer, int width, int height)
+    {
+        int tileCount = width * height;
+        if (layer != null && layer.Length == tileCount)
+            return layer;
+
+        return new uint[tileCount];
+    }
+
     public static void LoadFromTmx(MapData mapData, string path)
     {
         var loader = DotTiled.Serialization.Loader.Default();
@@ -218,6 +231,7 @@ public static class LevelSerializer
         mapData.Walls = (uint[])walls.Data!.Value.GlobalTileIDs!.Value.Clone();
         mapData.Ceiling = (uint[])ceiling.Data!.Value.GlobalTileIDs!.Value.Clone();
         mapData.Doors = (uint[])doors.Data!.Value.GlobalTileIDs!.Value.Clone();
+        mapData.Objects = new uint[mapData.Width * mapData.Height];
         mapData.Pickups = new List<PickupPlacement>();
     }
 
@@ -243,6 +257,7 @@ public static class LevelSerializer
         mapData.Walls = new uint[tileCount];
         mapData.Ceiling = new uint[tileCount];
         mapData.Doors = new uint[tileCount];
+        mapData.Objects = new uint[tileCount];
         mapData.Enemies = new List<EnemyPlacement>();
         mapData.Pickups = new List<PickupPlacement>();
 

@@ -381,6 +381,7 @@ public class EditorState
         MapData.Walls = new uint[tileCount];
         MapData.Ceiling = new uint[tileCount];
         MapData.Doors = new uint[tileCount];
+        MapData.Objects = new uint[tileCount];
         MapData.Enemies.Clear();
         MapData.Pickups.Clear();
         MapData.PlayerSpawnTileX = 30;
