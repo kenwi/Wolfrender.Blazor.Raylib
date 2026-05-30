@@ -133,7 +133,8 @@
 
 .editor-tile-palette,
 .editor-pickup-palette,
-.editor-door-palette {
+.editor-door-palette,
+.editor-object-palette {
     position: absolute;
     left: 10px;
     width: 260px;
@@ -150,8 +151,16 @@
     top: 340px;
 }
 
-.editor-door-palette {
+.editor-door-palette,
+.editor-object-palette {
     top: 46px;
+}
+
+.object-palette-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    margin-top: 6px;
 }
 
 .door-palette-grid {

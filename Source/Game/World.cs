@@ -35,6 +35,7 @@ public class World : IScene
     private readonly RuntimeConsoleService _runtimeConsole;
     private readonly EnemySystem _enemySystem;
     private readonly PickupSystem _pickupSystem;
+    private readonly PlacedObjectSystem _placedObjectSystem;
     private readonly WeaponSystem _weaponSystem;
     private readonly PlayerSystem _playerSystem;
     private readonly ScoreSystem _scoreSystem;
@@ -76,10 +77,13 @@ public class World : IScene
         _scoreSystem = new ScoreSystem();
         _exitSystem = new ExitSystem(_scoreSystem);
         _pickupSystem = new PickupSystem(_scoreSystem);
+        _placedObjectSystem = new PlacedObjectSystem();
         _enemySystem = new EnemySystem(
             _player, _inputSystem, _collisionSystem, _doorSystem, _combatFeedback, _pickupSystem, _scoreSystem);
         _pickupSystem.SetObjectsTexture(_gameTextures[GameTextureIndex.Objects]);
         _pickupSystem.Rebuild(_mapData.Pickups, _mapData);
+        _placedObjectSystem.SetObjectsTexture(_gameTextures[GameTextureIndex.Objects]);
+        _placedObjectSystem.Rebuild(_mapData);
         _animationSystem = new AnimationSystem(
             _gameTextures[GameTextureIndex.EnemyGuard],
             _gameTextures[GameTextureIndex.Weapons],
@@ -152,6 +156,7 @@ public class World : IScene
         _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
         _enemySystem.Rebuild(_mapData.Enemies, _mapData);
         _pickupSystem.Rebuild(_mapData.Pickups, _mapData);
+        _placedObjectSystem.Rebuild(_mapData);
         _scoreSystem.ResetForLevel(_mapData);
         _exitSystem.Rebuild(_mapData);
 
@@ -233,6 +238,7 @@ public class World : IScene
         _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
         _enemySystem.Rebuild(_mapData.Enemies, _mapData);
         _pickupSystem.Rebuild(_mapData.Pickups, _mapData);
+        _placedObjectSystem.Rebuild(_mapData);
         _scoreSystem.ResetForLevel(_mapData);
         _exitSystem.Rebuild(_mapData);
         _effectSystem.Clear();
@@ -342,6 +348,7 @@ public class World : IScene
         if (lightingShader.HasValue)
             EndShaderMode();
 
+        _placedObjectSystem.Render(_player.Camera.Position);
         _pickupSystem.Render(_player.Camera.Position);
         Debug.Draw3DOverlays(_inputState.IsDebugEnabled);
 

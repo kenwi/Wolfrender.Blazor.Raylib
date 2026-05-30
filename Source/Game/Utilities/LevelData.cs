@@ -47,6 +47,10 @@ public class LevelData
     public static (int tileX, int tileY) GetTileFromWorld(float worldX, float worldZ) =>
         ((int)MathF.Floor(worldX / QuadSize), (int)MathF.Floor(worldZ / QuadSize));
 
+    /// <summary>World X/Z center of tile (tileX, tileY).</summary>
+    public static (float worldX, float worldZ) GetTileCenterWorldXZ(int tileX, int tileY) =>
+        ((tileX + 0.5f) * QuadSize, (tileY + 0.5f) * QuadSize);
+
     public bool IsWallAt(float worldX, float worldZ)
     {
         int tileX = (int)(worldX / 4 + 0.5f);
@@ -64,4 +68,8 @@ public class LevelData
     public uint GetFloorTile(int x, int y) => _mapData.GetTile(_mapData.Floor, x, y);
 
     public uint GetCeilingTile(int x, int y) => _mapData.GetTile(_mapData.Ceiling, x, y);
+
+    public uint GetObjectTile(int x, int y) => _mapData.GetTile(_mapData.Objects, x, y);
+
+    public bool HasObjectAt(int x, int y) => GetObjectTile(x, y) > 0;
 }

@@ -1,4 +1,5 @@
 using System.Numerics;
+using Game.Systems;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 using Color = Raylib_cs.Color;
@@ -14,12 +15,14 @@ public class WebEditorScene : IScene
 {
     public readonly EditorState State;
     private readonly EditorMapRenderer _mapRenderer;
+    private readonly CollisionSystem _collisionSystem;
 
     public WebEditorScene(MapData mapData, Game.Systems.EnemySystem enemySystem,
         Game.Systems.DoorSystem doorSystem, Game.Entities.Player player)
     {
         State = new EditorState(mapData, enemySystem, doorSystem, player);
         _mapRenderer = new EditorMapRenderer(mapData);
+        _collisionSystem = new CollisionSystem(new Utilities.LevelData(mapData), doorSystem);
     }
 
     public void OnEnter()
@@ -107,6 +110,10 @@ public class WebEditorScene : IScene
                 _mapRenderer.RenderPickupLayer(
                     State.Camera, State.IsMouseOverUI,
                     ref State.HoveredPickupIndex, State.SelectedPickupIndex);
+            }
+            else if (layer.Name == EditorState.ObjectsLayerName)
+            {
+                _mapRenderer.RenderObjectLayer(State.Camera);
             }
             else if (State.IsSimulating && layer.Name == EditorState.DoorsLayerName)
             {
@@ -371,7 +378,11 @@ public class WebEditorScene : IScene
         if (moveDirLen > 0.001f)
         {
             moveDir /= moveDirLen;
-            State.Player.Position += moveDir * State.Player.MoveSpeed * deltaTime;
+            var oldPosition = State.Player.Position;
+            var desired = oldPosition + moveDir * State.Player.MoveSpeed * deltaTime;
+            State.Player.OldPosition = oldPosition;
+            State.Player.Position = _collisionSystem.ResolveMovement(
+                oldPosition, desired, State.Player.CollisionRadius);
         }
 
         camera.Position = State.Player.Position;

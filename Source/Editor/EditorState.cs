@@ -13,6 +13,7 @@ public class EditorState
 {
     public const string EnemiesLayerName = "Enemies";
     public const string PickupsLayerName = "Pickups";
+    public const string ObjectsLayerName = "Objects";
     public const string WallsLayerName = "Walls";
 
     public readonly MapData MapData;
@@ -105,6 +106,7 @@ public class EditorState
             new() { Name = "Walls", Tiles = mapData.Walls },
             new() { Name = "Ceiling", Tiles = mapData.Ceiling, IsVisible = false },
             new() { Name = DoorsLayerName, Tiles = mapData.Doors },
+            new() { Name = ObjectsLayerName, Tiles = mapData.Objects },
             new() { Name = EnemiesLayerName, Tiles = Array.Empty<uint>() },
             new() { Name = PickupsLayerName, Tiles = Array.Empty<uint>() },
         };
@@ -116,6 +118,7 @@ public class EditorState
     public bool IsOnEnemyLayer => Layers[ActiveLayerIndex].Name == EnemiesLayerName;
     public bool IsOnPickupLayer => Layers[ActiveLayerIndex].Name == PickupsLayerName;
     public bool IsOnDoorLayer => Layers[ActiveLayerIndex].Name == DoorsLayerName;
+    public bool IsOnObjectLayer => Layers[ActiveLayerIndex].Name == ObjectsLayerName;
 
     public const string DoorsLayerName = "Doors";
 
@@ -175,6 +178,19 @@ public class EditorState
     {
         if (IsOnEnemyLayer || IsOnPickupLayer) return;
         if (x < 0 || x >= MapData.Width || y < 0 || y >= MapData.Height) return;
+
+        if (IsOnObjectLayer)
+        {
+            if (SelectedTileId != 0 && !CanPlaceObjectAt(x, y))
+            {
+                SetStatus("Cannot place object on walls or doors");
+                return;
+            }
+
+            if (SelectedTileId != 0 && !ObjectSprites.IsValidObjectId(SelectedTileId))
+                return;
+        }
+
         var layer = Layers[ActiveLayerIndex];
         layer.Tiles[MapData.Width * y + x] = SelectedTileId;
     }
@@ -381,6 +397,7 @@ public class EditorState
         MapData.Walls = new uint[tileCount];
         MapData.Ceiling = new uint[tileCount];
         MapData.Doors = new uint[tileCount];
+        MapData.Objects = new uint[tileCount];
         MapData.Enemies.Clear();
         MapData.Pickups.Clear();
         MapData.PlayerSpawnTileX = 30;
@@ -412,6 +429,7 @@ public class EditorState
                 "Walls" => MapData.Walls,
                 "Ceiling" => MapData.Ceiling,
                 "Doors" => MapData.Doors,
+                ObjectsLayerName => MapData.Objects,
                 _ => layer.Tiles
             };
         }
@@ -470,6 +488,21 @@ public class EditorState
         }
     }
 
+    public void SwitchToObjectLayer()
+    {
+        for (int i = 0; i < Layers.Count; i++)
+        {
+            if (Layers[i].Name == ObjectsLayerName)
+            {
+                ActiveLayerIndex = i;
+                if (SelectedTileId != 0 && !ObjectSprites.IsValidObjectId(SelectedTileId))
+                    SelectedTileId = 1;
+                NotifyStateChanged();
+                break;
+            }
+        }
+    }
+
     public void SwitchToWallsLayer()
     {
         for (int i = 0; i < Layers.Count; i++)
@@ -499,8 +532,19 @@ public class EditorState
         return tile > 0 ? tile : 0;
     }
 
-    public bool CanPlacePickupAt(int tileX, int tileY) =>
+    public uint GetObjectTileAt(int tileX, int tileY)
+    {
+        if (tileX < 0 || tileX >= MapData.Width || tileY < 0 || tileY >= MapData.Height)
+            return 0;
+        uint tile = MapData.Objects[MapData.Width * tileY + tileX];
+        return ObjectSprites.IsValidObjectId(tile) ? tile : 0;
+    }
+
+    public bool CanPlaceObjectAt(int tileX, int tileY) =>
         GetDoorTileAt(tileX, tileY) == 0 && GetWallTileAt(tileX, tileY) == 0;
+
+    public bool CanPlacePickupAt(int tileX, int tileY) =>
+        CanPlaceObjectAt(tileX, tileY) && GetObjectTileAt(tileX, tileY) == 0;
 
     /// <summary>
     /// When the pickups layer is active, clicking a door or wall tile switches to that layer.

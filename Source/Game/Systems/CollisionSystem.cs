@@ -18,58 +18,32 @@ public class CollisionSystem
 
     public bool CheckCollisionAtPosition(Vector3 position, float radius)
     {
-        // Check center point
-        int tileX = (int)(position.X / TileSize + 0.5f);
-        int tileY = (int)(position.Z / TileSize + 0.5f);
-        if (_level.GetWallTile(tileX, tileY) > 0)
+        if (IsWallBlockingProbe(position.X, position.Z))
             return true;
 
-        // Check cardinal directions (N, S, E, W) at collision radius
-        // North (positive Z)
-        int northTileY = (int)((position.Z + radius) / TileSize + 0.5f);
-        if (_level.GetWallTile(tileX, northTileY) > 0)
+        float diagonalOffset = radius * 0.707f;
+
+        if (IsWallBlockingProbe(position.X, position.Z + radius)
+            || IsWallBlockingProbe(position.X, position.Z - radius)
+            || IsWallBlockingProbe(position.X + radius, position.Z)
+            || IsWallBlockingProbe(position.X - radius, position.Z)
+            || IsWallBlockingProbe(position.X + diagonalOffset, position.Z + diagonalOffset)
+            || IsWallBlockingProbe(position.X - diagonalOffset, position.Z + diagonalOffset)
+            || IsWallBlockingProbe(position.X + diagonalOffset, position.Z - diagonalOffset)
+            || IsWallBlockingProbe(position.X - diagonalOffset, position.Z - diagonalOffset))
             return true;
 
-        // South (negative Z)
-        int southTileY = (int)((position.Z - radius) / TileSize + 0.5f);
-        if (_level.GetWallTile(tileX, southTileY) > 0)
+        if (IsObjectBlockingProbe(position.X, position.Z, radius))
             return true;
 
-        // East (positive X)
-        int eastTileX = (int)((position.X + radius) / TileSize + 0.5f);
-        if (_level.GetWallTile(eastTileX, tileY) > 0)
-            return true;
-
-        // West (negative X)
-        int westTileX = (int)((position.X - radius) / TileSize + 0.5f);
-        if (_level.GetWallTile(westTileX, tileY) > 0)
-            return true;
-
-        // Check diagonal directions at collision radius
-        float diagonalOffset = radius * 0.707f; // 1/√2 for 45-degree angle
-        
-        // Northeast
-        int neTileX = (int)((position.X + diagonalOffset) / TileSize + 0.5f);
-        int neTileY = (int)((position.Z + diagonalOffset) / TileSize + 0.5f);
-        if (_level.GetWallTile(neTileX, neTileY) > 0)
-            return true;
-
-        // Northwest
-        int nwTileX = (int)((position.X - diagonalOffset) / TileSize + 0.5f);
-        int nwTileY = (int)((position.Z + diagonalOffset) / TileSize + 0.5f);
-        if (_level.GetWallTile(nwTileX, nwTileY) > 0)
-            return true;
-
-        // Southeast
-        int seTileX = (int)((position.X + diagonalOffset) / TileSize + 0.5f);
-        int seTileY = (int)((position.Z - diagonalOffset) / TileSize + 0.5f);
-        if (_level.GetWallTile(seTileX, seTileY) > 0)
-            return true;
-
-        // Southwest
-        int swTileX = (int)((position.X - diagonalOffset) / TileSize + 0.5f);
-        int swTileY = (int)((position.Z - diagonalOffset) / TileSize + 0.5f);
-        if (_level.GetWallTile(swTileX, swTileY) > 0)
+        if (IsObjectBlockingProbe(position.X, position.Z + radius, radius)
+            || IsObjectBlockingProbe(position.X, position.Z - radius, radius)
+            || IsObjectBlockingProbe(position.X + radius, position.Z, radius)
+            || IsObjectBlockingProbe(position.X - radius, position.Z, radius)
+            || IsObjectBlockingProbe(position.X + diagonalOffset, position.Z + diagonalOffset, radius)
+            || IsObjectBlockingProbe(position.X - diagonalOffset, position.Z + diagonalOffset, radius)
+            || IsObjectBlockingProbe(position.X + diagonalOffset, position.Z - diagonalOffset, radius)
+            || IsObjectBlockingProbe(position.X - diagonalOffset, position.Z - diagonalOffset, radius))
             return true;
 
         if (_doorSystem.IsDoorBlocking(position, radius))
@@ -108,5 +82,27 @@ public class CollisionSystem
         // (player.Position = oldPosition + player.Velocity * deltaTime)
         player.Position = ResolveMovement(player.OldPosition, player.Position, player.CollisionRadius);
     }
-}
 
+    private bool IsWallBlockingProbe(float probeX, float probeZ)
+    {
+        int tileX = (int)(probeX / TileSize + 0.5f);
+        int tileY = (int)(probeZ / TileSize + 0.5f);
+        return _level.GetWallTile(tileX, tileY) > 0;
+    }
+
+    /// <summary>
+    /// Tile lookup first; distance check only when the probe tile holds a placed object.
+    /// </summary>
+    private bool IsObjectBlockingProbe(float probeX, float probeZ, float entityRadius)
+    {
+        var (tileX, tileY) = LevelData.GetTileFromWorld(probeX, probeZ);
+        if (!_level.HasObjectAt(tileX, tileY))
+            return false;
+
+        var (centerX, centerZ) = LevelData.GetTileCenterWorldXZ(tileX, tileY);
+        float dx = probeX - centerX;
+        float dz = probeZ - centerZ;
+        float minDist = entityRadius + ObjectSprites.CollisionRadius;
+        return dx * dx + dz * dz < minDist * minDist;
+    }
+}
