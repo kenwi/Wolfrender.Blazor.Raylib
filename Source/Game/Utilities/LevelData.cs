@@ -47,6 +47,10 @@ public class LevelData
     public static (int tileX, int tileY) GetTileFromWorld(float worldX, float worldZ) =>
         ((int)MathF.Floor(worldX / QuadSize), (int)MathF.Floor(worldZ / QuadSize));
 
+    /// <summary>World X/Z center of tile (tileX, tileY).</summary>
+    public static (float worldX, float worldZ) GetTileCenterWorldXZ(int tileX, int tileY) =>
+        ((tileX + 0.5f) * QuadSize, (tileY + 0.5f) * QuadSize);
+
     public bool IsWallAt(float worldX, float worldZ)
     {
         int tileX = (int)(worldX / 4 + 0.5f);

@@ -13,6 +13,7 @@ public class LevelEditorScene : IScene
     private readonly EditorState _state;
     private readonly EditorMapRenderer _mapRenderer;
     private readonly EditorGui _gui;
+    private readonly CollisionSystem _collisionSystem;
 
     /// <summary>
     /// True while the left mouse button has been "consumed" by a non-map action
@@ -25,6 +26,7 @@ public class LevelEditorScene : IScene
         _state = new EditorState(mapData, enemySystem, doorSystem, player);
         _mapRenderer = new EditorMapRenderer(mapData);
         _gui = new EditorGui(mapData);
+        _collisionSystem = new CollisionSystem(new Utilities.LevelData(mapData), doorSystem);
     }
 
     public void OnEnter()
@@ -460,7 +462,11 @@ public class LevelEditorScene : IScene
         if (moveDirLen > 0.001f)
         {
             moveDir /= moveDirLen;
-            _state.Player.Position += moveDir * _state.Player.MoveSpeed * deltaTime;
+            var oldPosition = _state.Player.Position;
+            var desired = oldPosition + moveDir * _state.Player.MoveSpeed * deltaTime;
+            _state.Player.OldPosition = oldPosition;
+            _state.Player.Position = _collisionSystem.ResolveMovement(
+                oldPosition, desired, _state.Player.CollisionRadius);
         }
 
         camera.Position = _state.Player.Position;

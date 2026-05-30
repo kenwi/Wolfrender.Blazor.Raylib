@@ -193,6 +193,10 @@ public static class Pathfinding
                 return true;
         }
 
+        uint objectId = mapData.GetTile(mapData.Objects, tileX, tileY);
+        if (ObjectSprites.IsValidObjectId(objectId))
+            return true;
+
         return false;
     }
 

@@ -28,8 +28,8 @@ public static class ObjectSprites
     public const int SheetWidth = PickupSprites.SheetWidth;
     public const int SheetHeight = PickupSprites.SheetHeight;
 
-    /// <summary>World-space blocking radius (~one tile diameter centered on tile anchor).</summary>
-    public static float CollisionRadius => LevelData.QuadSize * 0.5f;
+    /// <summary>World-space blocking radius from tile center (slightly larger than half a tile).</summary>
+    public static float CollisionRadius => LevelData.QuadSize * 0.65f;
 
     /// <summary>0-based spritesheet cell index (column-major).</summary>
     public static Rectangle GetFrameRect(int objectIndex)
