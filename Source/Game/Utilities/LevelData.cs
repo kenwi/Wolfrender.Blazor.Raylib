@@ -47,6 +47,16 @@ public class LevelData
     public static (int tileX, int tileY) GetTileFromWorld(float worldX, float worldZ) =>
         ((int)MathF.Floor(worldX / QuadSize), (int)MathF.Floor(worldZ / QuadSize));
 
+    /// <summary>
+    /// Gameplay tile for an entity at world X/Z (anchor + half a tile), matching pickup collection
+    /// and the 2D editor convention of showing entities at tile center.
+    /// </summary>
+    public static (int tileX, int tileY) GetEntityTileFromWorld(float worldX, float worldZ)
+    {
+        float half = QuadSize * 0.5f;
+        return GetTileFromWorld(worldX + half, worldZ + half);
+    }
+
     /// <summary>World X/Z center of tile (tileX, tileY).</summary>
     public static (float worldX, float worldZ) GetTileCenterWorldXZ(int tileX, int tileY) =>
         ((tileX + 0.5f) * QuadSize, (tileY + 0.5f) * QuadSize);

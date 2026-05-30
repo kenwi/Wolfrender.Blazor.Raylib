@@ -33,17 +33,7 @@ public class CollisionSystem
             || IsWallBlockingProbe(position.X - diagonalOffset, position.Z - diagonalOffset))
             return true;
 
-        if (IsObjectBlockingProbe(position.X, position.Z, radius))
-            return true;
-
-        if (IsObjectBlockingProbe(position.X, position.Z + radius, radius)
-            || IsObjectBlockingProbe(position.X, position.Z - radius, radius)
-            || IsObjectBlockingProbe(position.X + radius, position.Z, radius)
-            || IsObjectBlockingProbe(position.X - radius, position.Z, radius)
-            || IsObjectBlockingProbe(position.X + diagonalOffset, position.Z + diagonalOffset, radius)
-            || IsObjectBlockingProbe(position.X - diagonalOffset, position.Z + diagonalOffset, radius)
-            || IsObjectBlockingProbe(position.X + diagonalOffset, position.Z - diagonalOffset, radius)
-            || IsObjectBlockingProbe(position.X - diagonalOffset, position.Z - diagonalOffset, radius))
+        if (IsObjectBlockingAt(position.X, position.Z, radius))
             return true;
 
         if (_doorSystem.IsDoorBlocking(position, radius))
@@ -91,18 +81,34 @@ public class CollisionSystem
     }
 
     /// <summary>
-    /// Tile lookup first; distance check only when the probe tile holds a placed object.
+    /// Circle overlap against placed objects on the entity tile and its neighbors.
+    /// Uses gameplay tile lookup (anchor + half tile) and sprite anchor for distance.
     /// </summary>
-    private bool IsObjectBlockingProbe(float probeX, float probeZ, float entityRadius)
+    private bool IsObjectBlockingAt(float worldX, float worldZ, float entityRadius)
     {
-        var (tileX, tileY) = LevelData.GetTileFromWorld(probeX, probeZ);
-        if (!_level.HasObjectAt(tileX, tileY))
-            return false;
-
-        var (centerX, centerZ) = LevelData.GetTileCenterWorldXZ(tileX, tileY);
-        float dx = probeX - centerX;
-        float dz = probeZ - centerZ;
+        var (entityTileX, entityTileY) = LevelData.GetEntityTileFromWorld(worldX, worldZ);
         float minDist = entityRadius + ObjectSprites.CollisionRadius;
-        return dx * dx + dz * dz < minDist * minDist;
+        float minDistSq = minDist * minDist;
+
+        for (int dy = -1; dy <= 1; dy++)
+        {
+            for (int dx = -1; dx <= 1; dx++)
+            {
+                int tileX = entityTileX + dx;
+                int tileY = entityTileY + dy;
+                if (tileX < 0 || tileX >= _level.Width || tileY < 0 || tileY >= _level.Height)
+                    continue;
+                if (!_level.HasObjectAt(tileX, tileY))
+                    continue;
+
+                var anchor = LevelData.GetTileAnchorWorld(tileX, tileY);
+                float ddx = worldX - anchor.X;
+                float ddz = worldZ - anchor.Z;
+                if (ddx * ddx + ddz * ddz < minDistSq)
+                    return true;
+            }
+        }
+
+        return false;
     }
 }
