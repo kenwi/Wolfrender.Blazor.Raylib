@@ -348,8 +348,8 @@ public class World : IScene
         if (lightingShader.HasValue)
             EndShaderMode();
 
-        _placedObjectSystem.Render(_player.Camera.Position);
-        _pickupSystem.Render(_player.Camera.Position);
+        _placedObjectSystem.Render(_player.Camera.Position, _player.Camera.Target);
+        _pickupSystem.Render(_player.Camera.Position, _player.Camera.Target);
         Debug.Draw3DOverlays(_inputState.IsDebugEnabled);
 
         EndMode3D();

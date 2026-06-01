@@ -492,44 +492,22 @@ public static class PrimitiveRenderer
         float angle = 0f,
         float heightOffset = 0.0f,
         Rectangle? frameRect = null,
-        bool quantizeToEightDirections = true)
+        bool quantizeToEightDirections = true,
+        Vector3? cameraViewTarget = null,
+        SpriteBillboardGeometry.FacingMode facingMode = SpriteBillboardGeometry.FacingMode.PointAtCamera)
     {
-        var directionToCamera = SpriteBillboardGeometry.ComputeBillboardFacingDirection(
-            position, cameraPosition, quantizeToEightDirections);
+        SpriteBillboardGeometry.ComputeBillboardBasis(
+            position,
+            cameraPosition,
+            cameraViewTarget,
+            facingMode,
+            quantizeToEightDirections,
+            out Vector3 directionToCamera,
+            out Vector3 right);
 
-        // Calculate right and up vectors for the billboard
-        var right = Vector3.Cross(directionToCamera, Vector3.UnitY);
-        var rightLength = right.Length();
-        if (rightLength > 0.001f)
-        {
-            right = right / rightLength;
-        }
-        else
-        {
-            right = Vector3.UnitX; // Fallback
-        }
-
-        var up = Vector3.UnitY;
-
-        // Apply rotation around the up vector (Y-axis)
-        var cosAngle = MathF.Cos(angle);
-        var sinAngle = MathF.Sin(angle);
-        
-        // Rotate the right vector around the up vector
-        var rotatedRight = new Vector3(
-            right.X * cosAngle - right.Z * sinAngle,
-            right.Y,
-            right.X * sinAngle + right.Z * cosAngle
-        );
-
-        // Calculate the four corners of the sprite quad
-        var halfWidth = rotatedRight * (width / 2);
-        var halfHeight = up * (height / 2);
-
-        var topLeft = position - halfWidth + halfHeight;
-        var topRight = position + halfWidth + halfHeight;
-        var bottomRight = position + halfWidth - halfHeight;
-        var bottomLeft = position - halfWidth - halfHeight;
+        SpriteBillboardGeometry.BuildQuadCorners(
+            position, right, width, height, angle,
+            out Vector3 topLeft, out Vector3 topRight, out Vector3 bottomRight, out Vector3 bottomLeft);
 
         // Calculate texture coordinates for frame clipping
         float texLeft, texRight, texTop, texBottom;
@@ -608,9 +586,13 @@ public static class PrimitiveRenderer
         float width = 4f,
         float height = 4f,
         float angle = 0f,
-        bool quantizeToEightDirections = false)
+        bool quantizeToEightDirections = false,
+        Vector3? cameraViewTarget = null,
+        SpriteBillboardGeometry.FacingMode facingMode = SpriteBillboardGeometry.FacingMode.ViewAligned)
     {
-        DrawColoredBillboard(position, cameraPosition, color, null, null, width, height, angle, quantizeToEightDirections);
+        DrawColoredBillboard(
+            position, cameraPosition, color, null, null,
+            width, height, angle, quantizeToEightDirections, cameraViewTarget, facingMode);
     }
 
     /// <summary>
@@ -643,34 +625,22 @@ public static class PrimitiveRenderer
         float width = 4f,
         float height = 4f,
         float angle = 0f,
-        bool quantizeToEightDirections = false)
+        bool quantizeToEightDirections = false,
+        Vector3? cameraViewTarget = null,
+        SpriteBillboardGeometry.FacingMode facingMode = SpriteBillboardGeometry.FacingMode.ViewAligned)
     {
-        var directionToCamera = SpriteBillboardGeometry.ComputeBillboardFacingDirection(
-            position, cameraPosition, quantizeToEightDirections);
+        SpriteBillboardGeometry.ComputeBillboardBasis(
+            position,
+            cameraPosition,
+            cameraViewTarget,
+            facingMode,
+            quantizeToEightDirections,
+            out Vector3 directionToCamera,
+            out Vector3 right);
 
-        var right = Vector3.Cross(directionToCamera, Vector3.UnitY);
-        var rightLength = right.Length();
-        if (rightLength > 0.001f)
-            right /= rightLength;
-        else
-            right = Vector3.UnitX;
-
-        var up = Vector3.UnitY;
-
-        var cosAngle = MathF.Cos(angle);
-        var sinAngle = MathF.Sin(angle);
-        var rotatedRight = new Vector3(
-            right.X * cosAngle - right.Z * sinAngle,
-            right.Y,
-            right.X * sinAngle + right.Z * cosAngle);
-
-        var halfWidth = rotatedRight * (width / 2f);
-        var halfHeight = up * (height / 2f);
-
-        var topLeft = position - halfWidth + halfHeight;
-        var topRight = position + halfWidth + halfHeight;
-        var bottomRight = position + halfWidth - halfHeight;
-        var bottomLeft = position - halfWidth - halfHeight;
+        SpriteBillboardGeometry.BuildQuadCorners(
+            position, right, width, height, angle,
+            out Vector3 topLeft, out Vector3 topRight, out Vector3 bottomRight, out Vector3 bottomLeft);
 
         if (texture is { Id: > 0 } tex && frameRect.HasValue)
         {

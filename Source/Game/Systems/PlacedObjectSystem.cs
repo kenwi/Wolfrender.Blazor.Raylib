@@ -51,7 +51,7 @@ public class PlacedObjectSystem
         }
     }
 
-    public void Render(Vector3 cameraPosition)
+    public void Render(Vector3 cameraPosition, Vector3 cameraViewTarget)
     {
         if (_objectsTexture.Id == 0)
             return;
@@ -65,7 +65,9 @@ public class PlacedObjectSystem
                 Color.White,
                 frameRect: ObjectSprites.GetFrameRectForObjectId(obj.ObjectId),
                 quantizeToEightDirections: false,
-                heightOffset: 0.5f);
+                heightOffset: 0.5f,
+                cameraViewTarget: cameraViewTarget,
+                facingMode: SpriteBillboardGeometry.FacingMode.ViewAligned);
         }
     }
 }
