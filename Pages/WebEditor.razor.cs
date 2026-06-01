@@ -61,6 +61,7 @@ public partial class WebEditor : IDisposable
             "resources/shaders/transparency.fs",
             "resources/shaders/lighting.vs",
             "resources/shaders/lighting.fs",
+            "resources/shaders/sprite_lit.fs",
             "resources/03.mp3",
         };
 

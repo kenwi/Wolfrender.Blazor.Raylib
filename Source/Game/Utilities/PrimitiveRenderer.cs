@@ -11,14 +11,22 @@ public static class PrimitiveRenderer
     public static readonly Color SpriteTransparencyKey = new Color(152, 0, 136, 255);
     private static Shader? _colorKeyShader;
     private static int _colorKeyShaderLoc;
-    
-    // Distance-based lighting shader
+
+    // Distance-based lighting (walls/floors) and sprite billboards (color key + same falloff)
     private static Shader? _lightingShader;
     private static int _lightingShaderPlayerPosLoc;
     private static int _lightingShaderMaxDistanceLoc;
     private static int _lightingShaderMinBrightnessLoc;
-    private static float _maxLightDistance = 1.0f; // Maximum distance for full brightness
-    private static float _minBrightness = 0.0f; // Minimum brightness at max distance
+
+    private static Shader? _spriteLitShader;
+    private static int _spriteLitPlayerPosLoc;
+    private static int _spriteLitMaxDistanceLoc;
+    private static int _spriteLitMinBrightnessLoc;
+    private static int _spriteLitColorKeyLoc;
+
+    private static Vector3 _lightingPlayerPosition;
+    private static float _cachedMaxLightDistance = 50f;
+    private static float _cachedMinBrightness = 0.1f;
 
     // rlgl texture coordinates use a different V origin than DrawTexturePro.
     // Flip V for world polygon rendering so in-game orientation matches the editor preview.
@@ -46,28 +54,89 @@ public static class PrimitiveRenderer
         if (_lightingShader.HasValue) return;
 
         _lightingShader = LoadShader(Res.Path("resources/shaders/lighting.vs"), Res.Path("resources/shaders/lighting.fs"));
-        // if (_lightingShader.HasValue)
-        {
-            _lightingShaderPlayerPosLoc = GetShaderLocation(_lightingShader.Value, "playerPosition");
-            _lightingShaderMaxDistanceLoc = GetShaderLocation(_lightingShader.Value, "maxLightDistance");
-            _lightingShaderMinBrightnessLoc = GetShaderLocation(_lightingShader.Value, "minBrightness");
-            
-            // Set default values
-            SetShaderValue(_lightingShader.Value, _lightingShaderMaxDistanceLoc, _maxLightDistance, ShaderUniformDataType.Float);
-            SetShaderValue(_lightingShader.Value, _lightingShaderMinBrightnessLoc, _minBrightness, ShaderUniformDataType.Float);
-        }
+        _lightingShaderPlayerPosLoc = GetShaderLocation(_lightingShader.Value, "playerPosition");
+        _lightingShaderMaxDistanceLoc = GetShaderLocation(_lightingShader.Value, "maxLightDistance");
+        _lightingShaderMinBrightnessLoc = GetShaderLocation(_lightingShader.Value, "minBrightness");
     }
-    
+
+    private static void EnsureSpriteLitShader()
+    {
+        if (_spriteLitShader.HasValue) return;
+
+        _spriteLitShader = LoadShader(
+            Res.Path("resources/shaders/lighting.vs"),
+            Res.Path("resources/shaders/sprite_lit.fs"));
+        _spriteLitPlayerPosLoc = GetShaderLocation(_spriteLitShader.Value, "playerPosition");
+        _spriteLitMaxDistanceLoc = GetShaderLocation(_spriteLitShader.Value, "maxLightDistance");
+        _spriteLitMinBrightnessLoc = GetShaderLocation(_spriteLitShader.Value, "minBrightness");
+        _spriteLitColorKeyLoc = GetShaderLocation(_spriteLitShader.Value, "colorKey");
+
+        float[] colorKeyArray = { SpriteTransparencyKey.R, SpriteTransparencyKey.G, SpriteTransparencyKey.B };
+        SetShaderValue(_spriteLitShader.Value, _spriteLitColorKeyLoc, colorKeyArray, ShaderUniformDataType.Vec3);
+    }
+
+    private static void ApplyLightingUniforms(Shader shader, int playerPosLoc, int maxDistanceLoc, int minBrightnessLoc)
+    {
+        float[] playerPosArray = { _lightingPlayerPosition.X, _lightingPlayerPosition.Y, _lightingPlayerPosition.Z };
+        SetShaderValue(shader, playerPosLoc, playerPosArray, ShaderUniformDataType.Vec3);
+        SetShaderValue(shader, maxDistanceLoc, _cachedMaxLightDistance, ShaderUniformDataType.Float);
+        SetShaderValue(shader, minBrightnessLoc, _cachedMinBrightness, ShaderUniformDataType.Float);
+    }
+
+    private static float ComputeDistanceBrightness(Vector3 worldPos)
+    {
+        float distance = Vector3.Distance(worldPos, _lightingPlayerPosition);
+        if (distance <= 0f || _cachedMaxLightDistance <= 0f)
+            return 1f;
+
+        float falloffFactor = _cachedMaxLightDistance / 3f;
+        float expBrightness = MathF.Exp(-distance / falloffFactor);
+        float brightness = expBrightness * (1f - _cachedMinBrightness) + _cachedMinBrightness;
+        return Math.Clamp(brightness, _cachedMinBrightness, 1f);
+    }
+
+    private static Color ApplyDistanceLighting(Color color, Vector3 worldPos)
+    {
+        float brightness = ComputeDistanceBrightness(worldPos);
+        return new Color(
+            (byte)Math.Clamp(color.R * brightness, 0, 255),
+            (byte)Math.Clamp(color.G * brightness, 0, 255),
+            (byte)Math.Clamp(color.B * brightness, 0, 255),
+            color.A);
+    }
+
+    private static void BeginSpriteLitDraw()
+    {
+        EnsureSpriteLitShader();
+        if (!_spriteLitShader.HasValue) return;
+
+        ApplyLightingUniforms(
+            _spriteLitShader.Value,
+            _spriteLitPlayerPosLoc,
+            _spriteLitMaxDistanceLoc,
+            _spriteLitMinBrightnessLoc);
+        BeginShaderMode(_spriteLitShader.Value);
+    }
+
+    private static void EndSpriteLitDraw()
+    {
+        if (_spriteLitShader.HasValue)
+            EndShaderMode();
+    }
+
     public static void SetLightingParameters(Vector3 playerPosition, float maxDistance = 50.0f, float minBrightness = 0.1f)
     {
+        _lightingPlayerPosition = playerPosition;
+        _cachedMaxLightDistance = maxDistance;
+        _cachedMinBrightness = minBrightness;
+
         EnsureLightingShader();
         if (_lightingShader.HasValue)
-        {
-            float[] playerPosArray = { playerPosition.X, playerPosition.Y, playerPosition.Z };
-            SetShaderValue(_lightingShader.Value, _lightingShaderPlayerPosLoc, playerPosArray, ShaderUniformDataType.Vec3);
-            SetShaderValue(_lightingShader.Value, _lightingShaderMaxDistanceLoc, maxDistance, ShaderUniformDataType.Float);
-            SetShaderValue(_lightingShader.Value, _lightingShaderMinBrightnessLoc, minBrightness, ShaderUniformDataType.Float);
-        }
+            ApplyLightingUniforms(
+                _lightingShader.Value,
+                _lightingShaderPlayerPosLoc,
+                _lightingShaderMaxDistanceLoc,
+                _lightingShaderMinBrightnessLoc);
     }
     
     public static Shader? GetLightingShader()
@@ -530,13 +599,8 @@ public static class PrimitiveRenderer
             texBottom = 1.0f;
         }
         
-        // Enable color key shader for transparency
-        EnsureColorKeyShader();
-        if (_colorKeyShader.HasValue)
-        {
-            BeginShaderMode(_colorKeyShader.Value);
-        }
-        
+        BeginSpriteLitDraw();
+
         // Draw the quad
         Rlgl.SetTexture(texture.Id);
         Rlgl.Begin(DrawMode.Quads);
@@ -564,19 +628,15 @@ public static class PrimitiveRenderer
 
         Rlgl.End();
         Rlgl.SetTexture(0);
-        
-        // Disable shader
-        if (_colorKeyShader.HasValue)
-        {
-            EndShaderMode();
-        }
-        
+
+        EndSpriteLitDraw();
+
         LevelData.DrawedQuads += 1;
     }
 
     /// <summary>
     /// Untextured semi-transparent billboard using the same layout as <see cref="DrawSpriteTexture"/>.
-    /// Draw after the lighting shader ends so colors are not attenuated.
+    /// Distance falloff matches wall lighting via CPU tint at the billboard anchor.
     /// </summary>
     /// <param name="position">World position at the center of the billboard quad (same anchor as <see cref="DrawSpriteTexture"/>).</param>
     public static void DrawColoredBillboard(
@@ -650,6 +710,8 @@ public static class PrimitiveRenderer
             float texTop = frame.Y / tex.Height;
             float texBottom = (frame.Y + frame.Height) / tex.Height;
 
+            BeginSpriteLitDraw();
+
             Rlgl.SetTexture(tex.Id);
             Rlgl.Begin(DrawMode.Quads);
             Rlgl.Color4ub(color.R, color.G, color.B, color.A);
@@ -666,9 +728,12 @@ public static class PrimitiveRenderer
 
             Rlgl.End();
             Rlgl.SetTexture(0);
+
+            EndSpriteLitDraw();
         }
         else
         {
+            color = ApplyDistanceLighting(color, position);
             Rlgl.Begin(DrawMode.Quads);
             Rlgl.Color4ub(color.R, color.G, color.B, color.A);
             Rlgl.Normal3f(directionToCamera.X, directionToCamera.Y, directionToCamera.Z);
