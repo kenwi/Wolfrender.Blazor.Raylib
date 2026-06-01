@@ -149,7 +149,7 @@ public class PickupSystem
         return true;
     }
 
-    public void Render(Vector3 cameraPosition)
+    public void Render(Vector3 cameraPosition, Vector3 cameraViewTarget)
     {
         foreach (var pickup in _activePickups)
         {
@@ -162,14 +162,18 @@ public class PickupSystem
                     Color.White,
                     frameRect: PickupSprites.GetFrameRect(pickup.Type),
                     quantizeToEightDirections: false,
-                    heightOffset: 0.5f);
+                    heightOffset: 0.5f,
+                    cameraViewTarget: cameraViewTarget,
+                    facingMode: SpriteBillboardGeometry.FacingMode.ViewAligned);
             }
             else
             {
                 PrimitiveRenderer.DrawColoredBillboard(
                     pickup.Position,
                     cameraPosition,
-                    PickupVisuals.GetColor(pickup.Type));
+                    PickupVisuals.GetColor(pickup.Type),
+                    cameraViewTarget: cameraViewTarget,
+                    facingMode: SpriteBillboardGeometry.FacingMode.ViewAligned);
             }
         }
     }

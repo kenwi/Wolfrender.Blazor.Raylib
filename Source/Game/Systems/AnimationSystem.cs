@@ -211,13 +211,19 @@ public class AnimationSystem
     {
         foreach (var enemy in _enemySystem.Enemies)
         {
-            bool facePlayer = enemy.EnemyState is EnemyState.DYING or EnemyState.CORPSE;
-            PrimitiveRenderer.DrawSpriteTexture(_enemyTexture,
+            bool isCorpse = enemy.EnemyState == EnemyState.CORPSE;
+            bool smoothFaceOnDeath = enemy.EnemyState == EnemyState.DYING;
+            PrimitiveRenderer.DrawSpriteTexture(
+                _enemyTexture,
                 enemy.Position,
                 _player.Camera.Position,
                 Color.White,
                 frameRect: enemy.FrameRect,
-                quantizeToEightDirections: !facePlayer);
+                quantizeToEightDirections: !(isCorpse || smoothFaceOnDeath),
+                cameraViewTarget: isCorpse ? _player.Camera.Target : null,
+                facingMode: isCorpse
+                    ? SpriteBillboardGeometry.FacingMode.ViewAligned
+                    : SpriteBillboardGeometry.FacingMode.PointAtCamera);
         }
     }
 
