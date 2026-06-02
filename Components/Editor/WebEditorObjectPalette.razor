@@ -35,7 +35,7 @@
             var objectId = (uint)(i + 1);
             <button type="button"
                     class="tile-btn @(State.SelectedTileId == objectId ? "selected" : "")"
-                    title="Object @objectId"
+                    title="@GetObjectTooltip(objectId)"
                     @onclick="() => SelectTile(objectId)">
                 <span class="pickup-palette-sprite-sheet"
                       style="@ObjectSprites.GetPaletteSpriteSheetStyle(objectIndex)"
@@ -62,4 +62,9 @@
 
     private void OnPointerEnter() => State.IsMouseOverUI = true;
     private void OnPointerLeave() => State.IsMouseOverUI = false;
+
+    private static string GetObjectTooltip(uint objectId) =>
+        LightObjectEncoding.IsLightObject(objectId)
+            ? $"Object {objectId} — light fixture (no collision)"
+            : $"Object {objectId}";
 }

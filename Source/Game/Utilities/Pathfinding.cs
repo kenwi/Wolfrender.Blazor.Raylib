@@ -194,7 +194,7 @@ public static class Pathfinding
         }
 
         uint objectId = mapData.GetTile(mapData.Objects, tileX, tileY);
-        if (ObjectSprites.IsValidObjectId(objectId))
+        if (ObjectSprites.BlocksMovement(objectId))
             return true;
 
         return false;

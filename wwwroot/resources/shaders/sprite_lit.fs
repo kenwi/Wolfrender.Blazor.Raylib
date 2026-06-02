@@ -13,6 +13,17 @@ uniform vec3 playerPosition;
 uniform float maxLightDistance;
 uniform float minBrightness;
 
+uniform float tileLightCount;
+uniform vec3 tileLight0;
+uniform vec3 tileLight1;
+uniform vec3 tileLight2;
+uniform vec3 tileLight3;
+uniform vec3 tileLight4;
+uniform vec3 tileLight5;
+uniform vec3 tileLight6;
+uniform vec3 tileLight7;
+uniform float tileLightRadius;
+
 // Magenta color key (#980088), same as transparency.fs
 uniform vec3 colorKey;
 
@@ -29,16 +40,7 @@ void main()
         discard;
     }
 
-    float distance = length(fragWorldPos - playerPosition);
-    float brightness = 1.0;
-    if (distance > 0.0 && maxLightDistance > 0.0)
-    {
-        float falloffFactor = maxLightDistance / 3.0;
-        float expBrightness = exp(-distance / falloffFactor);
-        brightness = expBrightness * (1.0 - minBrightness) + minBrightness;
-        brightness = clamp(brightness, minBrightness, 1.0);
-    }
-
+    float brightness = combinedSceneBrightness(fragWorldPos);
     vec3 litColor = texColor.rgb * brightness;
     gl_FragColor = vec4(litColor, texColor.a) * colDiffuse * fragColor;
 }

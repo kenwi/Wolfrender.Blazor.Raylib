@@ -80,4 +80,8 @@ public static class ObjectSprites
 
     public static bool IsValidObjectId(uint objectId) =>
         objectId >= 1 && objectId <= ObjectCount;
+
+    /// <summary>Objects that occupy the grid for rendering but do not block movement or pathfinding.</summary>
+    public static bool BlocksMovement(uint objectId) =>
+        IsValidObjectId(objectId) && !LightObjectEncoding.IsLightObject(objectId);
 }

@@ -98,7 +98,8 @@ public class CollisionSystem
                 int tileY = entityTileY + dy;
                 if (tileX < 0 || tileX >= _level.Width || tileY < 0 || tileY >= _level.Height)
                     continue;
-                if (!_level.HasObjectAt(tileX, tileY))
+                uint objectId = _level.GetObjectTile(tileX, tileY);
+                if (!ObjectSprites.BlocksMovement(objectId))
                     continue;
 
                 var anchor = LevelData.GetTileAnchorWorld(tileX, tileY);

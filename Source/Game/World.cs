@@ -331,7 +331,16 @@ public class World : IScene
 
     public void Render()
     {
-        PrimitiveRenderer.SetLightingParameters(_player.Position, maxDistance: 50.0f, minBrightness: 0.1f);
+        var mapLights = TileLightCollector.Collect(_mapData);
+        var activeTileLights = TileLightCollector.SelectNearest(
+            mapLights,
+            _player.Position,
+            LightObjectEncoding.MaxShaderLights);
+        PrimitiveRenderer.SetLightingParameters(
+            _player.Position,
+            maxDistance: 50f,
+            minBrightness: 0.1f,
+            activeTileLights);
         var lightingShader = PrimitiveRenderer.GetLightingShader();
 
         BeginTextureMode(_sceneRenderTexture);
@@ -339,7 +348,10 @@ public class World : IScene
         ClearBackground(Color.Black);
 
         if (lightingShader.HasValue)
+        {
             BeginShaderMode(lightingShader.Value);
+            PrimitiveRenderer.ApplyWallLightingUniforms();
+        }
 
         _renderSystem.Render(_player);
         _doorSystem.Render();

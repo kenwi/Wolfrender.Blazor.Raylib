@@ -1,3 +1,4 @@
+using System.IO;
 using System.Linq;
 using System.Numerics;
 using Raylib_cs;
@@ -17,16 +18,24 @@ public static class PrimitiveRenderer
     private static int _lightingShaderPlayerPosLoc;
     private static int _lightingShaderMaxDistanceLoc;
     private static int _lightingShaderMinBrightnessLoc;
+    private static int _lightingShaderTileLightCountLoc;
+    private static int _lightingShaderTileLightRadiusLoc;
+    private static readonly int[] _lightingShaderTileLightLocs = new int[LightObjectEncoding.MaxShaderLights];
 
     private static Shader? _spriteLitShader;
     private static int _spriteLitPlayerPosLoc;
     private static int _spriteLitMaxDistanceLoc;
     private static int _spriteLitMinBrightnessLoc;
     private static int _spriteLitColorKeyLoc;
+    private static int _spriteLitTileLightCountLoc;
+    private static int _spriteLitTileLightRadiusLoc;
+    private static readonly int[] _spriteLitTileLightLocs = new int[LightObjectEncoding.MaxShaderLights];
 
     private static Vector3 _lightingPlayerPosition;
     private static float _cachedMaxLightDistance = 50f;
     private static float _cachedMinBrightness = 0.1f;
+    private static float _cachedTileLightRadius = LightObjectEncoding.DefaultRadius;
+    private static Vector3[] _activeTileLights = Array.Empty<Vector3>();
 
     // rlgl texture coordinates use a different V origin than DrawTexturePro.
     // Flip V for world polygon rendering so in-game orientation matches the editor preview.
@@ -49,50 +58,146 @@ public static class PrimitiveRenderer
         }
     }
     
+    private static string ReadShaderFile(string relativePath) =>
+        File.ReadAllText(Res.Path(relativePath));
+
+    private static Shader LoadSceneLitShader(string fragmentFileName)
+    {
+        string vertexSource = ReadShaderFile("resources/shaders/lighting.vs");
+        string fragmentSource = ReadShaderFile($"resources/shaders/{fragmentFileName}");
+        string commonSource = ReadShaderFile("resources/shaders/lighting_common.glsl");
+
+        int mainIndex = fragmentSource.IndexOf("void main", StringComparison.Ordinal);
+        if (mainIndex < 0)
+            throw new InvalidOperationException($"Scene fragment shader missing main(): {fragmentFileName}");
+
+        string combinedFragment = fragmentSource[..mainIndex] + commonSource + fragmentSource[mainIndex..];
+        return LoadShaderFromMemory(vertexSource, combinedFragment);
+    }
+
+    private static void CacheTileLightUniformLocations(
+        Shader shader,
+        int[] tileLightLocs,
+        out int tileLightCountLoc,
+        out int tileLightRadiusLoc)
+    {
+        tileLightCountLoc = GetShaderLocation(shader, "tileLightCount");
+        tileLightRadiusLoc = GetShaderLocation(shader, "tileLightRadius");
+        for (int i = 0; i < tileLightLocs.Length; i++)
+            tileLightLocs[i] = GetShaderLocation(shader, $"tileLight{i}");
+    }
+
     private static void EnsureLightingShader()
     {
         if (_lightingShader.HasValue) return;
 
-        _lightingShader = LoadShader(Res.Path("resources/shaders/lighting.vs"), Res.Path("resources/shaders/lighting.fs"));
+        _lightingShader = LoadSceneLitShader("lighting.fs");
         _lightingShaderPlayerPosLoc = GetShaderLocation(_lightingShader.Value, "playerPosition");
         _lightingShaderMaxDistanceLoc = GetShaderLocation(_lightingShader.Value, "maxLightDistance");
         _lightingShaderMinBrightnessLoc = GetShaderLocation(_lightingShader.Value, "minBrightness");
+        CacheTileLightUniformLocations(
+            _lightingShader.Value,
+            _lightingShaderTileLightLocs,
+            out _lightingShaderTileLightCountLoc,
+            out _lightingShaderTileLightRadiusLoc);
     }
 
     private static void EnsureSpriteLitShader()
     {
         if (_spriteLitShader.HasValue) return;
 
-        _spriteLitShader = LoadShader(
-            Res.Path("resources/shaders/lighting.vs"),
-            Res.Path("resources/shaders/sprite_lit.fs"));
+        _spriteLitShader = LoadSceneLitShader("sprite_lit.fs");
         _spriteLitPlayerPosLoc = GetShaderLocation(_spriteLitShader.Value, "playerPosition");
         _spriteLitMaxDistanceLoc = GetShaderLocation(_spriteLitShader.Value, "maxLightDistance");
         _spriteLitMinBrightnessLoc = GetShaderLocation(_spriteLitShader.Value, "minBrightness");
         _spriteLitColorKeyLoc = GetShaderLocation(_spriteLitShader.Value, "colorKey");
+        CacheTileLightUniformLocations(
+            _spriteLitShader.Value,
+            _spriteLitTileLightLocs,
+            out _spriteLitTileLightCountLoc,
+            out _spriteLitTileLightRadiusLoc);
 
         float[] colorKeyArray = { SpriteTransparencyKey.R, SpriteTransparencyKey.G, SpriteTransparencyKey.B };
         SetShaderValue(_spriteLitShader.Value, _spriteLitColorKeyLoc, colorKeyArray, ShaderUniformDataType.Vec3);
     }
 
-    private static void ApplyLightingUniforms(Shader shader, int playerPosLoc, int maxDistanceLoc, int minBrightnessLoc)
+    private static void ApplyLightingUniforms(
+        Shader shader,
+        int playerPosLoc,
+        int maxDistanceLoc,
+        int minBrightnessLoc,
+        int tileLightCountLoc,
+        int[] tileLightLocs,
+        int tileLightRadiusLoc)
     {
         float[] playerPosArray = { _lightingPlayerPosition.X, _lightingPlayerPosition.Y, _lightingPlayerPosition.Z };
         SetShaderValue(shader, playerPosLoc, playerPosArray, ShaderUniformDataType.Vec3);
         SetShaderValue(shader, maxDistanceLoc, _cachedMaxLightDistance, ShaderUniformDataType.Float);
         SetShaderValue(shader, minBrightnessLoc, _cachedMinBrightness, ShaderUniformDataType.Float);
+
+        int lightCount = Math.Min(_activeTileLights.Length, LightObjectEncoding.MaxShaderLights);
+        if (tileLightCountLoc >= 0)
+            SetShaderValue(shader, tileLightCountLoc, (float)lightCount, ShaderUniformDataType.Float);
+
+        for (int i = 0; i < lightCount; i++)
+        {
+            if (tileLightLocs[i] < 0)
+                continue;
+
+            var light = _activeTileLights[i];
+            float[] lightPos = { light.X, light.Y, light.Z };
+            SetShaderValue(shader, tileLightLocs[i], lightPos, ShaderUniformDataType.Vec3);
+        }
+
+        if (tileLightRadiusLoc >= 0)
+            SetShaderValue(shader, tileLightRadiusLoc, _cachedTileLightRadius, ShaderUniformDataType.Float);
+    }
+
+    /// <summary>Re-upload lighting uniforms to the wall/floor shader (call after <see cref="BeginShaderMode"/>).</summary>
+    public static void ApplyWallLightingUniforms()
+    {
+        if (!_lightingShader.HasValue)
+            return;
+
+        ApplyLightingUniforms(
+            _lightingShader.Value,
+            _lightingShaderPlayerPosLoc,
+            _lightingShaderMaxDistanceLoc,
+            _lightingShaderMinBrightnessLoc,
+            _lightingShaderTileLightCountLoc,
+            _lightingShaderTileLightLocs,
+            _lightingShaderTileLightRadiusLoc);
+    }
+
+    private static float ExponentialFalloffBrightness(float distance, float maxDistance, float minBright)
+    {
+        if (distance <= 0f || maxDistance <= 0f)
+            return 1f;
+
+        float falloffFactor = maxDistance / 3f;
+        float expBrightness = MathF.Exp(-distance / falloffFactor);
+        float brightness = expBrightness * (1f - minBright) + minBright;
+        return Math.Clamp(brightness, minBright, 1f);
     }
 
     private static float ComputeDistanceBrightness(Vector3 worldPos)
     {
-        float distance = Vector3.Distance(worldPos, _lightingPlayerPosition);
-        if (distance <= 0f || _cachedMaxLightDistance <= 0f)
-            return 1f;
+        float brightness = ExponentialFalloffBrightness(
+            Vector3.Distance(worldPos, _lightingPlayerPosition),
+            _cachedMaxLightDistance,
+            _cachedMinBrightness);
 
-        float falloffFactor = _cachedMaxLightDistance / 3f;
-        float expBrightness = MathF.Exp(-distance / falloffFactor);
-        float brightness = expBrightness * (1f - _cachedMinBrightness) + _cachedMinBrightness;
-        return Math.Clamp(brightness, _cachedMinBrightness, 1f);
+        foreach (var lightPos in _activeTileLights)
+        {
+            float dx = worldPos.X - lightPos.X;
+            float dz = worldPos.Z - lightPos.Z;
+            float tileDistance = MathF.Sqrt(dx * dx + dz * dz);
+            brightness = MathF.Max(
+                brightness,
+                ExponentialFalloffBrightness(tileDistance, _cachedTileLightRadius, _cachedMinBrightness));
+        }
+
+        return brightness;
     }
 
     private static Color ApplyDistanceLighting(Color color, Vector3 worldPos)
@@ -114,7 +219,10 @@ public static class PrimitiveRenderer
             _spriteLitShader.Value,
             _spriteLitPlayerPosLoc,
             _spriteLitMaxDistanceLoc,
-            _spriteLitMinBrightnessLoc);
+            _spriteLitMinBrightnessLoc,
+            _spriteLitTileLightCountLoc,
+            _spriteLitTileLightLocs,
+            _spriteLitTileLightRadiusLoc);
         BeginShaderMode(_spriteLitShader.Value);
     }
 
@@ -124,19 +232,24 @@ public static class PrimitiveRenderer
             EndShaderMode();
     }
 
-    public static void SetLightingParameters(Vector3 playerPosition, float maxDistance = 50.0f, float minBrightness = 0.1f)
+    public static void SetLightingParameters(
+        Vector3 playerPosition,
+        float maxDistance = 50.0f,
+        float minBrightness = 0.1f,
+        ReadOnlySpan<Vector3> tileLights = default,
+        float tileLightRadius = LightObjectEncoding.DefaultRadius)
     {
         _lightingPlayerPosition = playerPosition;
         _cachedMaxLightDistance = maxDistance;
         _cachedMinBrightness = minBrightness;
+        _cachedTileLightRadius = tileLightRadius;
+        _activeTileLights = tileLights.Length == 0
+            ? Array.Empty<Vector3>()
+            : tileLights.ToArray();
 
         EnsureLightingShader();
         if (_lightingShader.HasValue)
-            ApplyLightingUniforms(
-                _lightingShader.Value,
-                _lightingShaderPlayerPosLoc,
-                _lightingShaderMaxDistanceLoc,
-                _lightingShaderMinBrightnessLoc);
+            ApplyWallLightingUniforms();
     }
     
     public static Shader? GetLightingShader()
