@@ -1,42 +1,8 @@
 using System.Text.Json;
-using Game.Entities;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 
 namespace Game.Editor;
-
-public class PatrolWaypointData
-{
-    public int TileX { get; set; }
-    public int TileY { get; set; }
-}
-
-public class EnemyPlacementData
-{
-    public int TileX { get; set; }
-    public int TileY { get; set; }
-    public float Rotation { get; set; }
-    public string EnemyType { get; set; } = "Guard";
-    public List<PatrolWaypointData> PatrolPath { get; set; } = new();
-    public bool StartsAsCorpse { get; set; }
-    public bool DropsAmmo { get; set; }
-}
-
-public class PickupPlacementData
-{
-    public int TileX { get; set; }
-    public int TileY { get; set; }
-    public string Type { get; set; } = "Health";
-    public int Amount { get; set; }
-}
-
-public class PlayerSpawnData
-{
-    public int TileX { get; set; } = 30;
-    public int TileY { get; set; } = 28;
-    public float WorldY { get; set; } = 2f;
-    public float Rotation { get; set; } = -MathF.PI / 2f;
-}
 
 public class LevelFileData
 {
@@ -139,10 +105,10 @@ public static class LevelSerializer
             }).ToList(),
             PlayerSpawn = new PlayerSpawnData
             {
-                TileX = mapData.PlayerSpawnTileX,
-                TileY = mapData.PlayerSpawnTileY,
-                WorldY = mapData.PlayerSpawnWorldY,
-                Rotation = mapData.PlayerSpawnRotation
+                TileX = mapData.Spawn.TileX,
+                TileY = mapData.Spawn.TileY,
+                WorldY = mapData.Spawn.WorldY,
+                Rotation = mapData.Spawn.Rotation
             }
         };
 
@@ -188,10 +154,10 @@ public static class LevelSerializer
 
         if (fileData.PlayerSpawn != null)
         {
-            mapData.PlayerSpawnTileX = fileData.PlayerSpawn.TileX;
-            mapData.PlayerSpawnTileY = fileData.PlayerSpawn.TileY;
-            mapData.PlayerSpawnWorldY = fileData.PlayerSpawn.WorldY;
-            mapData.PlayerSpawnRotation = fileData.PlayerSpawn.Rotation;
+            mapData.Spawn.TileX = fileData.PlayerSpawn.TileX;
+            mapData.Spawn.TileY = fileData.PlayerSpawn.TileY;
+            mapData.Spawn.WorldY = fileData.PlayerSpawn.WorldY;
+            mapData.Spawn.Rotation = fileData.PlayerSpawn.Rotation;
         }
     }
 

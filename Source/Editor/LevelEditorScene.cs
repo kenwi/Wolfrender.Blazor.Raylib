@@ -1,5 +1,4 @@
 using System.Numerics;
-using Game.Systems;
 using ImGuiNET;
 using Raylib_cs;
 using rlImGui_cs;
@@ -21,12 +20,12 @@ public class LevelEditorScene : IScene
     /// </summary>
     private bool _suppressMapClickUntilRelease;
 
-    public LevelEditorScene(MapData mapData, EnemySystem enemySystem, DoorSystem doorSystem, Entities.Player player)
+    public LevelEditorScene(MapData mapData, EnemySystem enemySystem, DoorSystem doorSystem, Player player)
     {
         _state = new EditorState(mapData, enemySystem, doorSystem, player);
         _mapRenderer = new EditorMapRenderer(mapData);
         _gui = new EditorGui(mapData);
-        _collisionSystem = new CollisionSystem(new Utilities.LevelData(mapData), doorSystem);
+        _collisionSystem = new CollisionSystem(new LevelData(mapData), doorSystem);
     }
 
     public void OnEnter()
@@ -176,7 +175,7 @@ public class LevelEditorScene : IScene
 
         // Draw player position indicator
         _mapRenderer.RenderPlayerIndicator(
-            _state.Player, _state.Camera, _state.MapData.PlayerSpawnRotation,
+            _state.Player, _state.Camera, _state.MapData.Spawn.Rotation,
             _state.HoveredPlayer, _state.IsPlayerSelected, _state.IsDraggingPlayer);
 
         // Pathfinding visualizer overlay

@@ -1,0 +1,58 @@
+@namespace Wolfrender.Blazor.Raylib.Components.Editor
+@using Game.Features.Pickups
+@using Game.Editor
+
+<svg class="pickup-palette-filters" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <filter id="pickup-color-key" color-interpolation-filters="sRGB">
+            <feFlood flood-color="@PickupSprites.TransparencyKeyHex" flood-opacity="1" result="keyCol"/>
+            <feComposite in="SourceGraphic" in2="keyCol" operator="arithmetic" k1="1" k2="-1" k3="0" k4="0" result="diff"/>
+            <feColorMatrix in="diff" type="matrix"
+                values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1 1 1 0 -0.06" result="alphaImg"/>
+            <feComponentTransfer in="alphaImg" result="alphaCut">
+                <feFuncA type="table" tableValues="0 0 0 0 1 1 1 1 1 1"/>
+            </feComponentTransfer>
+            <feComposite in="SourceGraphic" in2="alphaCut" operator="in" result="cut"/>
+            <feFlood flood-color="#000000" flood-opacity="1" result="bg"/>
+            <feComposite in="cut" in2="bg" operator="over"/>
+        </filter>
+    </defs>
+</svg>
+
+<div class="editor-panel editor-pickup-palette" @onpointerenter="OnPointerEnter" @onpointerleave="OnPointerLeave">
+    <h3>Pickup Palette</h3>
+    <div class="info-label">Active: @State.ActiveLayer.Name</div>
+
+    <div class="info-label" style="margin-top: 8px;">Pickups:</div>
+    <div class="tile-grid">
+        @foreach (PickupType type in Enum.GetValues<PickupType>())
+        {
+            var pickupType = type;
+            <button type="button"
+                    class="tile-btn @(State.SelectedPickupType == type ? "selected" : "")"
+                    title="@type"
+                    @onclick="() => SelectType(pickupType)">
+                <span class="pickup-palette-sprite-sheet" style="@PickupSprites.GetPaletteSpriteSheetStyle(type)"></span>
+            </button>
+        }
+    </div>
+
+    <div class="info-label" style="margin-top: 6px;">
+        Selected: @State.SelectedPickupType — click map to place (replaces existing on tile)
+    </div>
+</div>
+
+@code {
+    [Parameter] public EditorState State { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private void SelectType(PickupType type)
+    {
+        State.SelectedPickupType = type;
+        State.SwitchToPickupLayer();
+        OnChanged.InvokeAsync();
+    }
+
+    private void OnPointerEnter() => State.IsMouseOverUI = true;
+    private void OnPointerLeave() => State.IsMouseOverUI = false;
+}

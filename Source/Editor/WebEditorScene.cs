@@ -1,5 +1,4 @@
 using System.Numerics;
-using Game.Systems;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 using Color = Raylib_cs.Color;
@@ -17,12 +16,12 @@ public class WebEditorScene : IScene
     private readonly EditorMapRenderer _mapRenderer;
     private readonly CollisionSystem _collisionSystem;
 
-    public WebEditorScene(MapData mapData, Game.Systems.EnemySystem enemySystem,
-        Game.Systems.DoorSystem doorSystem, Game.Entities.Player player)
+    public WebEditorScene(MapData mapData, EnemySystem enemySystem,
+        DoorSystem doorSystem, Player player)
     {
         State = new EditorState(mapData, enemySystem, doorSystem, player);
         _mapRenderer = new EditorMapRenderer(mapData);
-        _collisionSystem = new CollisionSystem(new Utilities.LevelData(mapData), doorSystem);
+        _collisionSystem = new CollisionSystem(new LevelData(mapData), doorSystem);
     }
 
     public void OnEnter()
@@ -126,7 +125,7 @@ public class WebEditorScene : IScene
         }
 
         _mapRenderer.RenderPlayerIndicator(
-            State.Player, State.Camera, State.MapData.PlayerSpawnRotation,
+            State.Player, State.Camera, State.MapData.Spawn.Rotation,
             State.HoveredPlayer, State.IsPlayerSelected, State.IsDraggingPlayer);
 
         var mouseScreen = GetMousePosition();

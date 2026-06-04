@@ -5,9 +5,8 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using static Raylib_cs.Raylib;
 using Raylib_cs;
-using Game;
+using Game.Core;
 using Game.Editor;
-using Game.Utilities;
 
 namespace Wolfrender.Blazor.Raylib.Pages;
 
