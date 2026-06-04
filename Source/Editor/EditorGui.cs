@@ -1,7 +1,4 @@
 using System.Numerics;
-using Game.Entities;
-using Game.Systems;
-using Game.Utilities;
 using ImGuiNET;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
@@ -27,10 +24,10 @@ public class EditorGui
     private bool _showLoadJsonDialog;
     private bool _showLoadTmxDialog;
     private bool _showLoadBmpDialog;
-    private string _savePath = Game.Utilities.Res.Path("resources/level.json");
-    private string _loadJsonPath = Game.Utilities.Res.Path("resources/level.json");
-    private string _loadTmxPath = Game.Utilities.Res.Path("resources/map1.tmx");
-    private string _loadBmpPath = Game.Utilities.Res.Path("resources/level.bmp");
+    private string _savePath = Res.Path("resources/level.json");
+    private string _loadJsonPath = Res.Path("resources/level.json");
+    private string _loadTmxPath = Res.Path("resources/map1.tmx");
+    private string _loadBmpPath = Res.Path("resources/level.bmp");
     private string _statusMessage = "";
     private float _statusTimer;
 
@@ -932,8 +929,8 @@ public class EditorGui
             ImGui.Spacing();
             ImGui.Text("World Coordinate");
             ImGui.Separator();
-            float wx = worldPos.X * Utilities.LevelData.QuadSize;
-            float wy = worldPos.Y * Utilities.LevelData.QuadSize;
+            float wx = worldPos.X * LevelData.QuadSize;
+            float wy = worldPos.Y * LevelData.QuadSize;
             ImGui.Text($"X: {wx:F1}  Z: {wy:F1}");
 
             ImGui.Spacing();
@@ -1088,8 +1085,8 @@ public class EditorGui
 
         ImGui.Spacing();
 
-        float worldX = state.MapData.PlayerSpawnTileX * Utilities.LevelData.QuadSize;
-        float worldZ = state.MapData.PlayerSpawnTileY * Utilities.LevelData.QuadSize;
+        float worldX = state.MapData.PlayerSpawnTileX * LevelData.QuadSize;
+        float worldZ = state.MapData.PlayerSpawnTileY * LevelData.QuadSize;
         ImGui.Text("World Position");
         ImGui.Text($"  X: {worldX:F1}  Y: {state.MapData.PlayerSpawnWorldY:F1}  Z: {worldZ:F1}");
 
@@ -1132,8 +1129,8 @@ public class EditorGui
 
         ImGui.Spacing();
 
-        float worldX = enemy.TileX * Utilities.LevelData.QuadSize;
-        float worldZ = enemy.TileY * Utilities.LevelData.QuadSize;
+        float worldX = enemy.TileX * LevelData.QuadSize;
+        float worldZ = enemy.TileY * LevelData.QuadSize;
         ImGui.Text("World Position");
         ImGui.Text($"  X: {worldX:F1}  Y: 2.0  Z: {worldZ:F1}");
 
@@ -1245,7 +1242,7 @@ public class EditorGui
     public void RenderDebugLogPanel()
     {
         if (!_showDebugLog) return;
-        Utilities.Debug.RenderLogWindow(_guiScale);
+        Debug.RenderLogWindow(_guiScale);
     }
 
     // ─── Pathfinding Visualizer Panel ───────────────────────────────────────────

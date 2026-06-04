@@ -5,8 +5,7 @@ using Microsoft.JSInterop;
 using static Raylib_cs.Raylib;
 using Color = Raylib_cs.Color;
 using Raylib_cs;
-using Game;
-using Game.Utilities;
+using Game.Core;
 using System.Threading.Tasks;
 
 namespace Wolfrender.Blazor.Raylib.Pages;

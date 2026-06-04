@@ -1,7 +1,4 @@
 using System.Numerics;
-using Game.Entities;
-using Game.Systems;
-using Game.Utilities;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 using Color = Raylib_cs.Color;
@@ -150,11 +147,11 @@ public class EditorMapRenderer
     }
 
     public void RenderPlayerIndicator(
-        Entities.Player player, EditorCamera camera, float spawnRotation,
+        Player player, EditorCamera camera, float spawnRotation,
         bool hoveredPlayer, bool isPlayerSelected, bool isDraggingPlayer)
     {
         float tileSize = camera.TileSize;
-        float quadSize = Utilities.LevelData.QuadSize;
+        float quadSize = LevelData.QuadSize;
 
         var screen = WorldAnchorToTileCenterScreen(
             player.Position.X, player.Position.Z, quadSize, tileSize, camera.Offset);
@@ -383,7 +380,7 @@ public class EditorMapRenderer
     {
         float tileSize = camera.TileSize;
         float liveRadius = tileSize * 0.3f;
-        float quadSize = Utilities.LevelData.QuadSize;
+        float quadSize = LevelData.QuadSize;
 
         foreach (var liveEnemy in enemySystem.Enemies)
         {
@@ -516,7 +513,7 @@ public class EditorMapRenderer
     public void DrawEnemyChasePaths(EnemySystem enemySystem, EditorCamera camera)
     {
         float tileSize = camera.TileSize;
-        float quadSize = Utilities.LevelData.QuadSize;
+        float quadSize = LevelData.QuadSize;
         var pathColor = new Color(255, 140, 0, 220);
         var fallbackColor = new Color(255, 80, 0, 150);
 

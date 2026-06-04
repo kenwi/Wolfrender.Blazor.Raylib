@@ -1,7 +1,4 @@
 using System.Numerics;
-using Game.Entities;
-using Game.Systems;
-using Game.Utilities;
 
 namespace Game.Editor;
 
@@ -19,7 +16,7 @@ public class EditorState
     public readonly MapData MapData;
     public readonly EnemySystem EnemySystem;
     public readonly DoorSystem DoorSystem;
-    public readonly Entities.Player Player;
+    public readonly Player Player;
     public readonly EditorCamera Camera;
     public readonly List<EditorLayer> Layers;
 
@@ -91,7 +88,7 @@ public class EditorState
     // Fires when state changes that the Blazor UI should reflect
     public event Action? StateChanged;
 
-    public EditorState(MapData mapData, EnemySystem enemySystem, DoorSystem doorSystem, Entities.Player player)
+    public EditorState(MapData mapData, EnemySystem enemySystem, DoorSystem doorSystem, Player player)
     {
         MapData = mapData;
         EnemySystem = enemySystem;

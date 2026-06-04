@@ -1,5 +1,5 @@
 #if CONSOLE_APP
-using Game;
+using Game.Core;
 
 var app = new Application();
 app.Run();

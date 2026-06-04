@@ -1,0 +1,226 @@
+using System.Numerics;
+using Raylib_cs;
+
+using Game.Features.LevelProgress;
+
+namespace Game.Features.Enemies;
+
+public enum EnemyState
+{
+    IDLE,
+    WALKING,
+    NOTICING,
+    /// <summary>At last known player position, sweeping left/right before resuming patrol.</summary>
+    SEARCHING,
+    ATTACKING,
+    /// <summary>Non-lethal hit reaction; shows first death frame then resumes <see cref="Enemy.ResumeStateAfterHit"/>.</summary>
+    HIT,
+    DYING,
+    COLLIDING,
+    /// <summary>Death animation finished; body lies here until linger time elapses.</summary>
+    CORPSE
+}
+
+public class Enemy
+{
+    public float MaxHealth { get; set; } = 25f;
+    public float Health { get; set; } = 25f;
+
+    public Vector3 Position { get; set; }
+    public float Rotation { get; set; }
+    public float MoveSpeed { get; set; }
+    public Rectangle FrameRect { get; set; }
+    public int FrameColumnIndex { get; set; }
+    public int FrameRowIndex { get; set; }
+    public float AnimationTimer { get; set; }
+    public int ShootingAnimationIndex { get; set; } = 1;
+    public int DyingAnimationIndex { get; set; }
+    public float AngleToPlayer  { get; set; }
+    public float DistanceFromPlayer { get; set; }
+    public EnemyState EnemyState { get; set; }
+    public bool IsShooting { get; set; } = false;
+
+    /// <summary>Attack animation frame column from the previous tick (per-enemy shoot detection).</summary>
+    public int PreviousAttackFrameColumn { get; set; } = -1;
+
+    /// <summary>Whether <see cref="IsShooting"/> was true last tick (per-enemy damage edge detection).</summary>
+    public bool WasShooting { get; set; }
+
+    /// <summary>
+    /// Time the enemy has spent in the current state (seconds).
+    /// Reset to 0 on every state transition via <see cref="TransitionTo"/>.
+    /// </summary>
+    public float StateTimer { get; set; }
+
+    /// <summary>
+    /// Time spent unable to move (slide fully blocked).
+    /// Reset on any successful slide; <see cref="TransitionTo"/> does NOT reset it
+    /// because COLLIDING enters by direct assignment, not a transition.
+    /// </summary>
+    public float StuckTimer { get; set; }
+
+    /// <summary>How long the body stays visible in <see cref="EnemyState.CORPSE"/> before removal (seconds).</summary>
+    public float CorpseLingerSeconds { get; set; } = 30f;
+
+    /// <summary>State to restore after <see cref="EnemyState.HIT"/> (set when entering hit reaction).</summary>
+    public EnemyState ResumeStateAfterHit { get; set; } = EnemyState.IDLE;
+
+    /// <summary>How long <see cref="EnemyState.HIT"/> lasts before resuming <see cref="ResumeStateAfterHit"/>.</summary>
+    public float HitReactionDurationSeconds { get; set; } = 0.4f;
+
+    /// <summary>When true, an ammo pickup is spawned at this enemy's position when they die.</summary>
+    public bool DropsAmmoOnDeath { get; set; }
+
+    /// <summary>Set on lethal hit; consumed by <see cref="Systems.EnemySystem"/> to spawn the drop once.</summary>
+    public bool PendingAmmoDrop { get; set; }
+
+    /// <summary>Score table id for this enemy (from level JSON <c>EnemyType</c>).</summary>
+    public EnemyKind ScoreKind { get; set; } = EnemyKind.Guard;
+
+    /// <summary>True after kill points were awarded for entering <see cref="EnemyState.DYING"/>.</summary>
+    public bool KillPointsAwarded { get; set; }
+
+    /// <summary>
+    /// Transition to a new state and reset the state timer.
+    /// </summary>
+    public void TransitionTo(EnemyState newState)
+    {
+        if (EnemyState == newState) return;
+
+        if (EnemyState == EnemyState.ATTACKING && newState != EnemyState.ATTACKING)
+            ResetShootingState();
+
+        EnemyState = newState;
+        StateTimer = 0f;
+    }
+
+    public void ResetShootingState()
+    {
+        IsShooting = false;
+        WasShooting = false;
+        PreviousAttackFrameColumn = -1;
+    }
+
+    /// <summary>True while the enemy participates in combat and collision (not during death or corpse).</summary>
+    public bool IsCombatActive =>
+        EnemyState != EnemyState.DYING && EnemyState != EnemyState.CORPSE;
+
+    public void ApplyDamage(float amount)
+    {
+        if (!IsCombatActive || amount <= 0f)
+            return;
+
+        Health = MathF.Max(0f, Health - amount);
+        if (Health <= 0f)
+        {
+            if (DropsAmmoOnDeath)
+                PendingAmmoDrop = true;
+            DyingAnimationIndex = 0;
+            AnimationTimer = 0f;
+            TransitionTo(EnemyState.DYING);
+            return;
+        }
+
+        if (EnemyState == EnemyState.HIT)
+        {
+            StateTimer = 0f;
+            return;
+        }
+
+        ResumeStateAfterHit = EnemyState;
+        AnimationTimer = 0f;
+        TransitionTo(EnemyState.HIT);
+    }
+
+    /// <summary>
+    /// Patrol path as world-space waypoints. Empty list means no patrol.
+    /// </summary>
+    public List<Vector3> PatrolPath { get; set; } = new();
+
+    /// <summary>
+    /// Whether this enemy has a patrol path to follow.
+    /// </summary>
+    public bool HasPatrolPath => PatrolPath.Count > 0;
+
+    /// <summary>
+    /// Index of the current target waypoint in the patrol path.
+    /// </summary>
+    public int CurrentWaypointIndex { get; set; }
+
+    /// <summary>
+    /// The enemy's starting position, used to return after completing the patrol loop.
+    /// </summary>
+    public Vector3 PatrolOrigin { get; set; }
+
+    // --- Line of Sight ---
+
+    /// <summary>
+    /// Whether the enemy can currently see the player.
+    /// </summary>
+    public bool CanSeePlayer { get; set; }
+
+    /// <summary>
+    /// The enemy's field-of-view half-angle in radians (total FOV = 2 * this).
+    /// </summary>
+    public float FovHalfAngle { get; set; } = MathF.PI / 3f; // 60 degrees half = 120 total
+
+    /// <summary>
+    /// Maximum sight range in tile units.
+    /// </summary>
+    public float SightRange { get; set; } = 12f;
+
+    /// <summary>
+    /// FOV polygon endpoints in tile-space for editor visualization.
+    /// First point is the enemy's origin, subsequent points are ray hit positions.
+    /// </summary>
+    public List<Vector2> FovPolygon { get; set; } = new();
+
+    // --- Pathfinding / Chase ---
+
+    /// <summary>
+    /// The last known world-space position where the enemy saw the player.
+    /// Used as the pathfinding target after losing line of sight.
+    /// </summary>
+    public Vector3? LastSeenPlayerPosition { get; set; }
+
+    /// <summary>
+    /// World-space waypoints produced by A* pathfinding.
+    /// </summary>
+    public List<Vector3> ChasePath { get; set; } = new();
+
+    /// <summary>
+    /// Index of the current waypoint the enemy is walking toward in <see cref="ChasePath"/>.
+    /// </summary>
+    public int ChasePathIndex { get; set; }
+
+    /// <summary>
+    /// True while <see cref="ChasePath"/> is routing the enemy back to a patrol waypoint
+    /// after search/chase (doors ignored during A* planning).
+    /// </summary>
+    public bool IsPatrolReturnPath { get; set; }
+
+    /// <summary>
+    /// Accumulator used to throttle how often a new path is computed.
+    /// </summary>
+    public float PathRefreshTimer { get; set; }
+
+    /// <summary>Seconds until this enemy may fire another hitscan shot at the player.</summary>
+    public float AttackCooldownRemaining { get; set; }
+
+    /// <summary>Facing when <see cref="EnemyState.SEARCHING"/> began (center of the sweep).</summary>
+    public float SearchBaseRotation { get; set; }
+
+    /// <summary>0 = sweep left, 1 = sweep right, 2 = return to center and finish.</summary>
+    public int SearchSweepStep { get; set; }
+}
+
+public class EnemyGuard : Enemy
+{
+    public EnemyGuard()
+    {
+        MaxHealth = 25f;
+        Health = MaxHealth;
+        CorpseLingerSeconds = 30f;
+        HitReactionDurationSeconds = 0.4f;
+    }
+}

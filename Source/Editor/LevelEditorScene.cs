@@ -1,5 +1,4 @@
 using System.Numerics;
-using Game.Systems;
 using ImGuiNET;
 using Raylib_cs;
 using rlImGui_cs;
@@ -21,12 +20,12 @@ public class LevelEditorScene : IScene
     /// </summary>
     private bool _suppressMapClickUntilRelease;
 
-    public LevelEditorScene(MapData mapData, EnemySystem enemySystem, DoorSystem doorSystem, Entities.Player player)
+    public LevelEditorScene(MapData mapData, EnemySystem enemySystem, DoorSystem doorSystem, Player player)
     {
         _state = new EditorState(mapData, enemySystem, doorSystem, player);
         _mapRenderer = new EditorMapRenderer(mapData);
         _gui = new EditorGui(mapData);
-        _collisionSystem = new CollisionSystem(new Utilities.LevelData(mapData), doorSystem);
+        _collisionSystem = new CollisionSystem(new LevelData(mapData), doorSystem);
     }
 
     public void OnEnter()
