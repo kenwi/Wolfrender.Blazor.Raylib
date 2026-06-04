@@ -175,7 +175,7 @@ public class LevelEditorScene : IScene
 
         // Draw player position indicator
         _mapRenderer.RenderPlayerIndicator(
-            _state.Player, _state.Camera, _state.MapData.PlayerSpawnRotation,
+            _state.Player, _state.Camera, _state.MapData.Spawn.Rotation,
             _state.HoveredPlayer, _state.IsPlayerSelected, _state.IsDraggingPlayer);
 
         // Pathfinding visualizer overlay

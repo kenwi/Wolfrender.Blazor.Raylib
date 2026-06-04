@@ -4,14 +4,6 @@ using static Raylib_cs.Raylib;
 
 namespace Game.Editor;
 
-public class PlayerSpawnData
-{
-    public int TileX { get; set; } = 30;
-    public int TileY { get; set; } = 28;
-    public float WorldY { get; set; } = 2f;
-    public float Rotation { get; set; } = -MathF.PI / 2f;
-}
-
 public class LevelFileData
 {
     public int Width { get; set; }
@@ -113,10 +105,10 @@ public static class LevelSerializer
             }).ToList(),
             PlayerSpawn = new PlayerSpawnData
             {
-                TileX = mapData.PlayerSpawnTileX,
-                TileY = mapData.PlayerSpawnTileY,
-                WorldY = mapData.PlayerSpawnWorldY,
-                Rotation = mapData.PlayerSpawnRotation
+                TileX = mapData.Spawn.TileX,
+                TileY = mapData.Spawn.TileY,
+                WorldY = mapData.Spawn.WorldY,
+                Rotation = mapData.Spawn.Rotation
             }
         };
 
@@ -162,10 +154,10 @@ public static class LevelSerializer
 
         if (fileData.PlayerSpawn != null)
         {
-            mapData.PlayerSpawnTileX = fileData.PlayerSpawn.TileX;
-            mapData.PlayerSpawnTileY = fileData.PlayerSpawn.TileY;
-            mapData.PlayerSpawnWorldY = fileData.PlayerSpawn.WorldY;
-            mapData.PlayerSpawnRotation = fileData.PlayerSpawn.Rotation;
+            mapData.Spawn.TileX = fileData.PlayerSpawn.TileX;
+            mapData.Spawn.TileY = fileData.PlayerSpawn.TileY;
+            mapData.Spawn.WorldY = fileData.PlayerSpawn.WorldY;
+            mapData.Spawn.Rotation = fileData.PlayerSpawn.Rotation;
         }
     }
 

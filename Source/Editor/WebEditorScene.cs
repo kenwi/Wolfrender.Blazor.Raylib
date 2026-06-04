@@ -125,7 +125,7 @@ public class WebEditorScene : IScene
         }
 
         _mapRenderer.RenderPlayerIndicator(
-            State.Player, State.Camera, State.MapData.PlayerSpawnRotation,
+            State.Player, State.Camera, State.MapData.Spawn.Rotation,
             State.HoveredPlayer, State.IsPlayerSelected, State.IsDraggingPlayer);
 
         var mouseScreen = GetMousePosition();

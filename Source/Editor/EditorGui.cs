@@ -1070,29 +1070,29 @@ public class EditorGui
         ImGui.Text("Player Spawn");
         ImGui.Separator();
 
-        int tileX = state.MapData.PlayerSpawnTileX;
-        int tileY = state.MapData.PlayerSpawnTileY;
+        int tileX = state.MapData.Spawn.TileX;
+        int tileY = state.MapData.Spawn.TileY;
         if (ImGui.InputInt("Tile X", ref tileX))
         {
             tileX = Math.Clamp(tileX, 0, _mapData.Width - 1);
-            state.SyncPlayerToSpawnTile(tileX, state.MapData.PlayerSpawnTileY);
+            state.SyncPlayerToSpawnTile(tileX, state.MapData.Spawn.TileY);
         }
         if (ImGui.InputInt("Tile Y", ref tileY))
         {
             tileY = Math.Clamp(tileY, 0, _mapData.Height - 1);
-            state.SyncPlayerToSpawnTile(state.MapData.PlayerSpawnTileX, tileY);
+            state.SyncPlayerToSpawnTile(state.MapData.Spawn.TileX, tileY);
         }
 
         ImGui.Spacing();
 
-        float worldX = state.MapData.PlayerSpawnTileX * LevelData.QuadSize;
-        float worldZ = state.MapData.PlayerSpawnTileY * LevelData.QuadSize;
+        float worldX = state.MapData.Spawn.TileX * LevelData.QuadSize;
+        float worldZ = state.MapData.Spawn.TileY * LevelData.QuadSize;
         ImGui.Text("World Position");
-        ImGui.Text($"  X: {worldX:F1}  Y: {state.MapData.PlayerSpawnWorldY:F1}  Z: {worldZ:F1}");
+        ImGui.Text($"  X: {worldX:F1}  Y: {state.MapData.Spawn.WorldY:F1}  Z: {worldZ:F1}");
 
         ImGui.Spacing();
 
-        int rotIndex = EditorState.GetSpawnRotationIndex(state.MapData.PlayerSpawnRotation);
+        int rotIndex = EditorState.GetSpawnRotationIndex(state.MapData.Spawn.Rotation);
         string[] labels = { "0°", "45°", "90°", "135°", "180°", "225°", "270°", "315°" };
         if (ImGui.SliderInt("Rotation", ref rotIndex, 0, 7, labels[rotIndex]))
             state.SetPlayerSpawnRotationIndex(rotIndex);

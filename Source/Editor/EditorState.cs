@@ -397,10 +397,7 @@ public class EditorState
         MapData.Objects = new uint[tileCount];
         MapData.Enemies.Clear();
         MapData.Pickups.Clear();
-        MapData.PlayerSpawnTileX = 30;
-        MapData.PlayerSpawnTileY = 28;
-        MapData.PlayerSpawnWorldY = 2f;
-        MapData.PlayerSpawnRotation = -MathF.PI / 2f;
+        MapData.Spawn = new PlayerSpawnPlacement();
         DeselectPlayer();
         SelectedEnemyIndex = -1;
         HoveredEnemyIndex = -1;
@@ -558,8 +555,8 @@ public class EditorState
         if (tileX < 0 || tileX >= MapData.Width || tileY < 0 || tileY >= MapData.Height)
             return;
 
-        MapData.PlayerSpawnTileX = tileX;
-        MapData.PlayerSpawnTileY = tileY;
+        MapData.Spawn.TileX = tileX;
+        MapData.Spawn.TileY = tileY;
         PlayerSpawn.ApplyFromMap(Player, MapData, PlayerSpawnApplyMode.PositionAndCameraOnly);
         NotifyStateChanged();
     }
@@ -567,7 +564,7 @@ public class EditorState
     public void SetPlayerSpawnRotationIndex(int rotIndex)
     {
         const float step = MathF.PI / 4f;
-        MapData.PlayerSpawnRotation = Math.Clamp(rotIndex, 0, 7) * step;
+        MapData.Spawn.Rotation = Math.Clamp(rotIndex, 0, 7) * step;
         PlayerSpawn.ApplyCameraFromMap(Player, MapData);
         NotifyStateChanged();
     }

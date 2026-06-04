@@ -20,7 +20,7 @@ public static class PlayerSpawn
     public static void ApplyFromMap(Player player, MapData mapData, PlayerSpawnApplyMode mode = PlayerSpawnApplyMode.FullReset)
     {
         player.Position = LevelData.GetTileAnchorWorld(
-            mapData.PlayerSpawnTileX, mapData.PlayerSpawnTileY, mapData.PlayerSpawnWorldY);
+            mapData.Spawn.TileX, mapData.Spawn.TileY, mapData.Spawn.WorldY);
         player.OldPosition = player.Position;
         player.Velocity = Vector3.Zero;
 
@@ -36,7 +36,7 @@ public static class PlayerSpawn
 
     public static void ApplyCameraFromMap(Player player, MapData mapData)
     {
-        float r = mapData.PlayerSpawnRotation;
+        float r = mapData.Spawn.Rotation;
         var forward = new Vector3(MathF.Cos(r), 0f, MathF.Sin(r));
 
         var cam = player.Camera;
