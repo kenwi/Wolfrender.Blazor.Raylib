@@ -1,3 +1,4 @@
+@namespace Wolfrender.Blazor.Raylib.Components.Editor
 @using Game.Editor
 
 @if (State.IsPlayerSelected)
@@ -6,19 +7,19 @@
         <div class="info-value">Player spawn</div>
 
         <div class="info-label" style="margin-top: 6px;">Tile X</div>
-        <input type="number" class="editor-input" value="@State.MapData.PlayerSpawnTileX" min="0" max="@(State.MapData.Width - 1)"
+        <input type="number" class="editor-input" value="@State.MapData.Spawn.TileX" min="0" max="@(State.MapData.Width - 1)"
                @onchange="SetTileX" />
 
         <div class="info-label" style="margin-top: 4px;">Tile Y</div>
-        <input type="number" class="editor-input" value="@State.MapData.PlayerSpawnTileY" min="0" max="@(State.MapData.Height - 1)"
+        <input type="number" class="editor-input" value="@State.MapData.Spawn.TileY" min="0" max="@(State.MapData.Height - 1)"
                @onchange="SetTileY" />
 
         <div class="info-label" style="margin-top: 6px;">World Position</div>
-        <div class="info-value">X: @((State.MapData.PlayerSpawnTileX * LevelData.QuadSize).ToString("F1")) &nbsp; Y: @State.MapData.PlayerSpawnWorldY.ToString("F1") &nbsp; Z: @((State.MapData.PlayerSpawnTileY * LevelData.QuadSize).ToString("F1"))</div>
+        <div class="info-value">X: @((State.MapData.Spawn.TileX * LevelData.QuadSize).ToString("F1")) &nbsp; Y: @State.MapData.Spawn.WorldY.ToString("F1") &nbsp; Z: @((State.MapData.Spawn.TileY * LevelData.QuadSize).ToString("F1"))</div>
 
-        <div class="info-label" style="margin-top: 6px;">Rotation: @RotationLabels[EditorState.GetSpawnRotationIndex(State.MapData.PlayerSpawnRotation)]</div>
+        <div class="info-label" style="margin-top: 6px;">Rotation: @RotationLabels[EditorState.GetSpawnRotationIndex(State.MapData.Spawn.Rotation)]</div>
         <input type="range" class="editor-slider" min="0" max="7" step="1"
-               value="@EditorState.GetSpawnRotationIndex(State.MapData.PlayerSpawnRotation)"
+               value="@EditorState.GetSpawnRotationIndex(State.MapData.Spawn.Rotation)"
                @onchange="SetRotation" />
     </WebEditorEntityPropertiesPanel>
 }
@@ -34,7 +35,7 @@
         if (int.TryParse(e.Value?.ToString(), out var val))
         {
             int x = Math.Clamp(val, 0, State.MapData.Width - 1);
-            State.SyncPlayerToSpawnTile(x, State.MapData.PlayerSpawnTileY);
+            State.SyncPlayerToSpawnTile(x, State.MapData.Spawn.TileY);
             OnChanged.InvokeAsync();
         }
     }
@@ -44,7 +45,7 @@
         if (int.TryParse(e.Value?.ToString(), out var val))
         {
             int y = Math.Clamp(val, 0, State.MapData.Height - 1);
-            State.SyncPlayerToSpawnTile(State.MapData.PlayerSpawnTileX, y);
+            State.SyncPlayerToSpawnTile(State.MapData.Spawn.TileX, y);
             OnChanged.InvokeAsync();
         }
     }

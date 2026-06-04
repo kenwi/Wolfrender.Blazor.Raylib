@@ -388,10 +388,10 @@ public class World : IScene
         int screenHeight = GetScreenHeight();
 
         if (_player.IsAlive && !_exitSystem.IsLevelComplete)
-            GameOverlayHud.DrawScore(_scoreSystem, screenWidth);
+            LevelProgressOverlayHud.DrawScore(_scoreSystem, screenWidth);
 
         if (_player.IsAlive && !_exitSystem.IsLevelComplete)
-            GameOverlayHud.DrawInventory(_player);
+            CombatOverlayHud.DrawInventory(_player);
 
         if (_player.IsAlive && !_consoleOverlay.IsOpen && !_exitSystem.IsBlockingGameplay)
             _animationSystem.RenderWeaponOverlay(screenWidth, screenHeight);
@@ -399,19 +399,19 @@ public class World : IScene
         _effectSystem.RenderScreenOverlay(screenWidth, screenHeight);
 
         if (_exitSystem.IsLevelComplete && !_consoleOverlay.IsOpen)
-            GameOverlayHud.DrawLevelComplete(_scoreSystem, screenWidth, screenHeight);
+            LevelProgressOverlayHud.DrawLevelComplete(_scoreSystem, screenWidth, screenHeight);
         else if (_exitSystem.IsExitPending && !_consoleOverlay.IsOpen)
-            GameOverlayHud.DrawExitCountdown(_exitSystem.ExitCountdownRemaining, screenWidth, screenHeight);
+            LevelProgressOverlayHud.DrawExitCountdown(_exitSystem.ExitCountdownRemaining, screenWidth, screenHeight);
         else if (_player.IsAlive && !_consoleOverlay.IsOpen && _doorSystem.HasLockedHint)
-            GameOverlayHud.DrawDoorLockedHint(_doorSystem, screenWidth, screenHeight);
+            DoorOverlayHud.DrawLockedHint(_doorSystem, screenWidth, screenHeight);
         else if (_player.IsAlive && !_consoleOverlay.IsOpen && _weaponSystem.HasNoAmmoHint)
-            GameOverlayHud.DrawNoAmmoHint(_weaponSystem, screenWidth, screenHeight);
+            CombatOverlayHud.DrawNoAmmoHint(_weaponSystem, screenWidth, screenHeight);
 
         if (!_player.IsAlive && !_consoleOverlay.IsOpen)
-            GameOverlayHud.DrawGameOver(screenWidth, screenHeight);
+            PlaySessionOverlayHud.DrawGameOver(screenWidth, screenHeight);
 
         if (!_consoleOverlay.IsOpen && !_inputState.IsMouseFree && _player.IsAlive && !_exitSystem.IsBlockingGameplay)
-            GameOverlayHud.DrawReticle(_effectSystem, screenWidth, screenHeight);
+            PlaySessionOverlayHud.DrawReticle(_effectSystem, screenWidth, screenHeight);
 
         if (_inputState.IsMinimapEnabled)
             _minimapSystem.Render(_player);
