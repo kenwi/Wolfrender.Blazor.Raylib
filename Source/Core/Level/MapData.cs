@@ -3,35 +3,9 @@ using Raylib_cs;
 namespace Game.Core.Level;
 
 /// <summary>
-/// A waypoint in an enemy patrol path, stored as tile coordinates.
-/// </summary>
-public class PatrolWaypoint
-{
-    public int TileX { get; set; }
-    public int TileY { get; set; }
-}
-
-/// <summary>
-/// Describes a placed enemy in tile coordinates, used for editor and serialization.
-/// </summary>
-public class EnemyPlacement
-{
-    public int TileX { get; set; }
-    public int TileY { get; set; }
-    public float Rotation { get; set; }
-    public string EnemyType { get; set; } = "Guard";
-    public List<PatrolWaypoint> PatrolPath { get; set; } = new();
-    public bool ShowPatrolPath { get; set; } = true;
-    /// <summary>When true, the enemy spawns already in <see cref="Enemies.EnemyState.CORPSE"/>.</summary>
-    public bool StartsAsCorpse { get; set; }
-
-    /// <summary>When true, killing this enemy spawns an ammo pickup at its death tile.</summary>
-    public bool DropsAmmo { get; set; }
-}
-
-/// <summary>
 /// Shared level data stored as raw tile ID arrays.
 /// Both the game and editor scenes reference this, and serialization operates on these arrays directly.
+/// Feature placement records live in <see cref="Game.Features.Enemies"/> and <see cref="Game.Features.Pickups"/>.
 /// </summary>
 public class MapData
 {

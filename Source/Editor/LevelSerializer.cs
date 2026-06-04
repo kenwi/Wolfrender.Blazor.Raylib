@@ -4,31 +4,6 @@ using static Raylib_cs.Raylib;
 
 namespace Game.Editor;
 
-public class PatrolWaypointData
-{
-    public int TileX { get; set; }
-    public int TileY { get; set; }
-}
-
-public class EnemyPlacementData
-{
-    public int TileX { get; set; }
-    public int TileY { get; set; }
-    public float Rotation { get; set; }
-    public string EnemyType { get; set; } = "Guard";
-    public List<PatrolWaypointData> PatrolPath { get; set; } = new();
-    public bool StartsAsCorpse { get; set; }
-    public bool DropsAmmo { get; set; }
-}
-
-public class PickupPlacementData
-{
-    public int TileX { get; set; }
-    public int TileY { get; set; }
-    public string Type { get; set; } = "Health";
-    public int Amount { get; set; }
-}
-
 public class PlayerSpawnData
 {
     public int TileX { get; set; } = 30;
