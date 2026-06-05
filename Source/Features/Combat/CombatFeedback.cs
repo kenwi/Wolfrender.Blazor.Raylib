@@ -1,4 +1,4 @@
-namespace Game.Engine.Audio;
+namespace Game.Features.Combat;
 
 public sealed class CombatFeedback : ICombatFeedback
 {

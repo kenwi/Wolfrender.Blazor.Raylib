@@ -1,4 +1,4 @@
-namespace Game.Engine.Audio;
+namespace Game.Features.Combat;
 
 /// <summary>Audio/visual feedback for combat events (keeps gameplay systems decoupled from Raylib).</summary>
 public interface ICombatFeedback
