@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using System.Numerics;
+using Game.Features.Doors;
+using Game.Features.Enemies;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 

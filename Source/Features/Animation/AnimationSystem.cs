@@ -1,5 +1,7 @@
 using System.Numerics;
 using Game.Features.Combat;
+using Game.Features.Enemies;
+using Game.Features.Players;
 using Raylib_cs;
 
 namespace Game.Features.Animation;

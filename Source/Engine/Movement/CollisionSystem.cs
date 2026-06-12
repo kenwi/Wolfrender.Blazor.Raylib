@@ -1,4 +1,6 @@
 using System.Numerics;
+using Game.Features.Doors;
+using Game.Features.Players;
 
 namespace Game.Engine.Movement;
 

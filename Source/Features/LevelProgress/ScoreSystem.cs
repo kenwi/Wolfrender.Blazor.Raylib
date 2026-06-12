@@ -1,4 +1,5 @@
-using Game.Features.LevelProgress;
+using Game.Features.Enemies;
+using Game.Features.Pickups;
 
 namespace Game.Features.LevelProgress;
 

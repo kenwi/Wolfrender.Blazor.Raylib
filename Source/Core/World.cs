@@ -1,6 +1,15 @@
 using System.Numerics;
 using Game.DebugConsole;
 using Game.Editor;
+using Game.Features.Animation;
+using Game.Features.Combat;
+using Game.Features.Doors;
+using Game.Features.Enemies;
+using Game.Features.Hud;
+using Game.Features.LevelProgress;
+using Game.Features.Pickups;
+using Game.Features.Players;
+using Game.Features.WorldObjects;
 using ImGuiNET;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
@@ -25,7 +34,6 @@ public class World : IScene
     private readonly CameraSystem _cameraSystem;
     private readonly DoorSystem _doorSystem;
     private readonly RenderSystem _renderSystem;
-    private readonly HudSystem _hudSystem;
     private readonly AnimationSystem _animationSystem;
     private readonly MinimapSystem _minimapSystem;
     private readonly ConsoleOverlay _consoleOverlay;
@@ -69,7 +77,6 @@ public class World : IScene
         _collisionSystem = new CollisionSystem(_level, _doorSystem);
         _cameraSystem = new CameraSystem(_collisionSystem);
         _renderSystem = new RenderSystem(_level, _tileTextures);
-        _hudSystem = new HudSystem(screenWidth, screenHeight);
         _minimapSystem = new MinimapSystem(_level, _renderSystem);
         _scoreSystem = new ScoreSystem();
         _exitSystem = new ExitSystem(_scoreSystem);
