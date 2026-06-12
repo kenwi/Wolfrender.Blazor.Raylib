@@ -11,14 +11,13 @@ using static Raylib_cs.Raylib;
 namespace Game.Features.Players;
 
 /// <summary>
-/// Orchestrates player update order. Does not replace <see cref="MovementSystem"/> / <see cref="CameraSystem"/>.
+/// Orchestrates player update order.
 /// Alive order: cooldown → velocity → movement → collision → pickup → camera → doors → animation → weapon switch → fire.
 /// </summary>
 public sealed class PlayerSystem
 {
     private readonly Player _player;
     private readonly InputSystem _inputSystem;
-    private readonly MovementSystem _movementSystem;
     private readonly CollisionSystem _collisionSystem;
     private readonly CameraSystem _cameraSystem;
     private readonly PickupSystem _pickupSystem;
@@ -37,7 +36,6 @@ public sealed class PlayerSystem
     public PlayerSystem(
         Player player,
         InputSystem inputSystem,
-        MovementSystem movementSystem,
         CollisionSystem collisionSystem,
         CameraSystem cameraSystem,
         PickupSystem pickupSystem,
@@ -50,7 +48,6 @@ public sealed class PlayerSystem
     {
         _player = player;
         _inputSystem = inputSystem;
-        _movementSystem = movementSystem;
         _collisionSystem = collisionSystem;
         _cameraSystem = cameraSystem;
         _pickupSystem = pickupSystem;
@@ -99,11 +96,13 @@ public sealed class PlayerSystem
         _weaponSystem.Update(deltaTime);
         _player.WeaponCooldownRemaining = MathF.Max(0f, _player.WeaponCooldownRemaining - deltaTime);
 
-        _player.Velocity = _inputSystem.GetMoveDirection(_player) * _player.MoveSpeed;
-        _movementSystem.Update(_player, deltaTime);
-        _collisionSystem.Update(_player, deltaTime);
+        _player.Velocity = _inputSystem.GetMoveDirection(_player.Camera) * _player.MoveSpeed;
+        MoveWithCollision(deltaTime);
         _pickupSystem.Update(_player);
-        _cameraSystem.Update(_player, input.IsMouseFree, mouseDelta);
+
+        var camera = _player.Camera;
+        _cameraSystem.Update(ref camera, _player.Position, input.IsMouseFree, mouseDelta);
+        _player.Camera = camera;
         _doorSystem.Update(deltaTime, doorInput, _player, _enemySystem.Enemies);
 
         bool wantsFire = !input.IsMouseFree && WantsPrimaryFire(input, _player);
@@ -122,10 +121,24 @@ public sealed class PlayerSystem
     {
         HandleDeathOnce();
         _player.Velocity = Vector3.Zero;
-        _cameraSystem.UpdateDeathFall(_player, deltaTime);
+
+        var camera = _player.Camera;
+        _cameraSystem.UpdateDeathFall(ref camera, _player.Position, deltaTime);
+        _player.Camera = camera;
         _doorSystem.Update(deltaTime, input, _player, _enemySystem.Enemies);
         _animationSystem.Update(deltaTime);
         TryRestartFromGameOver();
+    }
+
+    /// <summary>Advance position by velocity, then resolve walls/objects/doors with axis sliding.</summary>
+    private void MoveWithCollision(float deltaTime)
+    {
+        _player.OldPosition = _player.Position;
+        if (_player.Velocity.LengthSquared() <= 0f)
+            return;
+
+        Vector3 desired = _player.Position + _player.Velocity * deltaTime;
+        _player.Position = _collisionSystem.ResolveMovement(_player.OldPosition, desired, _player.CollisionRadius);
     }
 
     private void HandleDeathOnce()

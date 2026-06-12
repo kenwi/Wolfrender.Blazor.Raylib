@@ -1,5 +1,4 @@
 using System.Numerics;
-using Game.Features.Players;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 
@@ -162,12 +161,12 @@ public class InputSystem
         return 0;
     }
 
-    public Vector3 GetMoveDirection(Player player)
+    public Vector3 GetMoveDirection(Camera3D camera)
     {
         Vector3 direction = Vector3.Zero;
 
         // Calculate forward direction (camera look direction)
-        Vector3 targetToPosition = player.Camera.Target - player.Camera.Position;
+        Vector3 targetToPosition = camera.Target - camera.Position;
         float targetDistance = targetToPosition.Length();
 
         if (targetDistance < 0.001f)

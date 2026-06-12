@@ -171,6 +171,6 @@ public sealed class WeaponSystem
 
         _effectSystem.TriggerReticleFireFlash();
         _animationSystem.PlayWeaponFire(player.Weapons.ActiveWeapon);
-        _soundSystem.PlayWeaponFire(player.Weapons.ActiveWeapon);
+        _soundSystem.PlaySfx(def.FireSoundPath);
     }
 }

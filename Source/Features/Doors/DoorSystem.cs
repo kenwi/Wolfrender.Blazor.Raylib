@@ -5,7 +5,7 @@ using Raylib_cs;
 
 namespace Game.Features.Doors;
 
-public class DoorSystem
+public class DoorSystem : IMovementBlocker
 {
     private readonly List<Texture2D> _textures;
     private readonly List<Door> _doors;
@@ -166,6 +166,9 @@ public class DoorSystem
         door.TimeDoorHasBeenOpen = 0;
         door.TimeDoorHasBeenOpening = 0;
     }
+
+    /// <summary><see cref="IMovementBlocker"/>: closed/moving doors block movement.</summary>
+    public bool IsBlocking(Vector3 position, float radius) => IsDoorBlocking(position, radius);
 
     public bool IsDoorBlocking(Vector3 playerPosition, float radius)
     {

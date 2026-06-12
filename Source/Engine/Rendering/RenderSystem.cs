@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Numerics;
-using Game.Features.Players;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 
@@ -27,7 +26,7 @@ public class RenderSystem
         _maxAngleDot = maxAngleDot;
     }
 
-    public void Render(Player player)
+    public void Render(Camera3D camera)
     {
         // Reset number of quads that is being drawed
         LevelData.DrawedQuads = 0;
@@ -35,12 +34,12 @@ public class RenderSystem
         // Clear rendered tiles tracking
         _renderedTiles.Clear();
         
-        Vector3 cameraForward = Vector3.Normalize(player.Camera.Target - player.Camera.Position);
-        Vector3 cameraPosXZ = new Vector3(player.Camera.Position.X, 0, player.Camera.Position.Z);
+        Vector3 cameraForward = Vector3.Normalize(camera.Target - camera.Position);
+        Vector3 cameraPosXZ = new Vector3(camera.Position.X, 0, camera.Position.Z);
         float drawDistanceWorld = _drawDistance * TileSize;
 
-        int cameraTileX = (int)(player.Camera.Position.X / TileSize + 0.5f);
-        int cameraTileY = (int)(player.Camera.Position.Z / TileSize + 0.5f);
+        int cameraTileX = (int)(camera.Position.X / TileSize + 0.5f);
+        int cameraTileY = (int)(camera.Position.Z / TileSize + 0.5f);
         int minX = Math.Max(0, cameraTileX - (int)_drawDistance);
         int maxX = Math.Min(_level.Width - 1, cameraTileX + (int)_drawDistance);
         int minY = Math.Max(0, cameraTileY - (int)_drawDistance);
@@ -61,7 +60,7 @@ public class RenderSystem
 
                 if (dot > _maxAngleDot || distance < 10)
                 {
-                    RenderTile(x, y, tilePos, player.Camera.Position);
+                    RenderTile(x, y, tilePos, camera.Position);
                     // Track that this tile was rendered
                     _renderedTiles.Add((x, y));
                 }

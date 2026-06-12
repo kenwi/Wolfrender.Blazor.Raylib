@@ -13,9 +13,9 @@ public static class PickupSprites
 
     /// <summary>Column count for tile and pickup palette grids.</summary>
     public const int PaletteColumns = 3;
-    public const int SheetWidth = 261;
-    public const int SheetHeight = 1053;
-    public const string SheetPath = "resources/Objects.png";
+    public const int SheetWidth = ObjectSprites.SheetWidth;
+    public const int SheetHeight = ObjectSprites.SheetHeight;
+    public const string SheetPath = ObjectSprites.SheetPath;
 
     /// <summary>Index of <see cref="SheetPath"/> in <see cref="MapData.GameTextures"/> (<see cref="Game.GameTextureIndex.Objects"/>).</summary>
     public const int ObjectsTextureIndex = GameTextureIndex.Objects;

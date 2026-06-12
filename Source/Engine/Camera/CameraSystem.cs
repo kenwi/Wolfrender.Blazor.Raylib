@@ -1,5 +1,4 @@
 using System.Numerics;
-using Game.Features.Players;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 
@@ -36,16 +35,15 @@ public class CameraSystem
         _deathFallT = 0f;
     }
 
-    /// <summary>Collapse the view toward the floor after the player dies.</summary>
-    public void UpdateDeathFall(Player player, float deltaTime)
+    /// <summary>Collapse the view toward the floor after the viewer dies.</summary>
+    public void UpdateDeathFall(ref Camera3D camera, Vector3 position, float deltaTime)
     {
         if (!_deathFallActive)
         {
             _deathFallActive = true;
             _deathFallT = 0f;
 
-            var cam = player.Camera;
-            Vector3 initialForward = cam.Target - cam.Position;
+            Vector3 initialForward = camera.Target - camera.Position;
             if (initialForward.LengthSquared() > 0.0001f)
                 _deathBaseForward = Vector3.Normalize(initialForward);
         }
@@ -61,17 +59,13 @@ public class CameraSystem
 
         Vector3 lookForward = Vector3.Normalize(horizontal + new Vector3(0f, -2.5f * t, 0f));
 
-        var camera = player.Camera;
-        camera.Position = player.Position + new Vector3(0f, DeathFloorEyeOffsetY * t, 0f);
+        camera.Position = position + new Vector3(0f, DeathFloorEyeOffsetY * t, 0f);
         camera.Target = camera.Position + lookForward * DeathLookDistance;
         camera.Up = Vector3.UnitY;
-        player.Camera = camera;
     }
 
-    public void Update(Player player, bool isMouseFree, Vector2 mouseDelta)
+    public void Update(ref Camera3D camera, Vector3 position, bool isMouseFree, Vector2 mouseDelta)
     {
-        var camera = player.Camera;
-
         // Get current look direction before any updates
         Vector3 forward = Vector3.Normalize(camera.Target - camera.Position);
         float lookDistance = Vector3.Distance(camera.Target, camera.Position);
@@ -106,14 +100,11 @@ public class CameraSystem
             }
         }
 
-        // Sync camera position with player position (after collision resolution)
-        camera.Position = player.Position;
-        
+        // Sync camera position with the viewer position (after collision resolution)
+        camera.Position = position;
+
         // Set target based on position and look direction
         camera.Target = camera.Position + forward * lookDistance;
-
-        // Sync back
-        player.Camera = camera;
     }
 }
 

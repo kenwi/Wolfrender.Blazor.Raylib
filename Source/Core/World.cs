@@ -29,7 +29,6 @@ public class World : IScene
     private readonly List<Texture2D> _tileTextures;
     private readonly List<Texture2D> _gameTextures;
     private readonly InputSystem _inputSystem;
-    private readonly MovementSystem _movementSystem;
     private readonly CollisionSystem _collisionSystem;
     private readonly CameraSystem _cameraSystem;
     private readonly DoorSystem _doorSystem;
@@ -72,7 +71,6 @@ public class World : IScene
         _effectSystem = new EffectSystem();
         _combatFeedback = new CombatFeedback(_soundSystem, _effectSystem);
         _inputSystem = new InputSystem();
-        _movementSystem = new MovementSystem();
         _doorSystem = new DoorSystem(mapData.Doors, mapData.Width, _tileTextures);
         _collisionSystem = new CollisionSystem(_level, _doorSystem);
         _cameraSystem = new CameraSystem(_collisionSystem);
@@ -104,7 +102,6 @@ public class World : IScene
         _playerSystem = new PlayerSystem(
             _player,
             _inputSystem,
-            _movementSystem,
             _collisionSystem,
             _cameraSystem,
             _pickupSystem,
@@ -357,7 +354,7 @@ public class World : IScene
             PrimitiveRenderer.ApplyWallLightingUniforms();
         }
 
-        _renderSystem.Render(_player);
+        _renderSystem.Render(_player.Camera);
         _doorSystem.Render();
         _animationSystem.Render();
 

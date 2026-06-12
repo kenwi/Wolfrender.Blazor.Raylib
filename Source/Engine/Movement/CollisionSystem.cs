@@ -1,19 +1,17 @@
 using System.Numerics;
-using Game.Features.Doors;
-using Game.Features.Players;
 
 namespace Game.Engine.Movement;
 
 public class CollisionSystem
 {
     private readonly LevelData _level;
-    private readonly DoorSystem _doorSystem;
+    private readonly IMovementBlocker _movementBlocker;
     private const float TileSize = 4.0f;
 
-    public CollisionSystem(LevelData level, DoorSystem doorSystem)
+    public CollisionSystem(LevelData level, IMovementBlocker movementBlocker)
     {
         _level = level;
-        _doorSystem = doorSystem;
+        _movementBlocker = movementBlocker;
     }
 
     public bool CheckCollisionAtPosition(Vector3 position, float radius)
@@ -36,7 +34,7 @@ public class CollisionSystem
         if (IsObjectBlockingAt(position.X, position.Z, radius))
             return true;
 
-        if (_doorSystem.IsDoorBlocking(position, radius))
+        if (_movementBlocker.IsBlocking(position, radius))
             return true;
 
         return false;
@@ -61,16 +59,6 @@ public class CollisionSystem
             return slideZ;
 
         return from;
-    }
-
-    public void Update(Player player, float deltaTime)
-    {
-        if (player.Velocity.Length() <= 0)
-            return;
-
-        // MovementSystem has already set player.Position to the desired position
-        // (player.Position = oldPosition + player.Velocity * deltaTime)
-        player.Position = ResolveMovement(player.OldPosition, player.Position, player.CollisionRadius);
     }
 
     private bool IsWallBlockingProbe(float probeX, float probeZ)
