@@ -1,4 +1,5 @@
 using System.Numerics;
+using Game.Features.Players;
 
 namespace Game.Features.LevelProgress;
 

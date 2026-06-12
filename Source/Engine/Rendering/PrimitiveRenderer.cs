@@ -10,6 +10,12 @@ public static class PrimitiveRenderer
 {
     // Color key for transparency: #980088 (R:152, G:0, B:136) - public for hit-testing vs CPU sprite samples.
     public static readonly Color SpriteTransparencyKey = new Color(152, 0, 136, 255);
+    /// <summary>Maximum point lights the lighting shaders support per frame.</summary>
+    public const int MaxShaderLights = 8;
+
+    /// <summary>Default world-unit radius for tile light falloff (about seven 4-unit tiles).</summary>
+    public const float DefaultTileLightRadius = 28f;
+
     private static Shader? _colorKeyShader;
     private static int _colorKeyShaderLoc;
 
@@ -20,7 +26,7 @@ public static class PrimitiveRenderer
     private static int _lightingShaderMinBrightnessLoc;
     private static int _lightingShaderTileLightCountLoc;
     private static int _lightingShaderTileLightRadiusLoc;
-    private static readonly int[] _lightingShaderTileLightLocs = new int[LightObjectEncoding.MaxShaderLights];
+    private static readonly int[] _lightingShaderTileLightLocs = new int[MaxShaderLights];
 
     private static Shader? _spriteLitShader;
     private static int _spriteLitPlayerPosLoc;
@@ -29,12 +35,12 @@ public static class PrimitiveRenderer
     private static int _spriteLitColorKeyLoc;
     private static int _spriteLitTileLightCountLoc;
     private static int _spriteLitTileLightRadiusLoc;
-    private static readonly int[] _spriteLitTileLightLocs = new int[LightObjectEncoding.MaxShaderLights];
+    private static readonly int[] _spriteLitTileLightLocs = new int[MaxShaderLights];
 
     private static Vector3 _lightingPlayerPosition;
     private static float _cachedMaxLightDistance = 50f;
     private static float _cachedMinBrightness = 0.1f;
-    private static float _cachedTileLightRadius = LightObjectEncoding.DefaultRadius;
+    private static float _cachedTileLightRadius = DefaultTileLightRadius;
     private static Vector3[] _activeTileLights = Array.Empty<Vector3>();
 
     // rlgl texture coordinates use a different V origin than DrawTexturePro.
@@ -135,7 +141,7 @@ public static class PrimitiveRenderer
         SetShaderValue(shader, maxDistanceLoc, _cachedMaxLightDistance, ShaderUniformDataType.Float);
         SetShaderValue(shader, minBrightnessLoc, _cachedMinBrightness, ShaderUniformDataType.Float);
 
-        int lightCount = Math.Min(_activeTileLights.Length, LightObjectEncoding.MaxShaderLights);
+        int lightCount = Math.Min(_activeTileLights.Length, MaxShaderLights);
         if (tileLightCountLoc >= 0)
             SetShaderValue(shader, tileLightCountLoc, (float)lightCount, ShaderUniformDataType.Float);
 
@@ -237,7 +243,7 @@ public static class PrimitiveRenderer
         float maxDistance = 50.0f,
         float minBrightness = 0.1f,
         ReadOnlySpan<Vector3> tileLights = default,
-        float tileLightRadius = LightObjectEncoding.DefaultRadius)
+        float tileLightRadius = DefaultTileLightRadius)
     {
         _lightingPlayerPosition = playerPosition;
         _cachedMaxLightDistance = maxDistance;

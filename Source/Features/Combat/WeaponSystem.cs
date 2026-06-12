@@ -1,5 +1,8 @@
 using System.Numerics;
-using Game.Features.Combat;
+using Game.Features.Animation;
+using Game.Features.Doors;
+using Game.Features.Enemies;
+using Game.Features.Players;
 using Raylib_cs;
 
 namespace Game.Features.Combat;
@@ -168,6 +171,6 @@ public sealed class WeaponSystem
 
         _effectSystem.TriggerReticleFireFlash();
         _animationSystem.PlayWeaponFire(player.Weapons.ActiveWeapon);
-        _soundSystem.PlayWeaponFire(player.Weapons.ActiveWeapon);
+        _soundSystem.PlaySfx(def.FireSoundPath);
     }
 }

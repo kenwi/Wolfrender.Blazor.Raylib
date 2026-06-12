@@ -1,5 +1,9 @@
 using System.Numerics;
+using Game.Features.Combat;
+using Game.Features.Doors;
 using Game.Features.LevelProgress;
+using Game.Features.Pickups;
+using Game.Features.Players;
 
 namespace Game.Features.Enemies;
 

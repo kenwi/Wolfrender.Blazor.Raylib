@@ -1,4 +1,7 @@
 using System.Numerics;
+using Game.Features.Enemies;
+using Game.Features.LevelProgress;
+using Game.Features.Players;
 
 namespace Game.DebugConsole;
 

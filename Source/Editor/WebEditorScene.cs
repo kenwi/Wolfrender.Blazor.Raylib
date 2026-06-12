@@ -1,4 +1,7 @@
 using System.Numerics;
+using Game.Features.Doors;
+using Game.Features.Enemies;
+using Game.Features.Players;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 using Color = Raylib_cs.Color;

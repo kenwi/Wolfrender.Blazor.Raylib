@@ -1,6 +1,15 @@
 using System.Numerics;
 using Game.DebugConsole;
 using Game.Editor;
+using Game.Features.Animation;
+using Game.Features.Combat;
+using Game.Features.Doors;
+using Game.Features.Enemies;
+using Game.Features.Hud;
+using Game.Features.LevelProgress;
+using Game.Features.Pickups;
+using Game.Features.Players;
+using Game.Features.WorldObjects;
 using ImGuiNET;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
@@ -20,12 +29,10 @@ public class World : IScene
     private readonly List<Texture2D> _tileTextures;
     private readonly List<Texture2D> _gameTextures;
     private readonly InputSystem _inputSystem;
-    private readonly MovementSystem _movementSystem;
     private readonly CollisionSystem _collisionSystem;
     private readonly CameraSystem _cameraSystem;
     private readonly DoorSystem _doorSystem;
     private readonly RenderSystem _renderSystem;
-    private readonly HudSystem _hudSystem;
     private readonly AnimationSystem _animationSystem;
     private readonly MinimapSystem _minimapSystem;
     private readonly ConsoleOverlay _consoleOverlay;
@@ -64,12 +71,10 @@ public class World : IScene
         _effectSystem = new EffectSystem();
         _combatFeedback = new CombatFeedback(_soundSystem, _effectSystem);
         _inputSystem = new InputSystem();
-        _movementSystem = new MovementSystem();
         _doorSystem = new DoorSystem(mapData.Doors, mapData.Width, _tileTextures);
         _collisionSystem = new CollisionSystem(_level, _doorSystem);
         _cameraSystem = new CameraSystem(_collisionSystem);
         _renderSystem = new RenderSystem(_level, _tileTextures);
-        _hudSystem = new HudSystem(screenWidth, screenHeight);
         _minimapSystem = new MinimapSystem(_level, _renderSystem);
         _scoreSystem = new ScoreSystem();
         _exitSystem = new ExitSystem(_scoreSystem);
@@ -97,7 +102,6 @@ public class World : IScene
         _playerSystem = new PlayerSystem(
             _player,
             _inputSystem,
-            _movementSystem,
             _collisionSystem,
             _cameraSystem,
             _pickupSystem,
@@ -350,7 +354,7 @@ public class World : IScene
             PrimitiveRenderer.ApplyWallLightingUniforms();
         }
 
-        _renderSystem.Render(_player);
+        _renderSystem.Render(_player.Camera);
         _doorSystem.Render();
         _animationSystem.Render();
 

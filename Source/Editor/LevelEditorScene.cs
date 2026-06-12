@@ -1,4 +1,7 @@
 using System.Numerics;
+using Game.Features.Doors;
+using Game.Features.Enemies;
+using Game.Features.Players;
 using ImGuiNET;
 using Raylib_cs;
 using rlImGui_cs;

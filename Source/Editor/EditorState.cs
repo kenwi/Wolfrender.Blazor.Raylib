@@ -1,4 +1,8 @@
 using System.Numerics;
+using Game.Features.Doors;
+using Game.Features.Enemies;
+using Game.Features.Pickups;
+using Game.Features.Players;
 
 namespace Game.Editor;
 

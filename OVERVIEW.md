@@ -1,6 +1,6 @@
 # Wolfrender - project overview
 
-Wolfrender is a Wolfenstein-inspired, tile-based first-person experience: game logic is written in C# against **Raylib** (via Raylib-cs), and the primary shipping target is the browser as **Blazor WebAssembly**. The same core types-levels, entities, and systems-back both play mode and editing. An optional **desktop** host compiles to a native Raylib window when `CONSOLE_APP` is defined: entry point switches in [`Program.cs`](Program.cs) from the WASM host to [`Source/Game/Application.cs`](Source/Game/Application.cs), which runs the classic init/update/render loop.
+Wolfrender is a Wolfenstein-inspired, tile-based first-person experience: game logic is written in C# against **Raylib** (via Raylib-cs), and the primary shipping target is the browser as **Blazor WebAssembly**. The same core types-levels, entities, and systems-back both play mode and editing. An optional **desktop** host compiles to a native Raylib window when `CONSOLE_APP` is defined: entry point switches in [`Program.cs`](Program.cs) from the WASM host to [`Source/Core/Application.cs`](Source/Core/Application.cs), which runs the classic init/update/render loop.
 
 This document is the high-level architecture tour. For short credits, see [README.md](README.md).
 
@@ -9,7 +9,7 @@ This document is the high-level architecture tour. For short credits, see [READM
 - **Blazor shell**: [`Program.cs`](Program.cs) builds a `WebAssemblyHost`, mounts [`App.razor`](App.razor), and registers services (see [`Services/RegisterServices.cs`](Services/RegisterServices.cs)). Routing sends `/` and `/editor` to their Razor pages.
 - **Raylib on the web**: [`Components/Raylib.razor`](Components/Raylib.razor) renders a full-viewport `<canvas>`. [`Components/Raylib.razor.cs`](Components/Raylib.razor.cs) imports [`wwwroot/js/raylib.js`](wwwroot/js/raylib.js), initializes the bridge, and drives a render loop that invokes the page’s `OnRender` callback each frame (browser `requestAnimationFrame` path).
 - **Native Raylib for WASM**: [`Raylib.props`](Raylib.props) wires Emscripten-oriented settings (including linking `raylib.a`, WASM native build, and exception handling). Details vary by Debug vs Release; treat this file as the source of truth for build flags.
-- **Shared game core**: Pages construct [`IScene`](Source/Game/IScene.cs) implementations-[`World`](Source/Game/World.cs) for play, editor scenes for tooling-living mostly under [`Source/Game`](Source/Game) and [`Source/Editor`](Source/Editor).
+- **Shared game core**: Pages construct [`IScene`](Source/Core/IScene.cs) implementations-[`World`](Source/Core/World.cs) for play, editor scenes for tooling-living under [`Source/Core`](Source/Core), [`Source/Engine`](Source/Engine), [`Source/Features`](Source/Features), and [`Source/Editor`](Source/Editor).
 
 ```mermaid
 flowchart LR
@@ -40,7 +40,7 @@ flowchart LR
 
 ### `/` - Play
 
-[`Pages/ThreeDFirstPerson.razor`](Pages/ThreeDFirstPerson.razor) hosts the [`Raylib`](Components/Raylib.razor) canvas for the main game. [`ThreeDFirstPerson.razor.cs`](Pages/ThreeDFirstPerson.razor.cs) lists assets under `wwwroot`, preloads them into the Emscripten virtual filesystem (`Raylib.PreloadFile`), then opens the Raylib window and audio device at the browser size. The active scene is [`World`](Source/Game/World.cs).
+[`Pages/ThreeDFirstPerson.razor`](Pages/ThreeDFirstPerson.razor) hosts the [`Raylib`](Components/Raylib.razor) canvas for the main game. [`ThreeDFirstPerson.razor.cs`](Pages/ThreeDFirstPerson.razor.cs) lists assets under `wwwroot`, preloads them into the Emscripten virtual filesystem (`Raylib.PreloadFile`), then opens the Raylib window and audio device at the browser size. The active scene is [`World`](Source/Core/World.cs).
 
 Small **HTML overlays** sit above the canvas when toggled: **Backspace** opens an options panel (volume, mouse sensitivity, resolution downsampling) and coordinates cursor capture with the game; **`I`** toggles a debug log panel.
 
@@ -50,26 +50,26 @@ Small **HTML overlays** sit above the canvas when toggled: **Backspace** opens a
 
 ## Editor: two UIs, one data model
 
-Editors and the game share **[`MapData`](Source/Game/MapData.cs)**-floor, walls, ceiling, doors grids plus enemy placements-and **[`EditorState`](Source/Editor/EditorState.cs)** for tool mode, layers, camera, and simulation toggles. **[`EditorMapRenderer`](Source/Editor/EditorMapRenderer.cs)** draws the top-down map view.
+Editors and the game share **[`MapData`](Source/Core/Level/MapData.cs)**-floor, walls, ceiling, doors grids plus enemy, pickup, and player-spawn placements-and **[`EditorState`](Source/Editor/EditorState.cs)** for tool mode, layers, camera, and simulation toggles. **[`EditorMapRenderer`](Source/Editor/EditorMapRenderer.cs)** draws the top-down map view.
 
 | Host | Scene | UI |
 |------|--------|-----|
 | Desktop (`Application`) | [`LevelEditorScene`](Source/Editor/LevelEditorScene.cs) | ImGui via [`EditorGui`](Source/Editor/EditorGui.cs) / rlImGui |
 | Web (`/editor`) | [`WebEditorScene`](Source/Editor/WebEditorScene.cs) | Blazor components |
 
-On **desktop**, [`Application.Run`](Source/Game/Application.cs) uses **F1** to swap between `World` and `LevelEditorScene`. If the project defines **`EDITOR`** at compile time, startup can begin in the editor instead of the game.
+On **desktop**, [`Application.Run`](Source/Core/Application.cs) uses **F1** to swap between `World` and `LevelEditorScene`. If the project defines **`EDITOR`** at compile time, startup can begin in the editor instead of the game.
 
 On **web**, [`WebEditor.razor.cs`](Pages/WebEditor.razor.cs) uses **Q** to toggle between `WebEditorScene` and `World` so you can **play-test** the same `EnemySystem`, `DoorSystem`, and `Player` instance without leaving the editor route.
 
-Levels load and save through **[`LevelSerializer`](Source/Editor/LevelSerializer.cs)** (JSON). The bundled level shipped with the app is [`wwwroot/resources/level.json`](wwwroot/resources/level.json); [`Application.LoadMapData`](Source/Game/Application.cs) is the shared loader used when constructing scenes.
+Levels load and save through **[`LevelSerializer`](Source/Core/Level/LevelSerializer.cs)** (JSON); feature placements (enemies, pickups, player spawn) map through DTOs owned by their feature slices. The bundled level shipped with the app is [`wwwroot/resources/level.json`](wwwroot/resources/level.json); [`Application.LoadMapData`](Source/Core/Application.cs) is the shared loader used when constructing scenes.
 
 ## Game runtime: `World` and systems
 
-[`World`](Source/Game/World.cs) implements `IScene` and coordinates the gameplay systems under [`Source/Game/Systems`](Source/Game/Systems): input, movement, collision, camera, doors, enemies, animation, sound, HUD, minimap, and rendering. **[`RenderSystem`](Source/Game/Systems/RenderSystem.cs)** walks tiles in range of the player, applies a forward-facing / distance heuristic, and draws textured geometry (see also utilities such as [`PrimitiveRenderer`](Source/Game/Utilities/PrimitiveRenderer.cs)).
+[`World`](Source/Core/World.cs) implements `IScene` and is the composition root for the gameplay systems. Infrastructure systems live under [`Source/Engine`](Source/Engine) (input, movement, collision, camera, audio, rendering) and feature slices under [`Source/Features`](Source/Features) (combat, enemies, pickups, doors, players, level progress, world objects, animation, HUD). **[`RenderSystem`](Source/Engine/Rendering/RenderSystem.cs)** walks tiles in range of the player, applies a forward-facing / distance heuristic, and draws textured geometry (see also utilities such as [`PrimitiveRenderer`](Source/Engine/Rendering/PrimitiveRenderer.cs)).
 
-For deeper behaviour while running (e.g. pause, mouse capture, minimap), see **[`InputSystem`](Source/Game/Systems/InputSystem.cs)**.
+For deeper behaviour while running (e.g. pause, mouse capture, minimap), see **[`InputSystem`](Source/Engine/Input/InputSystem.cs)**.
 
-There is also an in-game **debug console**: overlay and command plumbing live under [`Source/Game/Console`](Source/Game/Console), with commands wired for the `World` session.
+There is also an in-game **debug console**: overlay and command plumbing live under [`Source/DebugConsole`](Source/DebugConsole), with commands wired for the `World` session.
 
 **Runtime assets** (textures, shaders, music, level JSON) live under [`wwwroot/resources`](wwwroot/resources) and are preloaded from the page code when running in WASM.
 

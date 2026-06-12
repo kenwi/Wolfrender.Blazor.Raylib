@@ -1,4 +1,6 @@
-// Phase 1 vertical slice: shared namespaces for the game core (WASM + desktop).
+// Infrastructure-only global usings (WASM + desktop).
+// Feature slices, DebugConsole, and Editor must be imported explicitly so
+// cross-slice dependencies stay visible and greppable.
 global using Game.Core;
 global using Game.Core.Level;
 global using Game.Engine.Input;
@@ -6,15 +8,3 @@ global using Game.Engine.Movement;
 global using Game.Engine.Camera;
 global using Game.Engine.Rendering;
 global using Game.Engine.Audio;
-global using Game.Features.Players;
-global using Game.Features.Combat;
-global using Game.Features.Enemies;
-global using Game.Features.Pickups;
-global using Game.Features.Doors;
-global using Game.Features.LevelProgress;
-global using Game.Features.WorldObjects;
-global using Game.Features.Animation;
-global using Game.Features.Hud;
-global using Game.DebugConsole;
-global using Game.DebugConsole.Commands;
-global using Game.Editor;

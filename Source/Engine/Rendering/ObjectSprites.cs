@@ -6,7 +6,7 @@ namespace Game.Engine.Rendering;
 /// <summary>
 /// Sprite sheet layout for blocking placed objects on <c>Objects.png</c>
 /// (4×5 grid of 64×64 frames starting at 1, 309).
-/// Pickup frames on the same sheet are defined in <see cref="PickupSprites"/>.
+/// Pickup frames on the same sheet are defined in <c>Game.Features.Pickups.PickupSprites</c>.
 /// </summary>
 public static class ObjectSprites
 {
@@ -24,9 +24,17 @@ public static class ObjectSprites
     /// <summary>Display size for palette icons; matches tile palette buttons in the editor.</summary>
     public const int PaletteIconSize = 64;
 
-    public const string SheetPath = PickupSprites.SheetPath;
-    public const int SheetWidth = PickupSprites.SheetWidth;
-    public const int SheetHeight = PickupSprites.SheetHeight;
+    public const string SheetPath = "resources/Objects.png";
+    public const int SheetWidth = 261;
+    public const int SheetHeight = 1053;
+
+    /// <summary>
+    /// Object ID on the objects layer that renders as a light fixture and never blocks
+    /// movement. Lighting behavior lives in <c>Game.Features.WorldObjects.LightObjectEncoding</c>.
+    /// </summary>
+    public const uint LightObjectId = 3;
+
+    public static bool IsLightObject(uint objectId) => objectId == LightObjectId;
 
     /// <summary>World-space blocking radius from tile anchor (half of 4×4 sprite width).</summary>
     public static float CollisionRadius => LevelData.QuadSize * 0.2f;
@@ -61,7 +69,7 @@ public static class ObjectSprites
 
     /// <summary>
     /// Inline CSS for the sprite sheet layer inside a tile-sized palette cell.
-    /// Uses percentages so the sprite scales with the parent (same technique as <see cref="PickupSprites"/>).
+    /// Uses percentages so the sprite scales with the parent (same technique as the pickup palette).
     /// </summary>
     public static string GetPaletteSpriteSheetStyle(int objectIndex)
     {
@@ -83,5 +91,5 @@ public static class ObjectSprites
 
     /// <summary>Objects that occupy the grid for rendering but do not block movement or pathfinding.</summary>
     public static bool BlocksMovement(uint objectId) =>
-        IsValidObjectId(objectId) && !LightObjectEncoding.IsLightObject(objectId);
+        IsValidObjectId(objectId) && !IsLightObject(objectId);
 }

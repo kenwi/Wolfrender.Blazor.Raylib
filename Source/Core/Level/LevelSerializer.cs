@@ -1,8 +1,11 @@
 using System.Text.Json;
+using Game.Features.Enemies;
+using Game.Features.Pickups;
+using Game.Features.Players;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 
-namespace Game.Editor;
+namespace Game.Core.Level;
 
 public class LevelFileData
 {
@@ -70,6 +73,7 @@ public static class LevelSerializer
 
     /// <summary>
     /// Serialize MapData to a JSON string (no file system needed, suitable for WASM).
+    /// Feature placements map through their slice-owned DTOs.
     /// </summary>
     public static string SerializeToJson(MapData mapData)
     {
@@ -82,34 +86,9 @@ public static class LevelSerializer
             Ceiling = mapData.Ceiling,
             Doors = mapData.Doors,
             Objects = mapData.Objects,
-            Enemies = mapData.Enemies.Select(e => new EnemyPlacementData
-            {
-                TileX = e.TileX,
-                TileY = e.TileY,
-                Rotation = e.Rotation,
-                EnemyType = e.EnemyType,
-                PatrolPath = e.PatrolPath.Select(w => new PatrolWaypointData
-                {
-                    TileX = w.TileX,
-                    TileY = w.TileY
-                }).ToList(),
-                StartsAsCorpse = e.StartsAsCorpse,
-                DropsAmmo = e.DropsAmmo
-            }).ToList(),
-            Pickups = mapData.Pickups.Select(p => new PickupPlacementData
-            {
-                TileX = p.TileX,
-                TileY = p.TileY,
-                Type = p.Type.ToString(),
-                Amount = p.Amount
-            }).ToList(),
-            PlayerSpawn = new PlayerSpawnData
-            {
-                TileX = mapData.Spawn.TileX,
-                TileY = mapData.Spawn.TileY,
-                WorldY = mapData.Spawn.WorldY,
-                Rotation = mapData.Spawn.Rotation
-            }
+            Enemies = mapData.Enemies.Select(EnemyPlacementData.FromPlacement).ToList(),
+            Pickups = mapData.Pickups.Select(PickupPlacementData.FromPlacement).ToList(),
+            PlayerSpawn = PlayerSpawnData.FromPlacement(mapData.Spawn)
         };
 
         return JsonSerializer.Serialize(fileData, JsonOptions);
@@ -117,6 +96,7 @@ public static class LevelSerializer
 
     /// <summary>
     /// Deserialize a JSON string into MapData (no file system needed, suitable for WASM).
+    /// Feature placements map through their slice-owned DTOs.
     /// </summary>
     public static void DeserializeFromJson(MapData mapData, string json)
     {
@@ -130,42 +110,11 @@ public static class LevelSerializer
         mapData.Ceiling = fileData.Ceiling;
         mapData.Doors = fileData.Doors;
         mapData.Objects = NormalizeTileLayer(fileData.Objects, fileData.Width, fileData.Height);
-        mapData.Enemies = fileData.Enemies.Select(e => new EnemyPlacement
-        {
-            TileX = e.TileX,
-            TileY = e.TileY,
-            Rotation = e.Rotation,
-            EnemyType = e.EnemyType,
-            PatrolPath = e.PatrolPath.Select(w => new PatrolWaypoint
-            {
-                TileX = w.TileX,
-                TileY = w.TileY
-            }).ToList(),
-            StartsAsCorpse = e.StartsAsCorpse,
-            DropsAmmo = e.DropsAmmo
-        }).ToList();
-        mapData.Pickups = (fileData.Pickups ?? new List<PickupPlacementData>()).Select(p => new PickupPlacement
-        {
-            TileX = p.TileX,
-            TileY = p.TileY,
-            Type = ParsePickupType(p.Type),
-            Amount = p.Amount
-        }).ToList();
-
-        if (fileData.PlayerSpawn != null)
-        {
-            mapData.Spawn.TileX = fileData.PlayerSpawn.TileX;
-            mapData.Spawn.TileY = fileData.PlayerSpawn.TileY;
-            mapData.Spawn.WorldY = fileData.PlayerSpawn.WorldY;
-            mapData.Spawn.Rotation = fileData.PlayerSpawn.Rotation;
-        }
-    }
-
-    private static PickupType ParsePickupType(string type)
-    {
-        return Enum.TryParse<PickupType>(type, ignoreCase: true, out var result)
-            ? result
-            : PickupType.Health;
+        mapData.Enemies = fileData.Enemies.Select(e => e.ToPlacement()).ToList();
+        mapData.Pickups = (fileData.Pickups ?? new List<PickupPlacementData>())
+            .Select(p => p.ToPlacement())
+            .ToList();
+        fileData.PlayerSpawn?.ApplyTo(mapData.Spawn);
     }
 
     /// <summary>Returns the layer array when length matches the map, otherwise a zero-filled array.</summary>

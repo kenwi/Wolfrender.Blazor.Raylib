@@ -1,3 +1,6 @@
+using Game.Features.Enemies;
+using Game.Features.Pickups;
+using Game.Features.Players;
 using Raylib_cs;
 
 namespace Game.Core.Level;

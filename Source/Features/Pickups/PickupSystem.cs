@@ -1,6 +1,7 @@
 using System.Numerics;
-using Game.Features.LevelProgress;
 using Game.Features.Combat;
+using Game.Features.LevelProgress;
+using Game.Features.Players;
 using Raylib_cs;
 
 namespace Game.Features.Pickups;
