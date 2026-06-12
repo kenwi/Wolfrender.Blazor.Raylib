@@ -61,7 +61,7 @@ On **desktop**, [`Application.Run`](Source/Core/Application.cs) uses **F1** to s
 
 On **web**, [`WebEditor.razor.cs`](Pages/WebEditor.razor.cs) uses **Q** to toggle between `WebEditorScene` and `World` so you can **play-test** the same `EnemySystem`, `DoorSystem`, and `Player` instance without leaving the editor route.
 
-Levels load and save through **[`LevelSerializer`](Source/Editor/LevelSerializer.cs)** (JSON). The bundled level shipped with the app is [`wwwroot/resources/level.json`](wwwroot/resources/level.json); [`Application.LoadMapData`](Source/Core/Application.cs) is the shared loader used when constructing scenes.
+Levels load and save through **[`LevelSerializer`](Source/Core/Level/LevelSerializer.cs)** (JSON); feature placements (enemies, pickups, player spawn) map through DTOs owned by their feature slices. The bundled level shipped with the app is [`wwwroot/resources/level.json`](wwwroot/resources/level.json); [`Application.LoadMapData`](Source/Core/Application.cs) is the shared loader used when constructing scenes.
 
 ## Game runtime: `World` and systems
 

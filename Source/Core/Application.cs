@@ -79,7 +79,7 @@ public class Application
                 LoadTexture(Path("resources/Objects.png"))
             }
         };
-        Editor.LevelSerializer.LoadFromJson(mapData, Path(LevelCatalog.DefaultLevelPath));
+        LevelSerializer.LoadFromJson(mapData, Path(LevelCatalog.DefaultLevelPath));
 
         return mapData;
     }
