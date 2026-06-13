@@ -35,6 +35,10 @@
     <Content Remove="Library/**" />
     <EmbeddedResource Remove="Library/**" />
     <None Remove="Library/**" />
+    <Compile Remove="Server/**" />
+    <Content Remove="Server/**" />
+    <EmbeddedResource Remove="Server/**" />
+    <None Remove="Server/**" />
   </ItemGroup>
 
   <Import Project="Raylib.props" />

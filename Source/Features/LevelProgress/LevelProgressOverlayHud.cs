@@ -22,7 +22,7 @@ public static class LevelProgressOverlayHud
             screenWidth,
             screenHeight);
 
-    public static void DrawLevelComplete(ScoreSystem score, int screenWidth, int screenHeight)
+    public static void DrawLevelComplete(ScoreSystem score, int screenWidth, int screenHeight, bool showRestartHint = true)
     {
         const int panelW = 560;
         const int panelH = 360;
@@ -55,6 +55,9 @@ public static class LevelProgressOverlayHud
         Line($"BASE SCORE: {score.LevelScore}");
         Line($"BONUS: {score.CompletionBonus}");
         Line($"FINAL SCORE: {score.FinalScore}");
+
+        if (!showRestartHint)
+            return;
 
         const string restartLine = "Press R or click to continue";
         int restartW = MeasureText(restartLine, lineSize);

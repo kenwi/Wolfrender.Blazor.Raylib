@@ -6,4 +6,5 @@
   <Project Path="Wolfrender.Blazor.Raylib.Console.csproj" />
   <Project Path="Wolfrender.Blazor.Raylib.Console.Editor.csproj" />
   <Project Path="Wolfrender.Blazor.Raylib.csproj" />
+  <Project Path="Server/Wolfrender.Highscores.Server.csproj" />
 </Solution>

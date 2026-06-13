@@ -31,6 +31,7 @@ public sealed class PlayerSystem
     private bool _deathHandled;
     private bool _levelCompleteHandled;
     private Func<bool> _isConsoleOpen = () => false;
+    private Func<bool> _isHighscoreBlockingRestart = () => false;
     private Action? _restartLevel;
 
     public PlayerSystem(
@@ -61,10 +62,11 @@ public sealed class PlayerSystem
 
     public Player Player => _player;
 
-    public void ConfigureLifecycle(Func<bool> isConsoleOpen, Action restartLevel)
+    public void ConfigureLifecycle(Func<bool> isConsoleOpen, Action restartLevel, Func<bool>? isHighscoreBlockingRestart = null)
     {
         _isConsoleOpen = isConsoleOpen;
         _restartLevel = restartLevel;
+        _isHighscoreBlockingRestart = isHighscoreBlockingRestart ?? (() => false);
     }
 
     public void ResetForLevelLoad(MapData mapData)
@@ -177,7 +179,7 @@ public sealed class PlayerSystem
 
     private void TryRestartFromLevelComplete()
     {
-        if (_isConsoleOpen())
+        if (_isConsoleOpen() || _isHighscoreBlockingRestart())
             return;
 
         bool restartPressed = IsKeyPressed(KeyboardKey.R)

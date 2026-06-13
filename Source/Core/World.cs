@@ -5,6 +5,7 @@ using Game.Features.Animation;
 using Game.Features.Combat;
 using Game.Features.Doors;
 using Game.Features.Enemies;
+using Game.Features.Highscores;
 using Game.Features.Hud;
 using Game.Features.LevelProgress;
 using Game.Features.Pickups;
@@ -44,6 +45,9 @@ public class World : IScene
     private readonly PlayerSystem _playerSystem;
     private readonly ScoreSystem _scoreSystem;
     private readonly ExitSystem _exitSystem;
+    private readonly HighscoreClient _highscoreClient;
+    private readonly HighscoreIntermission _highscoreIntermission;
+    private bool _highscoreIntermissionStarted;
 
     private RenderTexture2D _sceneRenderTexture;
     private InputState _inputState = new();
@@ -78,6 +82,8 @@ public class World : IScene
         _minimapSystem = new MinimapSystem(_level, _renderSystem);
         _scoreSystem = new ScoreSystem();
         _exitSystem = new ExitSystem(_scoreSystem);
+        _highscoreClient = new HighscoreClient();
+        _highscoreIntermission = new HighscoreIntermission(_highscoreClient);
         _pickupSystem = new PickupSystem(_scoreSystem);
         _placedObjectSystem = new PlacedObjectSystem();
         _enemySystem = new EnemySystem(
@@ -116,7 +122,8 @@ public class World : IScene
         _runtimeConsole = WorldConsoleBindings.CreateConsole(this, _player, _enemySystem, _scoreSystem, _consoleOverlay);
         _playerSystem.ConfigureLifecycle(
             () => _consoleOverlay.IsOpen,
-            () => _ = RestartCurrentLevel());
+            () => _ = RestartCurrentLevel(),
+            () => _highscoreIntermission.IsBlockingRestart);
         _playerSystem.ResetForLevelLoad(_mapData);
         _exitSystem.Rebuild(_mapData);
 
@@ -242,6 +249,8 @@ public class World : IScene
         _placedObjectSystem.Rebuild(_mapData);
         _scoreSystem.ResetForLevel(_mapData);
         _exitSystem.Rebuild(_mapData);
+        _highscoreIntermission.ResetForLevel();
+        _highscoreIntermissionStarted = false;
         _effectSystem.Clear();
     }
 
@@ -322,6 +331,15 @@ public class World : IScene
                 _playerSystem.UpdateDead(deltaTime, _inputState, mouseDelta);
                 _enemySystem.Update(deltaTime);
             }
+
+            if (_exitSystem.IsLevelComplete && !_highscoreIntermissionStarted)
+            {
+                _highscoreIntermissionStarted = true;
+                _highscoreIntermission.Begin(_currentLevelPath, _scoreSystem);
+            }
+
+            if (_exitSystem.IsLevelComplete)
+                _highscoreIntermission.Update();
         }
     }
 
@@ -403,7 +421,12 @@ public class World : IScene
         _effectSystem.RenderScreenOverlay(screenWidth, screenHeight);
 
         if (_exitSystem.IsLevelComplete && !_consoleOverlay.IsOpen)
-            LevelProgressOverlayHud.DrawLevelComplete(_scoreSystem, screenWidth, screenHeight);
+        {
+            if (_highscoreIntermission.IsActive)
+                _highscoreIntermission.Draw(_scoreSystem, screenWidth, screenHeight);
+            else
+                LevelProgressOverlayHud.DrawLevelComplete(_scoreSystem, screenWidth, screenHeight);
+        }
         else if (_exitSystem.IsExitPending && !_consoleOverlay.IsOpen)
             LevelProgressOverlayHud.DrawExitCountdown(_exitSystem.ExitCountdownRemaining, screenWidth, screenHeight);
         else if (_player.IsAlive && !_consoleOverlay.IsOpen && _doorSystem.HasLockedHint)
