@@ -11,6 +11,7 @@ public sealed class HighscoreIntermission
     private enum Phase
     {
         Hidden,
+        LevelScore,
         NameEntry,
         Submitting,
         LoadingLeaderboard,
@@ -35,7 +36,7 @@ public sealed class HighscoreIntermission
     }
 
     public bool IsActive => _phase != Phase.Hidden;
-    public bool IsBlockingRestart => _phase is Phase.NameEntry or Phase.Submitting or Phase.LoadingLeaderboard;
+    public bool IsBlockingRestart => _phase is Phase.LevelScore or Phase.NameEntry or Phase.Submitting or Phase.LoadingLeaderboard;
 
     public void ResetForLevel()
     {
@@ -62,13 +63,16 @@ public sealed class HighscoreIntermission
         _leaderboard = Array.Empty<HighscoreEntry>();
         _statusMessage = null;
         _pendingTask = null;
-        _phase = Phase.NameEntry;
+        _phase = Phase.LevelScore;
     }
 
     public void Update()
     {
         switch (_phase)
         {
+            case Phase.LevelScore:
+                UpdateLevelScoreAdvance();
+                break;
             case Phase.NameEntry:
                 UpdateNameEntry();
                 break;
@@ -84,21 +88,33 @@ public sealed class HighscoreIntermission
 
     public void Draw(ScoreSystem score, int screenWidth, int screenHeight)
     {
-        LevelProgressOverlayHud.DrawLevelComplete(score, screenWidth, screenHeight, showRestartHint: false);
+        switch (_phase)
+        {
+            case Phase.Hidden:
+                return;
+            case Phase.LevelScore:
+                LevelProgressOverlayHud.DrawLevelComplete(
+                    score,
+                    screenWidth,
+                    screenHeight,
+                    showRestartHint: true,
+                    restartHint: "Click to submit score");
+                return;
+            case Phase.NameEntry:
+            case Phase.Submitting:
+                DrawNameEntryPanel(score, screenWidth, screenHeight);
+                return;
+            case Phase.LoadingLeaderboard:
+            case Phase.Leaderboard:
+                DrawLeaderboardPanel(screenWidth, screenHeight);
+                break;
+        }
+    }
 
-        if (_phase == Phase.Hidden)
-            return;
-
-        const int panelW = 560;
-        const int panelH = 360;
-        int panelX = (screenWidth - panelW) / 2;
-        int panelY = (screenHeight - panelH) / 2;
-        int contentY = panelY + panelH - 140;
-
-        if (_phase is Phase.NameEntry or Phase.Submitting)
-            DrawNameEntry(panelX, contentY, panelW, screenWidth);
-        else if (_phase is Phase.LoadingLeaderboard or Phase.Leaderboard)
-            DrawLeaderboard(panelX, panelY + 72, panelW, screenWidth, screenHeight);
+    private void UpdateLevelScoreAdvance()
+    {
+        if (IsMouseButtonPressed(MouseButton.Left))
+            _phase = Phase.NameEntry;
     }
 
     private void UpdateNameEntry()
@@ -199,49 +215,50 @@ public sealed class HighscoreIntermission
             _phase = Phase.Hidden;
     }
 
-    private void DrawNameEntry(int panelX, int contentY, int panelW, int screenWidth)
+    private void DrawNameEntryPanel(ScoreSystem score, int screenWidth, int screenHeight)
     {
-        const int lineSize = 20;
-        const int labelColor = 200;
-        var accent = new Color(255, 220, 40, 255);
+        var layout = LevelProgressOverlayHud.DrawIntermissionFrame(screenWidth, screenHeight, "SUBMIT SCORE");
+        const int lineSize = LevelProgressOverlayHud.IntermissionLineSize;
 
-        DrawText("ENTER YOUR NAME", panelX + 40, contentY, lineSize, accent);
+        int y = layout.ContentY;
+        DrawText($"FINAL SCORE: {score.FinalScore}", layout.ContentX, y, lineSize, Color.RayWhite);
+        y += 40;
+
+        DrawText("ENTER YOUR NAME", layout.ContentX, y, lineSize, LevelProgressOverlayHud.Accent);
+        y += 28;
 
         string nameDisplay = string.IsNullOrEmpty(_playerNameInput) ? "_" : _playerNameInput + "_";
-        DrawText(nameDisplay, panelX + 40, contentY + 28, lineSize + 2, Color.RayWhite);
+        DrawText(nameDisplay, layout.ContentX, y, lineSize + 2, Color.RayWhite);
 
         string hint = _phase == Phase.Submitting
             ? _statusMessage ?? "Submitting score..."
             : "Enter to submit  |  Esc to skip";
-        int hintW = MeasureText(hint, lineSize - 2);
-        DrawText(hint, (screenWidth - hintW) / 2, contentY + 64, lineSize - 2, new Color(labelColor, labelColor, labelColor, 255));
+        LevelProgressOverlayHud.DrawIntermissionHint(hint, layout, screenWidth, lineSize - 2);
     }
 
-    private void DrawLeaderboard(int panelX, int contentY, int panelW, int screenWidth, int screenHeight)
+    private void DrawLeaderboardPanel(int screenWidth, int screenHeight)
     {
-        const int titleSize = 24;
-        const int lineSize = 18;
-        var accent = new Color(255, 220, 40, 255);
+        var layout = LevelProgressOverlayHud.DrawIntermissionFrame(screenWidth, screenHeight, "HIGH SCORES");
+        const int lineSize = LevelProgressOverlayHud.IntermissionLineSize - 4;
         var highlight = new Color(120, 220, 120, 255);
 
-        DrawText("HIGH SCORES", panelX + 40, contentY, titleSize, accent);
-        int y = contentY + 34;
+        int y = layout.ContentY;
 
         if (_phase == Phase.LoadingLeaderboard)
         {
-            DrawText(_statusMessage ?? "Loading leaderboard...", panelX + 40, y, lineSize, Color.RayWhite);
+            DrawText(_statusMessage ?? "Loading leaderboard...", layout.ContentX, y, lineSize, Color.RayWhite);
             return;
         }
 
         if (!string.IsNullOrEmpty(_statusMessage))
         {
-            DrawText(_statusMessage, panelX + 40, y, lineSize, new Color(255, 140, 140, 255));
+            DrawText(_statusMessage, layout.ContentX, y, lineSize, new Color(255, 140, 140, 255));
             y += 24;
         }
 
         if (_leaderboard.Count == 0)
         {
-            DrawText("No scores yet.", panelX + 40, y, lineSize, Color.RayWhite);
+            DrawText("No scores yet.", layout.ContentX, y, lineSize, Color.RayWhite);
         }
         else
         {
@@ -256,13 +273,11 @@ public sealed class HighscoreIntermission
                     && string.Equals(entry.PlayerName, _submittedPlayerName, StringComparison.Ordinal)
                     && MathF.Abs(entry.ElapsedSeconds - (_submittedElapsedSeconds ?? 0f)) < 0.05f;
 
-                DrawText(line, panelX + 40, y, lineSize, highlightEntry ? highlight : Color.RayWhite);
+                DrawText(line, layout.ContentX, y, lineSize, highlightEntry ? highlight : Color.RayWhite);
                 y += 22;
             }
         }
 
-        const string restartLine = "Press R or click to continue";
-        int restartW = MeasureText(restartLine, lineSize);
-        DrawText(restartLine, (screenWidth - restartW) / 2, screenHeight / 2 + 170, lineSize, new Color(200, 200, 200, 255));
+        LevelProgressOverlayHud.DrawIntermissionHint("Press R or click to continue", layout, screenWidth, lineSize);
     }
 }

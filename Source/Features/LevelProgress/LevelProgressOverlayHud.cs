@@ -6,12 +6,28 @@ namespace Game.Features.LevelProgress;
 /// <summary>Score, exit countdown, and level-complete intermission overlays.</summary>
 public static class LevelProgressOverlayHud
 {
+    public static readonly Color Accent = new(255, 220, 40, 255);
+    public static readonly Color Hint = new(200, 200, 200, 255);
+    public static readonly Color PanelFill = new(0, 0, 0, 210);
+
+    public const int IntermissionPanelW = 560;
+    public const int IntermissionPanelH = 360;
+    public const int IntermissionLineSize = 22;
+
+    public readonly record struct IntermissionPanelLayout(
+        int PanelX,
+        int PanelY,
+        int PanelW,
+        int PanelH,
+        int ContentX,
+        int ContentY);
+
     public static void DrawScore(ScoreSystem score, int screenWidth)
     {
         const int fontSize = 20;
         var label = $"SCORE: {score.LevelScore}";
         int labelWidth = MeasureText(label, fontSize);
-        DrawText(label, screenWidth - labelWidth - 10, 40, fontSize, new Color(255, 220, 40, 255));
+        DrawText(label, screenWidth - labelWidth - 10, 40, fontSize, Accent);
     }
 
     public static void DrawExitCountdown(float secondsRemaining, int screenWidth, int screenHeight) =>
@@ -22,26 +38,46 @@ public static class LevelProgressOverlayHud
             screenWidth,
             screenHeight);
 
-    public static void DrawLevelComplete(ScoreSystem score, int screenWidth, int screenHeight, bool showRestartHint = true)
+    public static IntermissionPanelLayout DrawIntermissionFrame(int screenWidth, int screenHeight, string title)
     {
-        const int panelW = 560;
-        const int panelH = 360;
-        int panelX = (screenWidth - panelW) / 2;
-        int panelY = (screenHeight - panelH) / 2;
+        int panelX = (screenWidth - IntermissionPanelW) / 2;
+        int panelY = (screenHeight - IntermissionPanelH) / 2;
 
-        DrawRectangle(panelX, panelY, panelW, panelH, new Color(0, 0, 0, 210));
-        DrawRectangleLines(panelX, panelY, panelW, panelH, new Color(255, 220, 40, 255));
+        DrawRectangle(panelX, panelY, IntermissionPanelW, IntermissionPanelH, PanelFill);
+        DrawRectangleLines(panelX, panelY, IntermissionPanelW, IntermissionPanelH, Accent);
 
-        const string title = "LEVEL COMPLETE";
         const int titleSize = 40;
         int titleW = MeasureText(title, titleSize);
-        DrawText(title, (screenWidth - titleW) / 2, panelY + 20, titleSize, new Color(255, 220, 40, 255));
+        DrawText(title, (screenWidth - titleW) / 2, panelY + 20, titleSize, Accent);
 
-        int y = panelY + 80;
-        const int lineSize = 22;
+        return new IntermissionPanelLayout(
+            panelX,
+            panelY,
+            IntermissionPanelW,
+            IntermissionPanelH,
+            panelX + 40,
+            panelY + 80);
+    }
+
+    public static void DrawIntermissionHint(string text, in IntermissionPanelLayout layout, int screenWidth, int fontSize = IntermissionLineSize)
+    {
+        int hintW = MeasureText(text, fontSize);
+        DrawText(text, (screenWidth - hintW) / 2, layout.PanelY + layout.PanelH - 48, fontSize, Hint);
+    }
+
+    public static void DrawLevelComplete(
+        ScoreSystem score,
+        int screenWidth,
+        int screenHeight,
+        bool showRestartHint = true,
+        string? restartHint = null)
+    {
+        var layout = DrawIntermissionFrame(screenWidth, screenHeight, "LEVEL COMPLETE");
+
+        int y = layout.ContentY;
         void Line(string text)
         {
-            DrawText(text, panelX + 40, y, lineSize, Color.RayWhite);
+            DrawText(text, layout.ContentX, y, IntermissionLineSize, Color.RayWhite);
             y += 28;
         }
 
@@ -56,11 +92,7 @@ public static class LevelProgressOverlayHud
         Line($"BONUS: {score.CompletionBonus}");
         Line($"FINAL SCORE: {score.FinalScore}");
 
-        if (!showRestartHint)
-            return;
-
-        const string restartLine = "Press R or click to continue";
-        int restartW = MeasureText(restartLine, lineSize);
-        DrawText(restartLine, (screenWidth - restartW) / 2, panelY + panelH - 48, lineSize, new Color(200, 200, 200, 255));
+        if (showRestartHint)
+            DrawIntermissionHint(restartHint ?? "Press R or click to continue", layout, screenWidth);
     }
 }
