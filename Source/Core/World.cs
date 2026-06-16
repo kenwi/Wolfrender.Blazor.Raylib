@@ -152,8 +152,22 @@ public class World : IScene
     public void SetResolutionDownScaleMultiplier(int multiplier)
     {
         RenderData.ResolutionDownScaleMultiplier = multiplier;
+        RecreateSceneRenderTexture();
+    }
+
+    public void OnWindowResize()
+    {
+        RecreateSceneRenderTexture();
+    }
+
+    private void RecreateSceneRenderTexture()
+    {
         int newScreenWidth = (int)RenderData.Resolution.X / RenderData.ResolutionDownScaleMultiplier;
         int newScreenHeight = (int)RenderData.Resolution.Y / RenderData.ResolutionDownScaleMultiplier;
+
+        if (_sceneRenderTexture.Texture.Width == newScreenWidth &&
+            _sceneRenderTexture.Texture.Height == newScreenHeight)
+            return;
 
         UnloadRenderTexture(_sceneRenderTexture);
         _sceneRenderTexture = LoadRenderTexture(newScreenWidth, newScreenHeight);
@@ -372,7 +386,10 @@ public class World : IScene
             PrimitiveRenderer.ApplyWallLightingUniforms();
         }
 
-        _renderSystem.Render(_player.Camera);
+        _renderSystem.Render(
+            _player.Camera,
+            _sceneRenderTexture.Texture.Width,
+            _sceneRenderTexture.Texture.Height);
         _doorSystem.Render();
         _animationSystem.Render();
 

@@ -10,31 +10,41 @@ public class RenderSystem
     private readonly LevelData _level;
     private readonly List<Texture2D> _textures;
     private readonly float _drawDistance;
-    private readonly float _maxAngleDot;
     private const float TileSize = 4.0f;
-    
+    /// <summary>Extra half-angle beyond the view frustum (projection / pitch slack).</summary>
+    private const float FrustumEdgeMarginDegrees = 5f;
+
     // Track rendered tiles for minimap
     private HashSet<(int x, int y)> _renderedTiles = new HashSet<(int x, int y)>();
-    
+
     public HashSet<(int x, int y)> RenderedTiles => _renderedTiles;
 
-    public RenderSystem(LevelData level, List<Texture2D> textures, float drawDistance = 15.0f, float maxAngleDot = 0.4f)
+    public RenderSystem(LevelData level, List<Texture2D> textures, float drawDistance = 15.0f)
     {
         _level = level;
         _textures = textures;
         _drawDistance = drawDistance;
-        _maxAngleDot = maxAngleDot;
     }
 
-    public void Render(Camera3D camera)
+    public void Render(Camera3D camera, int viewportWidth, int viewportHeight)
     {
         // Reset number of quads that is being drawed
         LevelData.DrawedQuads = 0;
-        
+
         // Clear rendered tiles tracking
         _renderedTiles.Clear();
-        
+
+        float aspect = viewportHeight > 0 ? viewportWidth / (float)viewportHeight : 1f;
+        float halfHorizRad = ComputeHorizHalfFovRad(camera, aspect);
+        float baseMarginRad = FrustumEdgeMarginDegrees * (MathF.PI / 180f);
+
         Vector3 cameraForward = Vector3.Normalize(camera.Target - camera.Position);
+        Vector3 cameraForwardXZ = new Vector3(cameraForward.X, 0f, cameraForward.Z);
+        if (cameraForwardXZ.LengthSquared() > 0.0001f)
+            cameraForwardXZ = Vector3.Normalize(cameraForwardXZ);
+        else
+            cameraForwardXZ = new Vector3(0f, 0f, 1f);
+
         Vector3 cameraPosXZ = new Vector3(camera.Position.X, 0, camera.Position.Z);
         float drawDistanceWorld = _drawDistance * TileSize;
 
@@ -56,9 +66,13 @@ public class RenderSystem
                 if (distance > drawDistanceWorld) continue;
 
                 Vector3 toTileNormalized = Vector3.Normalize(toTile);
-                float dot = Vector3.Dot(cameraForward, toTileNormalized);
+                float dot = Vector3.Dot(cameraForwardXZ, toTileNormalized);
 
-                if (dot > _maxAngleDot || distance < 10)
+                // Widen cull cone by tile width at this distance so full quads at the screen edge are included.
+                float tileExtentRad = MathF.Atan(TileSize / MathF.Max(distance, TileSize));
+                float cullHalfAngle = halfHorizRad + baseMarginRad + tileExtentRad;
+
+                if (dot > MathF.Cos(cullHalfAngle) || distance < 10)
                 {
                     RenderTile(x, y, tilePos, camera.Position);
                     // Track that this tile was rendered
@@ -66,8 +80,16 @@ public class RenderSystem
                 }
             }
         }
+    }
 
-   }
+    /// <summary>
+    /// Horizontal half-FOV in radians. Matches Raylib perspective: vertical FOV from the camera, horizontal from aspect.
+    /// </summary>
+    private static float ComputeHorizHalfFovRad(Camera3D camera, float viewportAspect)
+    {
+        float halfVertRad = camera.FovY * (MathF.PI / 180f) * 0.5f;
+        return MathF.Atan(MathF.Tan(halfVertRad) * viewportAspect);
+    }
 
     private void RenderTile(int x, int y, Vector3 worldPos, Vector3 playerPosition)
     {
@@ -109,4 +131,3 @@ public class RenderSystem
         }
     }
 }
-

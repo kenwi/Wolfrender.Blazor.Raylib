@@ -173,6 +173,7 @@ public partial class ThreeDFirstPerson : IDisposable
         await DetectBrowserResolution();
         SetWindowSize(_screenWidth, _screenHeight);
         RenderData.Resolution = new Vector2(_screenWidth, _screenHeight);
+        (_gameScene as World)?.OnWindowResize();
     }
 
     public void Dispose()
