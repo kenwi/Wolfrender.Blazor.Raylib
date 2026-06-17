@@ -12,7 +12,7 @@ namespace Game.Features.Players;
 
 /// <summary>
 /// Orchestrates player update order.
-/// Alive order: cooldown → velocity → movement → collision → pickup → camera → doors → animation → weapon switch → fire.
+/// Alive order: cooldown → velocity (accel/decel) → movement → collision → pickup → camera → doors → animation → weapon switch → fire.
 /// </summary>
 public sealed class PlayerSystem
 {
@@ -98,7 +98,7 @@ public sealed class PlayerSystem
         _weaponSystem.Update(deltaTime);
         _player.WeaponCooldownRemaining = MathF.Max(0f, _player.WeaponCooldownRemaining - deltaTime);
 
-        _player.Velocity = _inputSystem.GetMoveDirection(_player.Camera) * _player.MoveSpeed;
+        UpdateVelocity(deltaTime);
         MoveWithCollision(deltaTime);
         _pickupSystem.Update(_player);
 
@@ -130,6 +130,24 @@ public sealed class PlayerSystem
         _doorSystem.Update(deltaTime, input, _player, _enemySystem.Enemies);
         _animationSystem.Update(deltaTime);
         TryRestartFromGameOver();
+    }
+
+    private void UpdateVelocity(float deltaTime)
+    {
+        Vector3 moveDirection = _inputSystem.GetMoveDirection(_player.Camera);
+        Vector3 targetVelocity = moveDirection * _player.MoveSpeed;
+        float rate = targetVelocity.LengthSquared() > 0f ? _player.MoveAcceleration : _player.MoveDeceleration;
+        _player.Velocity = MoveToward(_player.Velocity, targetVelocity, rate * deltaTime);
+    }
+
+    private static Vector3 MoveToward(Vector3 current, Vector3 target, float maxDelta)
+    {
+        Vector3 delta = target - current;
+        float distance = delta.Length();
+        if (distance <= maxDelta || distance <= 0f)
+            return target;
+
+        return current + delta / distance * maxDelta;
     }
 
     /// <summary>Advance position by velocity, then resolve walls/objects/doors with axis sliding.</summary>

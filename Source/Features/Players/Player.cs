@@ -12,7 +12,9 @@ public class Player
     public Vector3 Velocity { get; set; }
 
     public float CollisionRadius { get; set; } = 0.8f;
-    public float MoveSpeed { get; set; } = 5.0f;
+    public float MoveSpeed { get; set; } = 10.0f;
+    public float MoveAcceleration { get; set; } = 60f;
+    public float MoveDeceleration { get; set; } = 60f;
 
     public float MaxHealth { get; set; } = 100f;
     public float Health { get; set; } = 100f;
