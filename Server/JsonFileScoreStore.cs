@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Game.Features.Highscores.Shared;
+using Microsoft.Extensions.Logging;
 
 namespace Wolfrender.Highscores.Server;
 
@@ -11,11 +12,14 @@ public sealed class JsonFileScoreStore
     };
 
     private readonly string _filePath;
+    private readonly ILogger<JsonFileScoreStore> _logger;
     private readonly SemaphoreSlim _lock = new(1, 1);
 
-    public JsonFileScoreStore(IConfiguration configuration)
+    public JsonFileScoreStore(IConfiguration configuration, ILogger<JsonFileScoreStore> logger)
     {
         _filePath = configuration["Highscores:FilePath"] ?? "highscores.json";
+        _logger = logger;
+        _logger.LogInformation("JsonFileScoreStore initialized. FilePath={FilePath}", Path.GetFullPath(_filePath));
     }
 
     public async Task AddScoreAsync(ScoreSubmission submission, CancellationToken cancellationToken = default)
@@ -30,7 +34,8 @@ public sealed class JsonFileScoreStore
                 data.Levels[submission.LevelId] = entries;
             }
 
-            entries.Add(new StoredScoreEntry
+            var submittedAt = DateTimeOffset.UtcNow;
+            var newEntry = new StoredScoreEntry
             {
                 PlayerName = submission.PlayerName,
                 FinalScore = submission.FinalScore,
@@ -39,8 +44,26 @@ public sealed class JsonFileScoreStore
                 TreasuresCollected = submission.TreasuresCollected,
                 SecretsFound = submission.SecretsFound,
                 ElapsedSeconds = submission.ElapsedSeconds,
-                SubmittedAt = DateTimeOffset.UtcNow
-            });
+                SubmittedAt = submittedAt
+            };
+            entries.Add(newEntry);
+
+            var rank = entries
+                .OrderByDescending(e => e.FinalScore)
+                .ThenBy(e => e.ElapsedSeconds)
+                .ThenBy(e => e.SubmittedAt)
+                .ToList()
+                .FindIndex(e => ReferenceEquals(e, newEntry)) + 1;
+
+            _logger.LogInformation(
+                "Score persisted: LevelId={LevelId}, PlayerName={PlayerName}, FinalScore={FinalScore}, " +
+                "Rank={Rank}, LevelEntryCount={LevelEntryCount}, FilePath={FilePath}",
+                submission.LevelId,
+                submission.PlayerName,
+                submission.FinalScore,
+                rank,
+                entries.Count,
+                _filePath);
 
             await WriteAsync(data, cancellationToken);
         }
@@ -62,7 +85,7 @@ public sealed class JsonFileScoreStore
             if (!data.Levels.TryGetValue(levelId, out var entries))
                 return Array.Empty<HighscoreEntry>();
 
-            return entries
+            var results = entries
                 .OrderByDescending(e => e.FinalScore)
                 .ThenBy(e => e.ElapsedSeconds)
                 .ThenBy(e => e.SubmittedAt)
@@ -76,6 +99,16 @@ public sealed class JsonFileScoreStore
                     SubmittedAt = entry.SubmittedAt
                 })
                 .ToArray();
+
+            _logger.LogInformation(
+                "Leaderboard queried: LevelId={LevelId}, RequestedTop={RequestedTop}, ReturnedCount={ReturnedCount}, " +
+                "TotalStoredForLevel={TotalStoredForLevel}",
+                levelId,
+                top,
+                results.Length,
+                entries.Count);
+
+            return results;
         }
         finally
         {
