@@ -120,7 +120,9 @@ public static class WorldConsoleBindings
                     : ResolveResult.Ok(graphics),
                 CuratedListFactory = () => new[]
                 {
-                    "RenderData.ResolutionDownScaleMultiplier"
+                    "RenderData.InternalWidth",
+                    "RenderData.InternalHeight",
+                    "RenderData.ResolutionPresetId"
                 },
                 DiscoveryFactory = () => DiscoverVariablesForInstance(graphics, "RenderData")
             },
@@ -158,7 +160,9 @@ public static class WorldConsoleBindings
             "Enemy[index].EnemyState",
             "Enemy[index].CorpseLingerSeconds",
             "Enemy[index].HitReactionDurationSeconds",
-            "RenderData.ResolutionDownScaleMultiplier",
+            "RenderData.InternalWidth",
+            "RenderData.InternalHeight",
+            "RenderData.ResolutionPresetId",
             "Audio.Volume"
         };
     }
@@ -208,10 +212,14 @@ public sealed class GraphicsConsoleSettings
         _world = world;
     }
 
-    public int ResolutionDownScaleMultiplier
+    public int InternalWidth => RenderData.InternalWidth;
+
+    public int InternalHeight => RenderData.InternalHeight;
+
+    public string ResolutionPresetId
     {
-        get => RenderData.ResolutionDownScaleMultiplier;
-        set => _world.SetResolutionDownScaleMultiplier(Math.Max(1, value));
+        get => _world.GetResolutionPresetId();
+        set => _world.SetResolutionPresetId(value);
     }
 }
 

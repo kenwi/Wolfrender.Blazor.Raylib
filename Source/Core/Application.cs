@@ -15,6 +15,7 @@ public class Application
     {
         SetTargetFPS(120);
         InitWindow(0, 0, "");
+        SetExitKey(KeyboardKey.Null);
         SetWindowState(ConfigFlags.FullscreenMode);
         InitAudioDevice();
 

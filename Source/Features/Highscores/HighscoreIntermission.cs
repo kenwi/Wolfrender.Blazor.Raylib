@@ -38,6 +38,9 @@ public sealed class HighscoreIntermission
     public bool IsActive => _phase != Phase.Hidden;
     public bool IsBlockingRestart => _phase is Phase.LevelScore or Phase.NameEntry or Phase.Submitting or Phase.LoadingLeaderboard;
 
+    /// <summary>When true, ESC is reserved for the intermission flow (name skip / leaderboard dismiss).</summary>
+    public bool CapturesEscapeKey => _phase is Phase.NameEntry or Phase.Leaderboard;
+
     public void ResetForLevel()
     {
         _phase = Phase.Hidden;
