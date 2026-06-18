@@ -24,7 +24,7 @@ public static class OptionsMenuHud
         int titleW = MeasureText(title, TitleSize);
         DrawText(title, (screenWidth - titleW) / 2, layout.PanelY + 16, TitleSize, Color.RayWhite);
 
-        int contentX = layout.PanelX + 32;
+        int contentX = layout.PanelX + 64 + 32;
         var labelColor = new Color(200, 200, 200, 255);
         var valueColor = Color.RayWhite;
         int centerX = layout.PanelX + layout.PanelW / 2;

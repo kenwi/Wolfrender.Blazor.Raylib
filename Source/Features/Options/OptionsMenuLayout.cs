@@ -19,7 +19,7 @@ public readonly struct OptionsMenuLayout
 
     public static OptionsMenuLayout Compute(int screenWidth, int screenHeight)
     {
-        const int panelW = 580;
+        const int panelW = 800;
         const int panelH = 420;
         int panelX = (screenWidth - panelW) / 2;
         int panelY = (screenHeight - panelH) / 2;
@@ -44,7 +44,7 @@ public readonly struct OptionsMenuLayout
             GameResolutionPrev = new Rectangle(contentX, gameY, 36, 32),
             GameResolutionNext = new Rectangle(contentX + rowW - 36, gameY, 36, 32),
             VSyncCheckbox = new Rectangle(contentX, vsyncY, 24, 24),
-            FpsSliderTrack = new Rectangle(contentX + 100, fpsY + 4, rowW - 100, 16),
+            FpsSliderTrack = new Rectangle(contentX + 250, fpsY + 4, rowW - 350, 16),
         };
     }
 
