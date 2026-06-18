@@ -98,7 +98,7 @@ public sealed class HighscoreIntermission
                     screenWidth,
                     screenHeight,
                     showRestartHint: true,
-                    restartHint: "Click to submit score");
+                    restartHint: "Click or press Enter to submit score");
                 return;
             case Phase.NameEntry:
             case Phase.Submitting:
@@ -113,7 +113,7 @@ public sealed class HighscoreIntermission
 
     private void UpdateLevelScoreAdvance()
     {
-        if (IsMouseButtonPressed(MouseButton.Left))
+        if (IsMouseButtonPressed(MouseButton.Left) || IsKeyPressed(KeyboardKey.Enter))
             _phase = Phase.NameEntry;
     }
 
