@@ -3,6 +3,7 @@ using Game.Features.Doors;
 using Game.Features.Enemies;
 using Game.Features.Pickups;
 using Game.Features.Players;
+using Game.Features.SoundPropagation;
 
 namespace Game.Editor;
 
@@ -61,6 +62,12 @@ public class EditorState
     public Vector2? PathStart;
     public Vector2? PathEnd;
     public List<Vector2>? PathResult;
+
+    // Sound propagation visualizer
+    public bool SoundPropagationPicking;
+    public List<Vector2>? SoundPropagationTiles;
+    public float SoundPropagationShowUntil;
+    public const float SoundPropagationDurationSeconds = 2f;
 
     /// <summary>When true, the editor draws each live enemy's current A* chase path during simulation.</summary>
     public bool DrawEnemyPaths;
@@ -624,12 +631,14 @@ public class EditorState
 
     public void StartPickingPathStart()
     {
+        SoundPropagationPicking = false;
         PathPickingMode = PathPickMode.Start;
         NotifyStateChanged();
     }
 
     public void StartPickingPathEnd()
     {
+        SoundPropagationPicking = false;
         PathPickingMode = PathPickMode.End;
         NotifyStateChanged();
     }
@@ -685,6 +694,71 @@ public class EditorState
             startTile, endTile, MapData.Width, MapData.Height);
         PathResult = Pathfinding.FindPath(
             MapData, DoorSystem.Doors, sx, sy, sw, sh, startTile, endTile);
+    }
+
+    // ─── Sound propagation visualizer ────────────────────────────────────────────
+
+    public void StartSoundPropagationPick()
+    {
+        PathPickingMode = PathPickMode.None;
+        SoundPropagationPicking = true;
+        NotifyStateChanged();
+    }
+
+    public void CancelSoundPropagationPick()
+    {
+        if (!SoundPropagationPicking) return;
+        SoundPropagationPicking = false;
+        NotifyStateChanged();
+    }
+
+    public void RunSoundPropagationTest(int tileX, int tileY, float now)
+    {
+        SoundPropagationPicking = false;
+
+        if (tileX < 0 || tileX >= MapData.Width || tileY < 0 || tileY >= MapData.Height)
+            return;
+
+        bool treatAllDoorsClosed = !IsSimulating;
+        var reach = SoundPropagation.ComputeReach(
+            MapData, DoorSystem.Doors, tileX, tileY, treatAllDoorsClosed);
+
+        if (reach.Count == 0)
+        {
+            SoundPropagationTiles = null;
+            SoundPropagationShowUntil = 0;
+            SetStatus("Sound propagation: invalid origin (wall or closed door)");
+            NotifyStateChanged();
+            return;
+        }
+
+        SoundPropagationTiles = reach
+            .Select(t => new Vector2(t.X, t.Y))
+            .ToList();
+        SoundPropagationShowUntil = now + SoundPropagationDurationSeconds;
+        SetStatus($"Sound reached {reach.Count} tiles");
+        NotifyStateChanged();
+    }
+
+    public void TickSoundPropagationOverlay(float now)
+    {
+        if (SoundPropagationTiles == null || SoundPropagationShowUntil <= 0)
+            return;
+
+        if (now >= SoundPropagationShowUntil)
+        {
+            SoundPropagationTiles = null;
+            SoundPropagationShowUntil = 0;
+            NotifyStateChanged();
+        }
+    }
+
+    public void ClearSoundPropagation()
+    {
+        SoundPropagationPicking = false;
+        SoundPropagationTiles = null;
+        SoundPropagationShowUntil = 0;
+        NotifyStateChanged();
     }
 
     public void SwapLayers(int from, int to)

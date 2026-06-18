@@ -3,6 +3,7 @@ using Game.Features.Animation;
 using Game.Features.Doors;
 using Game.Features.Enemies;
 using Game.Features.Players;
+using Game.Features.SoundPropagation;
 using Raylib_cs;
 
 namespace Game.Features.Combat;
@@ -23,6 +24,7 @@ public sealed class WeaponSystem
     private readonly EffectSystem _effectSystem;
     private readonly SoundSystem _soundSystem;
     private readonly AnimationSystem _animationSystem;
+    private readonly SoundPropagationSystem _soundPropagationSystem;
 
     public WeaponSystem(
         MapData mapData,
@@ -31,7 +33,8 @@ public sealed class WeaponSystem
         Texture2D enemySpriteSheet,
         EffectSystem effectSystem,
         SoundSystem soundSystem,
-        AnimationSystem animationSystem)
+        AnimationSystem animationSystem,
+        SoundPropagationSystem soundPropagationSystem)
     {
         _mapData = mapData;
         _doorSystem = doorSystem;
@@ -40,6 +43,7 @@ public sealed class WeaponSystem
         _effectSystem = effectSystem;
         _soundSystem = soundSystem;
         _animationSystem = animationSystem;
+        _soundPropagationSystem = soundPropagationSystem;
     }
 
     public bool HasNoAmmoHint => _noAmmoHintRemaining > 0f;
@@ -172,5 +176,8 @@ public sealed class WeaponSystem
         _effectSystem.TriggerReticleFireFlash();
         _animationSystem.PlayWeaponFire(player.Weapons.ActiveWeapon);
         _soundSystem.PlaySfx(def.FireSoundPath);
+
+        if (def.Kind == WeaponKind.Hitscan)
+            _soundPropagationSystem.EmitPlayerGunshot(player.Position);
     }
 }

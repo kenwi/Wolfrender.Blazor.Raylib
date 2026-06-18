@@ -53,6 +53,7 @@ public class EditorGui
     private bool _showPickupProperties = true;
     private bool _showDebugLog = false;
     private bool _showPathfinding;
+    private bool _showSoundPropagation;
 
     private string? _entityPropertiesActiveWindowTitle;
 
@@ -196,6 +197,9 @@ public class EditorGui
 
                 if (ImGui.MenuItem("Pathfinding Visualizer", null, _showPathfinding))
                     _showPathfinding = !_showPathfinding;
+
+                if (ImGui.MenuItem("Sound Propagation", null, _showSoundPropagation))
+                    _showSoundPropagation = !_showSoundPropagation;
 
                 ImGui.EndMenu();
             }
@@ -1330,6 +1334,64 @@ public class EditorGui
         bool drawEnemyFov = state.DrawEnemyLineOfSight;
         if (ImGui.Checkbox("Draw enemy line of sight", ref drawEnemyFov))
             state.DrawEnemyLineOfSight = drawEnemyFov;
+
+        ImGui.End();
+    }
+
+    // ─── Sound Propagation Panel ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Tool window for testing tile-based sound propagation in the editor.
+    /// </summary>
+    public void RenderSoundPropagationPanel(EditorState state)
+    {
+        if (!_showSoundPropagation) return;
+
+        ImGui.SetNextWindowPos(new Vector2(10, GetScreenHeight() - 420), ImGuiCond.FirstUseEver);
+        ImGui.Begin("Sound Propagation", ref _showSoundPropagation, ImGuiWindowFlags.AlwaysAutoResize);
+        ImGui.SetWindowFontScale(_guiScale);
+
+        if (state.SoundPropagationPicking)
+        {
+            ImGui.TextColored(new Vector4(1f, 0.85f, 0.2f, 1f),
+                "Click a tile to test propagation  (Esc: cancel)");
+        }
+        else
+        {
+            ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Ready");
+        }
+
+        ImGui.Separator();
+
+        if (state.IsSimulating)
+        {
+            ImGui.TextColored(new Vector4(0.4f, 0.9f, 0.5f, 1f), "Using live door states");
+        }
+        else
+        {
+            ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "All doors treated as closed");
+        }
+
+        ImGui.Separator();
+
+        if (state.SoundPropagationTiles is { Count: > 0 })
+        {
+            ImGui.TextColored(new Vector4(1f, 0.65f, 0.2f, 1f),
+                $"Reached {state.SoundPropagationTiles.Count} tiles");
+        }
+        else
+        {
+            ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1f),
+                "Pick an origin tile to test propagation");
+        }
+
+        ImGui.Spacing();
+
+        if (ImGui.Button("Test at tile", new Vector2(120, 0)))
+            state.StartSoundPropagationPick();
+        ImGui.SameLine();
+        if (ImGui.Button("Clear", new Vector2(120, 0)))
+            state.ClearSoundPropagation();
 
         ImGui.End();
     }

@@ -11,6 +11,7 @@ using Game.Features.LevelProgress;
 using Game.Features.Pickups;
 using Game.Features.Players;
 using Game.Features.WorldObjects;
+using Game.Features.SoundPropagation;
 using ImGuiNET;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
@@ -42,6 +43,7 @@ public class World : IScene
     private readonly PickupSystem _pickupSystem;
     private readonly PlacedObjectSystem _placedObjectSystem;
     private readonly WeaponSystem _weaponSystem;
+    private readonly SoundPropagationSystem _soundPropagationSystem;
     private readonly PlayerSystem _playerSystem;
     private readonly ScoreSystem _scoreSystem;
     private readonly ExitSystem _exitSystem;
@@ -56,6 +58,7 @@ public class World : IScene
     public PlayerSystem PlayerSystem => _playerSystem;
     public EnemySystem EnemySystem => _enemySystem;
     public DoorSystem DoorSystem => _doorSystem;
+    public SoundPropagationSystem SoundPropagationSystem => _soundPropagationSystem;
     public ScoreSystem ScoreSystem => _scoreSystem;
     public ExitSystem ExitSystem => _exitSystem;
     public string CurrentLevelPath => _currentLevelPath;
@@ -77,6 +80,7 @@ public class World : IScene
         _inputSystem = new InputSystem();
         _doorSystem = new DoorSystem(mapData.Doors, mapData.Width, _tileTextures);
         _collisionSystem = new CollisionSystem(_level, _doorSystem);
+        _soundPropagationSystem = new SoundPropagationSystem(mapData, _doorSystem);
         _cameraSystem = new CameraSystem(_collisionSystem);
         _renderSystem = new RenderSystem(_level, _tileTextures);
         _minimapSystem = new MinimapSystem(_level, _renderSystem);
@@ -87,7 +91,8 @@ public class World : IScene
         _pickupSystem = new PickupSystem(_scoreSystem);
         _placedObjectSystem = new PlacedObjectSystem();
         _enemySystem = new EnemySystem(
-            _player, _inputSystem, _collisionSystem, _doorSystem, _combatFeedback, _pickupSystem, _scoreSystem);
+            _player, _inputSystem, _collisionSystem, _doorSystem, _combatFeedback,
+            _pickupSystem, _scoreSystem, _soundPropagationSystem);
         _pickupSystem.SetObjectsTexture(_gameTextures[GameTextureIndex.Objects]);
         _pickupSystem.Rebuild(_mapData.Pickups, _mapData);
         _placedObjectSystem.SetObjectsTexture(_gameTextures[GameTextureIndex.Objects]);
@@ -104,7 +109,8 @@ public class World : IScene
             _gameTextures[GameTextureIndex.EnemyGuard],
             _effectSystem,
             _soundSystem,
-            _animationSystem);
+            _animationSystem,
+            _soundPropagationSystem);
         _playerSystem = new PlayerSystem(
             _player,
             _inputSystem,
@@ -263,6 +269,7 @@ public class World : IScene
         _placedObjectSystem.Rebuild(_mapData);
         _scoreSystem.ResetForLevel(_mapData);
         _exitSystem.Rebuild(_mapData);
+        _soundPropagationSystem.ClearPendingEvents();
         _highscoreIntermission.ResetForLevel();
         _highscoreIntermissionStarted = false;
         _effectSystem.Clear();

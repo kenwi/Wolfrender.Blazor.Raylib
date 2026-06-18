@@ -4,6 +4,7 @@ using Game.Features.Doors;
 using Game.Features.LevelProgress;
 using Game.Features.Pickups;
 using Game.Features.Players;
+using Game.Features.SoundPropagation;
 
 namespace Game.Features.Enemies;
 
@@ -17,6 +18,7 @@ public class EnemySystem
     private readonly ICombatFeedback _combatFeedback;
     private readonly PickupSystem? _pickupSystem;
     private readonly ScoreSystem? _scoreSystem;
+    private readonly SoundPropagationSystem? _soundPropagationSystem;
     private readonly Random _rng = new();
     private MapData _mapData = null!;
 
@@ -49,7 +51,8 @@ public class EnemySystem
         DoorSystem doorSystem,
         ICombatFeedback combatFeedback,
         PickupSystem? pickupSystem = null,
-        ScoreSystem? scoreSystem = null)
+        ScoreSystem? scoreSystem = null,
+        SoundPropagationSystem? soundPropagationSystem = null)
     {
         _inputSystem = inputSystem;
         _player = player;
@@ -58,6 +61,7 @@ public class EnemySystem
         _combatFeedback = combatFeedback;
         _pickupSystem = pickupSystem;
         _scoreSystem = scoreSystem;
+        _soundPropagationSystem = soundPropagationSystem;
         _enemies = new List<Enemy>();
     }
 
@@ -108,6 +112,8 @@ public class EnemySystem
 
     public void Update(float deltaTime)
     {
+        UpdateHearing();
+
         // Throttled line-of-sight and FOV polygon update
         _losAccumulator += deltaTime;
         if (_losAccumulator >= LosInterval)
@@ -826,6 +832,71 @@ public class EnemySystem
         enemy.FrameColumnIndex = (int)MathF.Round(rotatedAngle / (MathF.PI * 2f) * 8f) % 8;
         enemy.AngleToPlayer = rotatedAngle;
         enemy.DistanceFromPlayer = toPlayer.Length() / LevelData.QuadSize;
+    }
+
+    /// <summary>
+    /// Process gunshots emitted this frame; enemies on reached tiles investigate the player.
+    /// </summary>
+    private void UpdateHearing()
+    {
+        if (_soundPropagationSystem is null || _mapData is null || !_player.IsAlive)
+        {
+            _soundPropagationSystem?.ClearPendingEvents();
+            return;
+        }
+
+        var events = _soundPropagationSystem.PendingEvents;
+        if (events.Count == 0)
+            return;
+
+        foreach (var soundEvent in events)
+        {
+            foreach (var enemy in _enemies)
+            {
+                if (!ShouldEnemyHearGunshot(enemy))
+                    continue;
+
+                if (!soundEvent.ReachedTiles.Contains(GetEnemyFloorTile(enemy)))
+                    continue;
+
+                ReactToHeardGunshot(enemy);
+            }
+        }
+
+        _soundPropagationSystem.ClearPendingEvents();
+    }
+
+    private static bool ShouldEnemyHearGunshot(Enemy enemy) =>
+        enemy.IsCombatActive && enemy.EnemyState is not (EnemyState.HIT or EnemyState.DYING or EnemyState.CORPSE);
+
+    private static (int X, int Y) GetEnemyFloorTile(Enemy enemy)
+    {
+        float quadSize = LevelData.QuadSize;
+        return (
+            (int)MathF.Floor(enemy.Position.X / quadSize),
+            (int)MathF.Floor(enemy.Position.Z / quadSize));
+    }
+
+    private void ReactToHeardGunshot(Enemy enemy)
+    {
+        if (enemy.EnemyState is EnemyState.ATTACKING && enemy.CanSeePlayer)
+            return;
+
+        enemy.IsPatrolReturnPath = false;
+        enemy.LastSeenPlayerPosition = _player.Position;
+        enemy.ResetShootingState();
+
+        ComputePathToTarget(enemy, _player.Position, ignoreDoors: false);
+
+        switch (enemy.EnemyState)
+        {
+            case EnemyState.IDLE:
+            case EnemyState.WALKING:
+            case EnemyState.SEARCHING:
+            case EnemyState.COLLIDING:
+                enemy.TransitionTo(EnemyState.NOTICING);
+                break;
+        }
     }
 
     /// <summary>
