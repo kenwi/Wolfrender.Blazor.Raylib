@@ -364,6 +364,12 @@ public class World : IScene
 
     public void Render()
     {
+        RenderSceneToTexture();
+        RenderToScreen();
+    }
+
+    private void RenderSceneToTexture()
+    {
         var mapLights = TileLightCollector.Collect(_mapData);
         var activeTileLights = TileLightCollector.SelectNearest(
             mapLights,
@@ -402,6 +408,12 @@ public class World : IScene
 
         EndMode3D();
         EndTextureMode();
+    }
+
+    private void RenderToScreen()
+    {
+        int screenWidth = GetScreenWidth();
+        int screenHeight = GetScreenHeight();
 
         BeginDrawing();
         ClearBackground(Color.Black);
@@ -409,54 +421,89 @@ public class World : IScene
         DrawTexturePro(
             _sceneRenderTexture.Texture,
             new Rectangle(0, 0, (float)_sceneRenderTexture.Texture.Width, (float)-_sceneRenderTexture.Texture.Height),
-            new Rectangle(0, 0, GetScreenWidth(), GetScreenHeight()),
+            new Rectangle(0, 0, screenWidth, screenHeight),
             new Vector2(0, 0),
             0,
             Color.White);
 
-        DrawFPS(10, GetScreenHeight() - 120);
+        RenderDebugLabels(screenWidth, screenHeight);
+        RenderPlayHud(screenWidth, screenHeight);
+        RenderMinimapAndDebugOverlays();
+
+        _consoleOverlay.Render();
+        EndDrawing();
+    }
+
+    private void RenderDebugLabels(int screenWidth, int screenHeight)
+    {
+        DrawFPS(10, screenHeight - 120);
+
         var mouseLabel = _inputState.IsMouseFree ? "MOUSE: FREE" : "MOUSE: LOCKED";
         var mouseColor = _inputState.IsMouseFree ? Color.Green : Color.Red;
         int mouseLabelWidth = MeasureText(mouseLabel, 20);
-        DrawText(mouseLabel, GetScreenWidth() - mouseLabelWidth - 10, 10, 20, mouseColor);
+        DrawText(mouseLabel, screenWidth - mouseLabelWidth - 10, 10, 20, mouseColor);
 
         var healthLabel = $"HEALTH: {(int)_player.Health} / {(int)_player.MaxHealth}";
         DrawText(healthLabel, 10, 40, 20, _player.IsAlive ? Color.RayWhite : Color.Red);
+    }
 
-        int screenWidth = GetScreenWidth();
-        int screenHeight = GetScreenHeight();
+    private void RenderPlayHud(int screenWidth, int screenHeight)
+    {
+        bool consoleOpen = _consoleOverlay.IsOpen;
+        bool inActiveLevel = _player.IsAlive && !_exitSystem.IsLevelComplete;
+        bool showWeaponView = _player.IsAlive && !consoleOpen && !_exitSystem.IsBlockingGameplay;
 
-        if (_player.IsAlive && !_exitSystem.IsLevelComplete)
+        if (inActiveLevel)
+        {
             LevelProgressOverlayHud.DrawScore(_scoreSystem, screenWidth);
-
-        if (_player.IsAlive && !_exitSystem.IsLevelComplete)
             CombatOverlayHud.DrawInventory(_player);
+        }
 
-        if (_player.IsAlive && !_consoleOverlay.IsOpen && !_exitSystem.IsBlockingGameplay)
+        if (showWeaponView)
             _animationSystem.RenderWeaponOverlay(screenWidth, screenHeight);
 
         _effectSystem.RenderScreenOverlay(screenWidth, screenHeight);
+        RenderModalOverlay(screenWidth, screenHeight, consoleOpen);
 
-        if (_exitSystem.IsLevelComplete && !_consoleOverlay.IsOpen)
+        if (!_player.IsAlive && !consoleOpen)
+            PlaySessionOverlayHud.DrawGameOver(screenWidth, screenHeight);
+
+        if (!consoleOpen && !_inputState.IsMouseFree && showWeaponView)
+            PlaySessionOverlayHud.DrawReticle(_effectSystem, screenWidth, screenHeight);
+    }
+
+    /// <summary>Mutually exclusive banners: level complete, exit countdown, door hint, no-ammo hint.</summary>
+    private void RenderModalOverlay(int screenWidth, int screenHeight, bool consoleOpen)
+    {
+        if (consoleOpen)
+            return;
+
+        if (_exitSystem.IsLevelComplete)
         {
             if (_highscoreIntermission.IsActive)
                 _highscoreIntermission.Draw(_scoreSystem, screenWidth, screenHeight);
             else
                 LevelProgressOverlayHud.DrawLevelComplete(_scoreSystem, screenWidth, screenHeight);
+            return;
         }
-        else if (_exitSystem.IsExitPending && !_consoleOverlay.IsOpen)
+
+        if (_exitSystem.IsExitPending)
+        {
             LevelProgressOverlayHud.DrawExitCountdown(_exitSystem.ExitCountdownRemaining, screenWidth, screenHeight);
-        else if (_player.IsAlive && !_consoleOverlay.IsOpen && _doorSystem.HasLockedHint)
+            return;
+        }
+
+        if (!_player.IsAlive)
+            return;
+
+        if (_doorSystem.HasLockedHint)
             DoorOverlayHud.DrawLockedHint(_doorSystem, screenWidth, screenHeight);
-        else if (_player.IsAlive && !_consoleOverlay.IsOpen && _weaponSystem.HasNoAmmoHint)
+        else if (_weaponSystem.HasNoAmmoHint)
             CombatOverlayHud.DrawNoAmmoHint(_weaponSystem, screenWidth, screenHeight);
+    }
 
-        if (!_player.IsAlive && !_consoleOverlay.IsOpen)
-            PlaySessionOverlayHud.DrawGameOver(screenWidth, screenHeight);
-
-        if (!_consoleOverlay.IsOpen && !_inputState.IsMouseFree && _player.IsAlive && !_exitSystem.IsBlockingGameplay)
-            PlaySessionOverlayHud.DrawReticle(_effectSystem, screenWidth, screenHeight);
-
+    private void RenderMinimapAndDebugOverlays()
+    {
         if (_inputState.IsMinimapEnabled)
             _minimapSystem.Render(_player);
 
@@ -464,8 +511,5 @@ public class World : IScene
         int renderH = (int)RenderData.Resolution.Y / RenderData.ResolutionDownScaleMultiplier;
         Debug.DrawWorldOverlays(_inputState.IsDebugEnabled, _player.Camera, renderW, renderH);
         Debug.Draw(_inputState.IsDebugEnabled);
-        _consoleOverlay.Render();
-
-        EndDrawing();
     }
 }
