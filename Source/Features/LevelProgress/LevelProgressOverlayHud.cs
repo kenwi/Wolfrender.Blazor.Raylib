@@ -10,7 +10,7 @@ public static class LevelProgressOverlayHud
     public static readonly Color Hint = new(200, 200, 200, 255);
     public static readonly Color PanelFill = new(0, 0, 0, 210);
 
-    public const int IntermissionPanelW = 560;
+    public const int IntermissionPanelW = 600;
     public const int IntermissionPanelH = 360;
     public const int IntermissionLineSize = 22;
 
