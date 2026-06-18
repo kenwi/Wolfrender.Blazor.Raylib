@@ -118,13 +118,20 @@ public static class OptionsMenuInput
             graphicsChanged = true;
         }
 
-        if (!settings.VSyncEnabled && (click || drag) && OptionsMenuLayout.Contains(layout.FpsSliderTrack, mouse))
+        if ((click || drag) && OptionsMenuLayout.Contains(layout.FpsSliderTrack, mouse))
         {
-            float t = (mouse.X - layout.FpsSliderTrack.X) / layout.FpsSliderTrack.Width;
-            t = Math.Clamp(t, 0f, 1f);
-            int fps = GraphicsFramePacing.MinTargetFps +
-                (int)MathF.Round(t * (GraphicsFramePacing.MaxTargetFps - GraphicsFramePacing.MinTargetFps));
-            settings.TargetFps = GraphicsFramePacing.ClampTargetFps(fps);
+            if (settings.VSyncEnabled && click)
+                settings.VSyncEnabled = false;
+
+            if (!settings.VSyncEnabled)
+            {
+                float t = (mouse.X - layout.FpsSliderTrack.X) / layout.FpsSliderTrack.Width;
+                t = Math.Clamp(t, 0f, 1f);
+                int fps = GraphicsFramePacing.MinTargetFps +
+                    (int)MathF.Round(t * (GraphicsFramePacing.MaxTargetFps - GraphicsFramePacing.MinTargetFps));
+                settings.TargetFps = GraphicsFramePacing.ClampTargetFps(fps);
+            }
+
             graphicsChanged = true;
         }
 

@@ -6,7 +6,7 @@ namespace Game.Features.Options;
 public static class GraphicsFramePacing
 {
     public const int MinTargetFps = 30;
-    public const int MaxTargetFps = 240;
+    public const int MaxTargetFps = 3000;
     public const int DefaultTargetFps = 120;
 
     /// <summary>Browser host hook (registered by the Blazor shell). Args: vsync, targetFps.</summary>
