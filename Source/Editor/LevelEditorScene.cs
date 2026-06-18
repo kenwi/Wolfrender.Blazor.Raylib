@@ -69,6 +69,7 @@ public class LevelEditorScene : IScene
 
         // Status message and GUI scaling
         _state.UpdateStatusTimer(deltaTime);
+        _state.TickSoundPropagationOverlay((float)GetTime());
         _gui.HandleScalingInput();
 
         // Toggle simulation with P key
@@ -107,6 +108,10 @@ public class LevelEditorScene : IScene
         {
             HandlePathPickInput(imGuiWantsMouse);
         }
+        else if (_state.SoundPropagationPicking)
+        {
+            HandleSoundPropagationPickInput(imGuiWantsMouse);
+        }
         else if (!_suppressMapClickUntilRelease)
         {
             HandleTileAndEnemyInput(imGuiWantsMouse);
@@ -131,6 +136,24 @@ public class LevelEditorScene : IScene
         // Keep painting/enemy drag suppressed for the rest of this press —
         // otherwise a long-held click would paint a tile on the very next frame
         // since the picker has already switched mode back to None.
+        _suppressMapClickUntilRelease = true;
+    }
+
+    private void HandleSoundPropagationPickInput(bool mouseOverUI)
+    {
+        if (IsKeyPressed(KeyboardKey.Escape))
+        {
+            _state.CancelSoundPropagationPick();
+            return;
+        }
+
+        if (mouseOverUI || !IsMouseButtonPressed(MouseButton.Left)) return;
+
+        var worldPos = _state.Camera.ScreenToWorld(GetMousePosition());
+        int tx = (int)MathF.Floor(worldPos.X);
+        int ty = (int)MathF.Floor(worldPos.Y);
+        _state.RunSoundPropagationTest(tx, ty, (float)GetTime());
+
         _suppressMapClickUntilRelease = true;
     }
 
@@ -184,6 +207,8 @@ public class LevelEditorScene : IScene
         // Pathfinding visualizer overlay
         _mapRenderer.DrawPathPreview(_state.PathStart, _state.PathEnd, _state.PathResult, _state.Camera);
 
+        _mapRenderer.DrawSoundPropagationOverlay(_state.SoundPropagationTiles, _state.Camera);
+
         if (_state.IsSimulating && _state.DrawEnemyPaths)
             _mapRenderer.DrawEnemyChasePaths(_state.EnemySystem, _state.Camera);
 
@@ -212,6 +237,7 @@ public class LevelEditorScene : IScene
         _gui.RenderPickupPropertiesPanel(ref _state.SelectedPickupIndex);
         _gui.RenderDebugLogPanel();
         _gui.RenderPathfindingPanel(_state);
+        _gui.RenderSoundPropagationPanel(_state);
         rlImGui.End();
 
         DrawText("Level Editor - F1 to return to game", 10, GetScreenHeight() - 70, 20, Color.White);
@@ -228,6 +254,12 @@ public class LevelEditorScene : IScene
             string msg = _state.PathPickingMode == EditorState.PathPickMode.Start
                 ? "PICKING PATHFINDING START - LMB: Set tile | Esc: Cancel"
                 : "PICKING PATHFINDING END - LMB: Set tile | Esc: Cancel";
+            int msgW = MeasureText(msg, 24);
+            DrawText(msg, (GetScreenWidth() - msgW) / 2, GetScreenHeight() - 100, 24, Color.Yellow);
+        }
+        else if (_state.SoundPropagationPicking)
+        {
+            const string msg = "TEST SOUND PROPAGATION - LMB: Set origin | Esc: Cancel";
             int msgW = MeasureText(msg, 24);
             DrawText(msg, (GetScreenWidth() - msgW) / 2, GetScreenHeight() - 100, 24, Color.Yellow);
         }

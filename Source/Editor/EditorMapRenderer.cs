@@ -594,6 +594,21 @@ public class EditorMapRenderer
         }
     }
 
+    /// <summary>
+    /// Draw the sound propagation visualizer overlay on reached tiles.
+    /// </summary>
+    public void DrawSoundPropagationOverlay(List<Vector2>? tiles, EditorCamera camera)
+    {
+        if (tiles == null || tiles.Count == 0) return;
+
+        float tileSize = camera.TileSize;
+        var fill = new Color(255, 160, 40, 140);
+        var border = new Color(255, 180, 60, 200);
+
+        foreach (var tile in tiles)
+            FillTile(tile, tileSize, camera.Offset, fill, border);
+    }
+
     private static void FillTile(Vector2 tile, float tileSize, Vector2 offset, Color fill, Color border)
     {
         float x = tile.X * tileSize + offset.X;
