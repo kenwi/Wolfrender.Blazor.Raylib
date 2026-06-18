@@ -184,7 +184,7 @@ public static class Debug
             ImGui.SameLine();
             ImGui.Text($"{LevelData.DrawedQuads}");
             
-            ImGui.Text($"Internal resolution: {RenderData.InternalWidth} x {RenderData.InternalHeight}");
+            ImGui.Text($"Game resolution (render texture): {RenderData.InternalWidth} x {RenderData.InternalHeight}");
             ImGui.Text($"Window resolution: {(int)RenderData.Resolution.X} x {(int)RenderData.Resolution.Y}");
         }
         

@@ -54,6 +54,7 @@ public class World : IScene
     private bool _highscoreIntermissionStarted;
 
     private RenderTexture2D _sceneRenderTexture;
+    private bool _hasSceneRenderTexture;
     private InputState _inputState = new();
 
     public Player Player => _player;
@@ -67,13 +68,6 @@ public class World : IScene
 
     public World(MapData mapData)
     {
-        int windowWidth = ResolveWindowWidth();
-        int windowHeight = ResolveWindowHeight();
-        RenderResolution.ApplyToRenderData(_optionsMenu.Settings, windowWidth, windowHeight);
-
-        int screenWidth = RenderData.InternalWidth;
-        int screenHeight = RenderData.InternalHeight;
-
         _mapData = mapData;
         _level = new LevelData(mapData);
         _tileTextures = mapData.TileTextures;
@@ -139,8 +133,16 @@ public class World : IScene
         _playerSystem.ResetForLevelLoad(_mapData);
         _exitSystem.Rebuild(_mapData);
 
-        _sceneRenderTexture = LoadRenderTexture(screenWidth, screenHeight);
+        WindowDisplayMode.SyncRenderDataFromWindow();
+        GameRenderResolution.Apply(
+            _optionsMenu.Settings,
+            ResolveWindowWidth(),
+            ResolveWindowHeight());
+        _sceneRenderTexture = LoadRenderTexture(RenderData.InternalWidth, RenderData.InternalHeight);
+        _hasSceneRenderTexture = true;
         Debug.Setup(_doorSystem.Doors, _player, _animationSystem, _enemySystem);
+        ApplyGraphicsSettings();
+        EnsureStartupDisplay();
 #if DEBUG
         ConsoleSelfTests.RunOnce();
 #endif
@@ -161,29 +163,78 @@ public class World : IScene
         _cameraSystem.SetMouseSensitivity(sensitivity);
     }
 
-    public void ApplyRenderResolution()
+    public void ApplyWindowDisplay()
     {
-        RenderResolution.ApplyToRenderData(
+        WindowDisplayMode.Apply(_optionsMenu.Settings);
+    }
+
+    public void ApplyGameResolution()
+    {
+        GameRenderResolution.Apply(
             _optionsMenu.Settings,
             ResolveWindowWidth(),
             ResolveWindowHeight());
         RecreateSceneRenderTexture();
     }
 
-    public string GetResolutionPresetId() => _optionsMenu.Settings.ResolutionPresetId;
+    public bool GetFullscreenEnabled() => _optionsMenu.Settings.FullscreenEnabled;
 
-    public void SetResolutionPresetId(string presetId)
+    public void SetFullscreenEnabled(bool enabled)
     {
-        _optionsMenu.Settings.ResolutionPresetId = presetId;
-        ApplyRenderResolution();
+        _optionsMenu.Settings.FullscreenEnabled = enabled;
+        ApplyWindowDisplay();
+        ApplyGameResolution();
+    }
+
+    public string GetWindowResolutionPresetId() => _optionsMenu.Settings.WindowResolutionPresetId;
+
+    public void SetWindowResolutionPresetId(string presetId)
+    {
+        _optionsMenu.Settings.WindowResolutionPresetId = presetId;
+        ApplyWindowDisplay();
+        ApplyGameResolution();
+    }
+
+    public string GetGameResolutionPresetId() => _optionsMenu.Settings.GameResolutionPresetId;
+
+    public void SetGameResolutionPresetId(string presetId)
+    {
+        _optionsMenu.Settings.GameResolutionPresetId = presetId;
+        ApplyGameResolution();
+    }
+
+    public bool GetVSyncEnabled() => _optionsMenu.Settings.VSyncEnabled;
+
+    public void SetVSyncEnabled(bool enabled)
+    {
+        _optionsMenu.Settings.VSyncEnabled = enabled;
+        ApplyGraphicsSettings();
+    }
+
+    public int GetTargetFps() => _optionsMenu.Settings.TargetFps;
+
+    public void SetTargetFps(int fps)
+    {
+        _optionsMenu.Settings.TargetFps = GraphicsFramePacing.ClampTargetFps(fps);
+        ApplyGraphicsSettings();
+    }
+
+    public void ApplyGraphicsSettings() => GraphicsFramePacing.Apply(_optionsMenu.Settings);
+
+    public void EnsureStartupDisplay()
+    {
+        WindowDisplayMode.ReapplyFullscreenIfNeeded(_optionsMenu.Settings);
+        WindowDisplayMode.SyncRenderDataFromWindow();
+
+        if (KnownResolutions.FindById(_optionsMenu.Settings.GameResolutionPresetId).IsNative)
+            ApplyGameResolution();
     }
 
     public void OnWindowResize()
     {
-        if (KnownResolutions.FindById(_optionsMenu.Settings.ResolutionPresetId).IsNative)
-            ApplyRenderResolution();
-        else
-            RecreateSceneRenderTexture();
+        WindowDisplayMode.SyncRenderDataFromWindow();
+        if (KnownResolutions.FindById(_optionsMenu.Settings.GameResolutionPresetId).IsNative)
+            ApplyGameResolution();
     }
 
     private static int ResolveWindowWidth()
@@ -203,12 +254,16 @@ public class World : IScene
         int newScreenWidth = RenderData.InternalWidth;
         int newScreenHeight = RenderData.InternalHeight;
 
-        if (_sceneRenderTexture.Texture.Width == newScreenWidth &&
+        if (_hasSceneRenderTexture &&
+            _sceneRenderTexture.Texture.Width == newScreenWidth &&
             _sceneRenderTexture.Texture.Height == newScreenHeight)
             return;
 
-        UnloadRenderTexture(_sceneRenderTexture);
+        if (_hasSceneRenderTexture)
+            UnloadRenderTexture(_sceneRenderTexture);
+
         _sceneRenderTexture = LoadRenderTexture(newScreenWidth, newScreenHeight);
+        _hasSceneRenderTexture = true;
     }
 
     public void OnEnter()
@@ -333,6 +388,19 @@ public class World : IScene
 
         if (_optionsMenu.IsOpen)
         {
+            var inputResult = _optionsMenu.HandleInput(GetScreenWidth(), GetScreenHeight());
+
+            if (inputResult.WindowDisplayChanged)
+            {
+                ApplyWindowDisplay();
+                ApplyGameResolution();
+            }
+
+            if (inputResult.GameResolutionChanged)
+                ApplyGameResolution();
+            if (inputResult.GraphicsChanged)
+                ApplyGraphicsSettings();
+
             if (IsKeyPressed(KeyboardKey.Escape))
                 _optionsMenu.Close(_inputSystem);
             else if (IsKeyPressed(KeyboardKey.Q))
@@ -481,7 +549,7 @@ public class World : IScene
         _consoleOverlay.Render();
 
         if (_optionsMenu.IsOpen)
-            OptionsMenuHud.Draw(screenWidth, screenHeight);
+            OptionsMenuHud.Draw(_optionsMenu.Settings, screenWidth, screenHeight);
 
         EndDrawing();
     }

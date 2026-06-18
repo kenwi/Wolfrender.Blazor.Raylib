@@ -26,4 +26,9 @@ public sealed class OptionsMenuSystem
     }
 
     public void Dismiss() => IsOpen = false;
+
+    public OptionsMenuInput.Result HandleInput(int screenWidth, int screenHeight)
+    {
+        return OptionsMenuInput.Update(Settings, screenWidth, screenHeight);
+    }
 }

@@ -64,9 +64,20 @@ class Raylib {
         this.resize({});
     }
 
+    setFramePacing(vsyncEnabled, targetFps) {
+        const fps = Math.max(30, Math.min(240, targetFps | 0));
+        Blazor.runtime.Module['framePacing'] = {
+            vsync: !!vsyncEnabled,
+            fps
+        };
+    }
+
     render(dotnetObject, id, fps) {
         if (dotnetObject) {
-            const frameCap = 1000.0 / (fps + 16.0);
+            if (!Blazor.runtime.Module['framePacing']) {
+                this.setFramePacing(true, fps || 120);
+            }
+
             let lastTime = performance.now();
             const localRender = async (time) => {
                 const { getAssemblyExports } = await globalThis.getDotnetRuntime(0);
@@ -74,8 +85,12 @@ class Raylib {
                 
                 const now = performance.now();
                 let delta = now - lastTime;
+
+                const pacing = Blazor.runtime.Module['framePacing'];
+                const useVsync = pacing.vsync;
+                const frameCap = useVsync ? 0 : (1000.0 / pacing.fps);
                 
-               if (delta > frameCap) {
+               if (useVsync || delta >= frameCap) {
                    exports.Wolfrender.Blazor.Raylib.Components.Raylib.EventAnimationFrame(dotnetObject, delta);
                    lastTime = now;
                }

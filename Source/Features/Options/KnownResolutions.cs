@@ -55,4 +55,25 @@ public static class KnownResolutions
 
         return preset.Label;
     }
+
+    public static int IndexOf(string id)
+    {
+        for (int i = 0; i < Presets.Length; i++)
+        {
+            if (string.Equals(Presets[i].Id, id, StringComparison.OrdinalIgnoreCase))
+                return i;
+        }
+
+        return Presets.Length - 1;
+    }
+
+    public static string CycleId(string id, int delta)
+    {
+        int index = IndexOf(id);
+        int next = (index + delta) % Presets.Length;
+        if (next < 0)
+            next += Presets.Length;
+
+        return Presets[next].Id;
+    }
 }

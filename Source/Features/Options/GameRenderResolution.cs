@@ -2,7 +2,8 @@ using Game.Core.Level;
 
 namespace Game.Features.Options;
 
-public static class RenderResolution
+/// <summary>Internal render texture resolution (upscaled to the window when drawn).</summary>
+public static class GameRenderResolution
 {
     public static (int Width, int Height) ResolveInternalSize(GameSettings settings, int windowWidth, int windowHeight)
     {
@@ -11,11 +12,11 @@ public static class RenderResolution
         if (windowHeight <= 0)
             windowHeight = 1;
 
-        var preset = KnownResolutions.FindById(settings.ResolutionPresetId);
+        var preset = KnownResolutions.FindById(settings.GameResolutionPresetId);
         return KnownResolutions.Resolve(preset, windowWidth, windowHeight);
     }
 
-    public static void ApplyToRenderData(GameSettings settings, int windowWidth, int windowHeight)
+    public static void Apply(GameSettings settings, int windowWidth, int windowHeight)
     {
         var (width, height) = ResolveInternalSize(settings, windowWidth, windowHeight);
         RenderData.InternalWidth = width;

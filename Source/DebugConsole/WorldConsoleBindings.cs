@@ -122,7 +122,11 @@ public static class WorldConsoleBindings
                 {
                     "RenderData.InternalWidth",
                     "RenderData.InternalHeight",
-                    "RenderData.ResolutionPresetId"
+                    "RenderData.FullscreenEnabled",
+                    "RenderData.WindowResolutionPresetId",
+                    "RenderData.GameResolutionPresetId",
+                    "RenderData.VSyncEnabled",
+                    "RenderData.TargetFps"
                 },
                 DiscoveryFactory = () => DiscoverVariablesForInstance(graphics, "RenderData")
             },
@@ -162,7 +166,11 @@ public static class WorldConsoleBindings
             "Enemy[index].HitReactionDurationSeconds",
             "RenderData.InternalWidth",
             "RenderData.InternalHeight",
-            "RenderData.ResolutionPresetId",
+            "RenderData.FullscreenEnabled",
+            "RenderData.WindowResolutionPresetId",
+            "RenderData.GameResolutionPresetId",
+            "RenderData.VSyncEnabled",
+            "RenderData.TargetFps",
             "Audio.Volume"
         };
     }
@@ -216,10 +224,34 @@ public sealed class GraphicsConsoleSettings
 
     public int InternalHeight => RenderData.InternalHeight;
 
-    public string ResolutionPresetId
+    public bool FullscreenEnabled
     {
-        get => _world.GetResolutionPresetId();
-        set => _world.SetResolutionPresetId(value);
+        get => _world.GetFullscreenEnabled();
+        set => _world.SetFullscreenEnabled(value);
+    }
+
+    public string WindowResolutionPresetId
+    {
+        get => _world.GetWindowResolutionPresetId();
+        set => _world.SetWindowResolutionPresetId(value);
+    }
+
+    public string GameResolutionPresetId
+    {
+        get => _world.GetGameResolutionPresetId();
+        set => _world.SetGameResolutionPresetId(value);
+    }
+
+    public bool VSyncEnabled
+    {
+        get => _world.GetVSyncEnabled();
+        set => _world.SetVSyncEnabled(value);
+    }
+
+    public int TargetFps
+    {
+        get => _world.GetTargetFps();
+        set => _world.SetTargetFps(value);
     }
 }
 

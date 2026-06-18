@@ -2,6 +2,7 @@ using System.Numerics;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 using static Game.Core.Level.Res;
+using Game.Features.Options;
 
 namespace Game.Core;
 
@@ -10,16 +11,16 @@ public class Application
     private IScene _activeScene;
     private readonly IScene _gameScene;
     private readonly IScene _editorScene;
+    private bool _ensuredStartupDisplay;
 
     public Application()
     {
-        SetTargetFPS(120);
         InitWindow(0, 0, "");
-        SetExitKey(KeyboardKey.Null);
         SetWindowState(ConfigFlags.FullscreenMode);
+        SetExitKey(KeyboardKey.Null);
         InitAudioDevice();
 
-        RenderData.Resolution = new Vector2(GetScreenWidth(), GetScreenHeight());
+        WindowDisplayMode.SyncRenderDataFromWindow();
 
         var mapData = LoadMapData();
 
@@ -38,6 +39,13 @@ public class Application
     {
         while (!WindowShouldClose())
         {
+            if (!_ensuredStartupDisplay)
+            {
+                _ensuredStartupDisplay = true;
+                if (_gameScene is World world)
+                    world.EnsureStartupDisplay();
+            }
+
             // F1 toggles between game and level editor
             if (IsKeyPressed(KeyboardKey.F1))
             {

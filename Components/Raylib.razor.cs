@@ -68,6 +68,9 @@ public partial class Raylib : IDisposable
     [JSImport("raylib.render", "Raylib")]
     public static partial void Render([JSMarshalAs<JSType.Any>] object reference, string id, int fps);
 
+    [JSImport("raylib.setFramePacing", "Raylib")]
+    public static partial void SetFramePacing(bool vsyncEnabled, int targetFps);
+
     [JSImport("raylib.syncCanvasSize", "Raylib")]
     public static partial void SyncCanvasSize();
 

@@ -5,7 +5,9 @@ using Microsoft.JSInterop;
 using static Raylib_cs.Raylib;
 using Raylib_cs;
 using Game.Core;
+using Game.Features.Options;
 using System.Threading.Tasks;
+using Wolfrender.Blazor.Raylib.Components;
 
 namespace Wolfrender.Blazor.Raylib.Pages;
 
@@ -79,6 +81,9 @@ public partial class ThreeDFirstPerson : IDisposable
         InitWindow(_screenWidth, _screenHeight, "Wolfrender");
         SetExitKey(KeyboardKey.Null);
         InitAudioDevice();
+
+        GraphicsFramePacing.BrowserApply = Raylib.SetFramePacing;
+
         await OnResize((_screenWidth, _screenHeight));
 
         RenderData.Resolution = new Vector2(GetScreenWidth(), GetScreenHeight());
