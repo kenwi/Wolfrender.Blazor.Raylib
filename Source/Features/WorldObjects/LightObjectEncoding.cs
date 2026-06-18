@@ -11,7 +11,7 @@ public static class LightObjectEncoding
 
     public const int MaxShaderLights = PrimitiveRenderer.MaxShaderLights;
 
-    /// <summary>World-unit radius for fixture falloff (about seven 4-unit tiles).</summary>
+    /// <summary>World-unit radius for fixture falloff (about eight 4-unit tiles).</summary>
     public const float DefaultRadius = PrimitiveRenderer.DefaultTileLightRadius;
 
     /// <summary>World Y for the light anchor; matches <see cref="Systems.PlacedObjectSystem"/> billboards.</summary>

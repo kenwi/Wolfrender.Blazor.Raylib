@@ -375,11 +375,7 @@ public class World : IScene
             mapLights,
             _player.Position,
             LightObjectEncoding.MaxShaderLights);
-        PrimitiveRenderer.SetLightingParameters(
-            _player.Position,
-            maxDistance: 50f,
-            minBrightness: 0.1f,
-            activeTileLights);
+        PrimitiveRenderer.SetLightingParameters(_player.Position, tileLights: activeTileLights);
         var lightingShader = PrimitiveRenderer.GetLightingShader();
 
         BeginTextureMode(_sceneRenderTexture);

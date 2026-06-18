@@ -13,8 +13,14 @@ public static class PrimitiveRenderer
     /// <summary>Maximum point lights the lighting shaders support per frame.</summary>
     public const int MaxShaderLights = 8;
 
-    /// <summary>Default world-unit radius for tile light falloff (about seven 4-unit tiles).</summary>
-    public const float DefaultTileLightRadius = 28f;
+    /// <summary>Ambient floor in unlit areas (0 = pitch black, 1 = no darkening).</summary>
+    public const float DefaultMinBrightness = 0.02f;
+
+    /// <summary>Player torch reach in world units (~6 tiles at QuadSize 4).</summary>
+    public const float DefaultPlayerLightDistance = 24f;
+
+    /// <summary>Default world-unit radius for placed light fixture falloff (~8 tiles).</summary>
+    public const float DefaultTileLightRadius = 32f;
 
     private static Shader? _colorKeyShader;
     private static int _colorKeyShaderLoc;
@@ -38,8 +44,8 @@ public static class PrimitiveRenderer
     private static readonly int[] _spriteLitTileLightLocs = new int[MaxShaderLights];
 
     private static Vector3 _lightingPlayerPosition;
-    private static float _cachedMaxLightDistance = 50f;
-    private static float _cachedMinBrightness = 0.1f;
+    private static float _cachedMaxLightDistance = DefaultPlayerLightDistance;
+    private static float _cachedMinBrightness = DefaultMinBrightness;
     private static float _cachedTileLightRadius = DefaultTileLightRadius;
     private static Vector3[] _activeTileLights = Array.Empty<Vector3>();
 
@@ -240,8 +246,8 @@ public static class PrimitiveRenderer
 
     public static void SetLightingParameters(
         Vector3 playerPosition,
-        float maxDistance = 50.0f,
-        float minBrightness = 0.1f,
+        float maxDistance = DefaultPlayerLightDistance,
+        float minBrightness = DefaultMinBrightness,
         ReadOnlySpan<Vector3> tileLights = default,
         float tileLightRadius = DefaultTileLightRadius)
     {
