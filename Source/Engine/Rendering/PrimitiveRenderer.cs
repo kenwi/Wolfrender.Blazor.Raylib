@@ -24,6 +24,9 @@ public static class PrimitiveRenderer
 
     private static Shader? _colorKeyShader;
     private static int _colorKeyShaderLoc;
+    private static bool _colorKeyShaderUsable;
+    private static bool _loggedGpuInfo;
+    private static bool _loggedColorKeyDrawFallback;
 
     // Distance-based lighting (walls/floors) and sprite billboards (color key + same falloff)
     private static Shader? _lightingShader;
@@ -53,23 +56,66 @@ public static class PrimitiveRenderer
     // Flip V for world polygon rendering so in-game orientation matches the editor preview.
     private static void TexCoordFlippedY(float u, float v) => Rlgl.TexCoord2f(u, 1.0f - v);
     
+    private static void EnsureGpuInfoLogged()
+    {
+        if (_loggedGpuInfo)
+            return;
+
+        _loggedGpuInfo = true;
+        Console.WriteLine($"[Shader] OpenGL version: {Rlgl.GetVersion()}");
+    }
+
+    private static void LogShaderLoad(string label, Shader shader, params (string Name, int Location)[] uniforms)
+    {
+        bool valid = IsShaderValid(shader);
+        Console.WriteLine($"[Shader] {label}: programId={shader.Id}, valid={valid}");
+
+        foreach (var (name, location) in uniforms)
+        {
+            string locationText = location >= 0 ? location.ToString() : "NOT FOUND";
+            Console.WriteLine($"[Shader] {label} uniform '{name}': location={locationText}");
+        }
+
+        if (!valid)
+            Console.WriteLine($"[Shader] WARNING: {label} failed to compile or link.");
+    }
+
+    private static Shader LoadColorKeyShader()
+    {
+        string vertexSource = ReadShaderFile("resources/shaders/screen_sprite.vs");
+        string fragmentSource = ReadShaderFile("resources/shaders/transparency.fs");
+        return LoadShaderFromMemory(vertexSource, fragmentSource);
+    }
+
     private static void EnsureColorKeyShader()
     {
         if (_colorKeyShader.HasValue) return;
- 
-        // Load shader (Raylib will use default vertex shader)
-        // _colorKeyShader = LoadShaderFromMemory(null, fragmentShader);
-        _colorKeyShader = LoadShader(null, Res.Path("resources/shaders/transparency.fs"));
-        if (_colorKeyShader.HasValue)
+
+        EnsureGpuInfoLogged();
+        Console.WriteLine("[Shader] Loading color-key shader (transparency.fs + screen_sprite.vs)");
+
+        _colorKeyShader = LoadColorKeyShader();
+        _colorKeyShaderLoc = GetShaderLocation(_colorKeyShader.Value, "colorKey");
+        _colorKeyShaderUsable = IsShaderValid(_colorKeyShader.Value) && _colorKeyShaderLoc >= 0;
+
+        LogShaderLoad("color-key (transparency.fs)", _colorKeyShader.Value, ("colorKey", _colorKeyShaderLoc));
+
+        if (IsShaderValid(_colorKeyShader.Value) && _colorKeyShaderLoc < 0)
         {
-            _colorKeyShaderLoc = GetShaderLocation(_colorKeyShader.Value, "colorKey");
-            
+            Console.WriteLine(
+                "[Shader] WARNING: Program is valid but 'colorKey' uniform is missing. " +
+                "Raylib likely fell back to the default shader after a link failure " +
+                "(check above for 'Failed to link shader program').");
+        }
+
+        if (_colorKeyShaderUsable)
+        {
             // Set the color key (in 0-255 range for shader)
             float[] colorKeyArray = { SpriteTransparencyKey.R, SpriteTransparencyKey.G, SpriteTransparencyKey.B };
             SetShaderValue(_colorKeyShader.Value, _colorKeyShaderLoc, colorKeyArray, ShaderUniformDataType.Vec3);
         }
     }
-    
+
     private static string ReadShaderFile(string relativePath) =>
         File.ReadAllText(Res.Path(relativePath));
 
@@ -103,6 +149,9 @@ public static class PrimitiveRenderer
     {
         if (_lightingShader.HasValue) return;
 
+        EnsureGpuInfoLogged();
+        Console.WriteLine("[Shader] Loading scene lighting shader (lighting.fs + lighting.vs)");
+
         _lightingShader = LoadSceneLitShader("lighting.fs");
         _lightingShaderPlayerPosLoc = GetShaderLocation(_lightingShader.Value, "playerPosition");
         _lightingShaderMaxDistanceLoc = GetShaderLocation(_lightingShader.Value, "maxLightDistance");
@@ -112,11 +161,23 @@ public static class PrimitiveRenderer
             _lightingShaderTileLightLocs,
             out _lightingShaderTileLightCountLoc,
             out _lightingShaderTileLightRadiusLoc);
+
+        LogShaderLoad(
+            "scene lighting (lighting.fs)",
+            _lightingShader.Value,
+            ("playerPosition", _lightingShaderPlayerPosLoc),
+            ("maxLightDistance", _lightingShaderMaxDistanceLoc),
+            ("minBrightness", _lightingShaderMinBrightnessLoc),
+            ("tileLightCount", _lightingShaderTileLightCountLoc),
+            ("tileLightRadius", _lightingShaderTileLightRadiusLoc));
     }
 
     private static void EnsureSpriteLitShader()
     {
         if (_spriteLitShader.HasValue) return;
+
+        EnsureGpuInfoLogged();
+        Console.WriteLine("[Shader] Loading sprite-lit shader (sprite_lit.fs + lighting.vs)");
 
         _spriteLitShader = LoadSceneLitShader("sprite_lit.fs");
         _spriteLitPlayerPosLoc = GetShaderLocation(_spriteLitShader.Value, "playerPosition");
@@ -129,8 +190,21 @@ public static class PrimitiveRenderer
             out _spriteLitTileLightCountLoc,
             out _spriteLitTileLightRadiusLoc);
 
-        float[] colorKeyArray = { SpriteTransparencyKey.R, SpriteTransparencyKey.G, SpriteTransparencyKey.B };
-        SetShaderValue(_spriteLitShader.Value, _spriteLitColorKeyLoc, colorKeyArray, ShaderUniformDataType.Vec3);
+        LogShaderLoad(
+            "sprite-lit (sprite_lit.fs)",
+            _spriteLitShader.Value,
+            ("playerPosition", _spriteLitPlayerPosLoc),
+            ("maxLightDistance", _spriteLitMaxDistanceLoc),
+            ("minBrightness", _spriteLitMinBrightnessLoc),
+            ("colorKey", _spriteLitColorKeyLoc),
+            ("tileLightCount", _spriteLitTileLightCountLoc),
+            ("tileLightRadius", _spriteLitTileLightRadiusLoc));
+
+        if (IsShaderValid(_spriteLitShader.Value) && _spriteLitColorKeyLoc >= 0)
+        {
+            float[] colorKeyArray = { SpriteTransparencyKey.R, SpriteTransparencyKey.G, SpriteTransparencyKey.B };
+            SetShaderValue(_spriteLitShader.Value, _spriteLitColorKeyLoc, colorKeyArray, ShaderUniformDataType.Vec3);
+        }
     }
 
     private static void ApplyLightingUniforms(
@@ -278,12 +352,19 @@ public static class PrimitiveRenderer
         Color tint)
     {
         EnsureColorKeyShader();
-        if (_colorKeyShader.HasValue)
+        if (_colorKeyShaderUsable && _colorKeyShader.HasValue)
+        {
             BeginShaderMode(_colorKeyShader.Value);
+        }
+        else if (!_loggedColorKeyDrawFallback)
+        {
+            _loggedColorKeyDrawFallback = true;
+            Console.WriteLine("[Shader] DrawScreenSprite: color-key shader unavailable; drawing without transparency.");
+        }
 
         DrawTexturePro(texture, source, dest, Vector2.Zero, 0f, tint);
 
-        if (_colorKeyShader.HasValue)
+        if (_colorKeyShaderUsable && _colorKeyShader.HasValue)
             EndShaderMode();
     }
     public static void DrawCubeTexture(

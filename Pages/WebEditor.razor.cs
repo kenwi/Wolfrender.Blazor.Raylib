@@ -58,6 +58,7 @@ public partial class WebEditor : IDisposable
             "resources/level.json",
             "resources/test.json",
             "resources/shaders/transparency.fs",
+            "resources/shaders/screen_sprite.vs",
             "resources/shaders/lighting.vs",
             "resources/shaders/lighting.fs",
             "resources/shaders/lighting_common.glsl",
