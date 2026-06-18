@@ -91,7 +91,8 @@ public class World : IScene
         _pickupSystem = new PickupSystem(_scoreSystem);
         _placedObjectSystem = new PlacedObjectSystem();
         _enemySystem = new EnemySystem(
-            _player, _inputSystem, _collisionSystem, _doorSystem, _combatFeedback, _pickupSystem, _scoreSystem);
+            _player, _inputSystem, _collisionSystem, _doorSystem, _combatFeedback,
+            _pickupSystem, _scoreSystem, _soundPropagationSystem);
         _pickupSystem.SetObjectsTexture(_gameTextures[GameTextureIndex.Objects]);
         _pickupSystem.Rebuild(_mapData.Pickups, _mapData);
         _placedObjectSystem.SetObjectsTexture(_gameTextures[GameTextureIndex.Objects]);
