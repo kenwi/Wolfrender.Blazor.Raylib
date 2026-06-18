@@ -1,13 +1,14 @@
 namespace Game.Features.WorldObjects;
 
 /// <summary>
-/// Objects layer palette entry: object ID 3 on <see cref="MapData.Objects"/> is a light fixture
-/// (spritesheet cell 3 on <c>Objects.png</c>). Emits point lighting in play mode; does not block movement.
+/// Objects layer palette entries in <see cref="ObjectSprites.LightObjectIds"/> on
+/// <see cref="MapData.Objects"/> are light fixtures (matching spritesheet cells on <c>Objects.png</c>).
+/// Emits point lighting in play mode; does not block movement.
 /// Sheet layout and shader limits are owned by the Engine (<see cref="ObjectSprites"/>, <see cref="PrimitiveRenderer"/>).
 /// </summary>
 public static class LightObjectEncoding
 {
-    public const uint ObjectId = ObjectSprites.LightObjectId;
+    public static readonly uint[] ObjectIds = ObjectSprites.LightObjectIds;
 
     public const int MaxShaderLights = PrimitiveRenderer.MaxShaderLights;
 

@@ -29,12 +29,12 @@ public static class ObjectSprites
     public const int SheetHeight = 1053;
 
     /// <summary>
-    /// Object ID on the objects layer that renders as a light fixture and never blocks
+    /// Object IDs on the objects layer that render as light fixtures and never block
     /// movement. Lighting behavior lives in <c>Game.Features.WorldObjects.LightObjectEncoding</c>.
     /// </summary>
-    public const uint LightObjectId = 3;
+    public static readonly uint[] LightObjectIds = [3];
 
-    public static bool IsLightObject(uint objectId) => objectId == LightObjectId;
+    public static bool IsLightObject(uint objectId) => LightObjectIds.Contains(objectId);
 
     /// <summary>World-space blocking radius from tile anchor (half of 4×4 sprite width).</summary>
     public static float CollisionRadius => LevelData.QuadSize * 0.2f;
