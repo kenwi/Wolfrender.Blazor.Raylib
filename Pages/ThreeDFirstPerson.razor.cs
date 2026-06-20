@@ -3,10 +3,11 @@ using System.Text;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using static Raylib_cs.Raylib;
-using Color = Raylib_cs.Color;
 using Raylib_cs;
 using Game.Core;
+using Game.Features.Options;
 using System.Threading.Tasks;
+using Wolfrender.Blazor.Raylib.Components;
 
 namespace Wolfrender.Blazor.Raylib.Pages;
 
@@ -25,51 +26,11 @@ public partial class ThreeDFirstPerson : IDisposable
     private readonly StringBuilder _logBuilder = new();
     public string BlazorUILog => _logBuilder.ToString();
     public bool ShowDebugLogUI = false;
-    public bool ShowOptionsUI = false;
-
-    public float Volume { get; set; } = 0.5f;
-    public float MouseSensitivity { get; set; } = 1f;
-    public int ResolutionDownsampling { get; set; } = 1;
-
-    public event Action<float>? VolumeChanged;
-    public event Action<float>? MouseSensitivityChanged;
-    public event Action<int>? ResolutionDownsamplingChanged;
 
     public void Log(string message)
     {
         _logBuilder.AppendLine(message);
         InvokeAsync(ScrollLogToBottom);
-    }
-
-    private void OnVolumeChanged(ChangeEventArgs e)
-    {
-        if (float.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value))
-        {
-            Volume = value;
-            VolumeChanged?.Invoke(Volume);
-            Log($"Volume changed to {Volume}");
-        }
-    }
-
-    private void OnMouseSensitivityChanged(ChangeEventArgs e)
-    {
-        if (float.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value))
-        {
-            MouseSensitivity = value;
-            MouseSensitivityChanged?.Invoke(MouseSensitivity);
-            Log($"Mouse sensitivity X changed to {MouseSensitivity}");
-            
-        }
-    }
-
-    private void OnResolutionDownsamplingChanged(ChangeEventArgs e)
-    {
-        if (int.TryParse(e.Value?.ToString(), out var value))
-        {
-            ResolutionDownsampling = value;
-            ResolutionDownsamplingChanged?.Invoke(ResolutionDownsampling);
-            Log($"Resolution downsampling changed to {ResolutionDownsampling}");
-        }
     }
 
     private async Task ScrollLogToBottom()
@@ -93,7 +54,6 @@ public partial class ThreeDFirstPerson : IDisposable
     {
         await DetectBrowserResolution();
 
-        // Preload all resources into the Emscripten VFS before Raylib/File APIs can use them
         var resourceFiles = new[]
         {
             "resources/spritesheet_tiles.png",
@@ -119,44 +79,29 @@ public partial class ThreeDFirstPerson : IDisposable
             Wolfrender.Blazor.Raylib.Components.Raylib.PreloadFile));
 
         InitWindow(_screenWidth, _screenHeight, "Wolfrender");
+        SetExitKey(KeyboardKey.Null);
         InitAudioDevice();
+
+        GraphicsFramePacing.BrowserApply = Raylib.SetFramePacing;
+
         await OnResize((_screenWidth, _screenHeight));
 
         RenderData.Resolution = new Vector2(GetScreenWidth(), GetScreenHeight());
         var mapData = Application.LoadMapData();
 
-        // Create scenes with shared data
-        _gameScene = new World(mapData);    
-        var world = (World)_gameScene;
-        _editorScene = new Game.Editor.LevelEditorScene(mapData, world.EnemySystem, world.DoorSystem, world.Player);
+        _gameScene = new World(mapData);
+        _editorScene = new Game.Editor.LevelEditorScene(
+            mapData,
+            ((World)_gameScene).EnemySystem,
+            ((World)_gameScene).DoorSystem,
+            ((World)_gameScene).Player);
 
-        VolumeChanged += world.SetVolume;
-        VolumeChanged?.Invoke(Volume);
-
-        MouseSensitivityChanged += world.SetMouseSensitivity;
-        MouseSensitivityChanged?.Invoke(MouseSensitivity);
-
-        ResolutionDownsamplingChanged += world.SetResolutionDownScaleMultiplier;
-        ResolutionDownsamplingChanged?.Invoke(ResolutionDownsampling);
-
-        // Start with the game scene
         _activeScene = _gameScene;
         _activeScene.OnEnter();
     }
 
-    // Main game loop
     private async void Render(float delta)
     {
-        if (IsKeyPressed(KeyboardKey.Backspace))
-        {
-            ShowOptionsUI = !ShowOptionsUI;
-            var world = _gameScene as World;
-            var logString = ShowOptionsUI ? "Enabling cursor" : "Disabling cursor";
-            Log(logString);
-            world?.ToggleMouse();
-            await InvokeAsync(StateHasChanged);
-        }
-
         if (IsKeyPressed(KeyboardKey.I))
         {
             ShowDebugLogUI = !ShowDebugLogUI;

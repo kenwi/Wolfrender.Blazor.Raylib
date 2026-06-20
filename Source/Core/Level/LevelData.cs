@@ -14,7 +14,8 @@ public static class Res
 public static class RenderData
 {
     public static Vector2 Resolution = new Vector2(1025, 411);
-    public static int ResolutionDownScaleMultiplier = 4;
+    public static int InternalWidth = 1025;
+    public static int InternalHeight = 411;
 }
 
 public class LevelData

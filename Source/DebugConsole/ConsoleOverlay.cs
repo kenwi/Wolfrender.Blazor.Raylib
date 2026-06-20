@@ -32,6 +32,12 @@ public sealed class ConsoleOverlay
             _scrollbackOffsetLines = 0;
     }
 
+    public void Close()
+    {
+        IsOpen = false;
+        _historyIndex = -1;
+    }
+
     public void AddLine(string line)
     {
         _scrollback.Add(line);

@@ -120,7 +120,13 @@ public static class WorldConsoleBindings
                     : ResolveResult.Ok(graphics),
                 CuratedListFactory = () => new[]
                 {
-                    "RenderData.ResolutionDownScaleMultiplier"
+                    "RenderData.InternalWidth",
+                    "RenderData.InternalHeight",
+                    "RenderData.FullscreenEnabled",
+                    "RenderData.WindowResolutionPresetId",
+                    "RenderData.GameResolutionPresetId",
+                    "RenderData.VSyncEnabled",
+                    "RenderData.TargetFps"
                 },
                 DiscoveryFactory = () => DiscoverVariablesForInstance(graphics, "RenderData")
             },
@@ -158,7 +164,13 @@ public static class WorldConsoleBindings
             "Enemy[index].EnemyState",
             "Enemy[index].CorpseLingerSeconds",
             "Enemy[index].HitReactionDurationSeconds",
-            "RenderData.ResolutionDownScaleMultiplier",
+            "RenderData.InternalWidth",
+            "RenderData.InternalHeight",
+            "RenderData.FullscreenEnabled",
+            "RenderData.WindowResolutionPresetId",
+            "RenderData.GameResolutionPresetId",
+            "RenderData.VSyncEnabled",
+            "RenderData.TargetFps",
             "Audio.Volume"
         };
     }
@@ -208,10 +220,38 @@ public sealed class GraphicsConsoleSettings
         _world = world;
     }
 
-    public int ResolutionDownScaleMultiplier
+    public int InternalWidth => RenderData.InternalWidth;
+
+    public int InternalHeight => RenderData.InternalHeight;
+
+    public bool FullscreenEnabled
     {
-        get => RenderData.ResolutionDownScaleMultiplier;
-        set => _world.SetResolutionDownScaleMultiplier(Math.Max(1, value));
+        get => _world.GetFullscreenEnabled();
+        set => _world.SetFullscreenEnabled(value);
+    }
+
+    public string WindowResolutionPresetId
+    {
+        get => _world.GetWindowResolutionPresetId();
+        set => _world.SetWindowResolutionPresetId(value);
+    }
+
+    public string GameResolutionPresetId
+    {
+        get => _world.GetGameResolutionPresetId();
+        set => _world.SetGameResolutionPresetId(value);
+    }
+
+    public bool VSyncEnabled
+    {
+        get => _world.GetVSyncEnabled();
+        set => _world.SetVSyncEnabled(value);
+    }
+
+    public int TargetFps
+    {
+        get => _world.GetTargetFps();
+        set => _world.SetTargetFps(value);
     }
 }
 

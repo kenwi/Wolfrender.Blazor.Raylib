@@ -49,16 +49,15 @@ public class InputState
 public class InputSystem
 {
     private bool _isMouseFree = true;
-    private bool _isPaused;
     private bool _isDebugEnabled = false;
     private bool _isMinimapEnabled = false;
 
-    public void Update()
+    public void Update(bool suppressClickToCapture = false)
     {
         // Click-to-capture: locks the cursor on first click so the browser's
         // pointer lock API receives the required user gesture. Also gives desktop
         // users a natural "click to play" entry point after toggling mouse free.
-        if (_isMouseFree && IsMouseButtonPressed(MouseButton.Left))
+        if (!suppressClickToCapture && _isMouseFree && IsMouseButtonPressed(MouseButton.Left))
         {
             DisableMouse();
         }
@@ -74,12 +73,6 @@ public class InputSystem
             {
                 HideCursor();
             }
-        }
-
-        if (IsKeyPressed(KeyboardKey.P))
-        {
-            _isPaused = !_isPaused;
-            ToggleMouse();
         }
 
         if (IsKeyPressed(KeyboardKey.I))
@@ -136,7 +129,7 @@ public class InputSystem
             MoveRight = IsKeyDown(KeyboardKey.D),
             MouseDelta = GetMouseDelta(),
             IsMouseFree = _isMouseFree,
-            IsPaused = _isPaused,
+            IsPaused = false,
             IsDebugEnabled = _isDebugEnabled,
             IsMinimapEnabled = _isMinimapEnabled,
             IsInteractPressed =  IsKeyPressed(KeyboardKey.E),

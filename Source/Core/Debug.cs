@@ -184,7 +184,8 @@ public static class Debug
             ImGui.SameLine();
             ImGui.Text($"{LevelData.DrawedQuads}");
             
-            ImGui.Text($"Resolution: Width: {RenderData.Resolution.X / RenderData.ResolutionDownScaleMultiplier} Height: {RenderData.Resolution.Y / RenderData.ResolutionDownScaleMultiplier}");
+            ImGui.Text($"Game resolution (render texture): {RenderData.InternalWidth} x {RenderData.InternalHeight}");
+            ImGui.Text($"Window resolution: {(int)RenderData.Resolution.X} x {(int)RenderData.Resolution.Y}");
         }
         
         // Enemy System Information Section

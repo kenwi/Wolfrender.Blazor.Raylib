@@ -8,6 +8,7 @@ using Game.Features.Enemies;
 using Game.Features.Highscores;
 using Game.Features.Hud;
 using Game.Features.LevelProgress;
+using Game.Features.Options;
 using Game.Features.Pickups;
 using Game.Features.Players;
 using Game.Features.WorldObjects;
@@ -49,9 +50,11 @@ public class World : IScene
     private readonly ExitSystem _exitSystem;
     private readonly HighscoreClient _highscoreClient;
     private readonly HighscoreIntermission _highscoreIntermission;
+    private readonly OptionsMenuSystem _optionsMenu = new();
     private bool _highscoreIntermissionStarted;
 
     private RenderTexture2D _sceneRenderTexture;
+    private bool _hasSceneRenderTexture;
     private InputState _inputState = new();
 
     public Player Player => _player;
@@ -65,9 +68,6 @@ public class World : IScene
 
     public World(MapData mapData)
     {
-        int screenWidth = (int)RenderData.Resolution.X / RenderData.ResolutionDownScaleMultiplier;
-        int screenHeight = (int)RenderData.Resolution.Y / RenderData.ResolutionDownScaleMultiplier;
-
         _mapData = mapData;
         _level = new LevelData(mapData);
         _tileTextures = mapData.TileTextures;
@@ -133,8 +133,16 @@ public class World : IScene
         _playerSystem.ResetForLevelLoad(_mapData);
         _exitSystem.Rebuild(_mapData);
 
-        _sceneRenderTexture = LoadRenderTexture(screenWidth, screenHeight);
+        WindowDisplayMode.SyncRenderDataFromWindow();
+        GameRenderResolution.Apply(
+            _optionsMenu.Settings,
+            ResolveWindowWidth(),
+            ResolveWindowHeight());
+        _sceneRenderTexture = LoadRenderTexture(RenderData.InternalWidth, RenderData.InternalHeight);
+        _hasSceneRenderTexture = true;
         Debug.Setup(_doorSystem.Doors, _player, _animationSystem, _enemySystem);
+        ApplyGraphicsSettings();
+        EnsureStartupDisplay();
 #if DEBUG
         ConsoleSelfTests.RunOnce();
 #endif
@@ -155,28 +163,107 @@ public class World : IScene
         _cameraSystem.SetMouseSensitivity(sensitivity);
     }
 
-    public void SetResolutionDownScaleMultiplier(int multiplier)
+    public void ApplyWindowDisplay()
     {
-        RenderData.ResolutionDownScaleMultiplier = multiplier;
+        WindowDisplayMode.Apply(_optionsMenu.Settings);
+    }
+
+    public void ApplyGameResolution()
+    {
+        GameRenderResolution.Apply(
+            _optionsMenu.Settings,
+            ResolveWindowWidth(),
+            ResolveWindowHeight());
         RecreateSceneRenderTexture();
+    }
+
+    public bool GetFullscreenEnabled() => _optionsMenu.Settings.FullscreenEnabled;
+
+    public void SetFullscreenEnabled(bool enabled)
+    {
+        _optionsMenu.Settings.FullscreenEnabled = enabled;
+        ApplyWindowDisplay();
+        ApplyGameResolution();
+    }
+
+    public string GetWindowResolutionPresetId() => _optionsMenu.Settings.WindowResolutionPresetId;
+
+    public void SetWindowResolutionPresetId(string presetId)
+    {
+        _optionsMenu.Settings.WindowResolutionPresetId = presetId;
+        ApplyWindowDisplay();
+        ApplyGameResolution();
+    }
+
+    public string GetGameResolutionPresetId() => _optionsMenu.Settings.GameResolutionPresetId;
+
+    public void SetGameResolutionPresetId(string presetId)
+    {
+        _optionsMenu.Settings.GameResolutionPresetId = presetId;
+        ApplyGameResolution();
+    }
+
+    public bool GetVSyncEnabled() => _optionsMenu.Settings.VSyncEnabled;
+
+    public void SetVSyncEnabled(bool enabled)
+    {
+        _optionsMenu.Settings.VSyncEnabled = enabled;
+        ApplyGraphicsSettings();
+    }
+
+    public int GetTargetFps() => _optionsMenu.Settings.TargetFps;
+
+    public void SetTargetFps(int fps)
+    {
+        _optionsMenu.Settings.TargetFps = GraphicsFramePacing.ClampTargetFps(fps);
+        ApplyGraphicsSettings();
+    }
+
+    public void ApplyGraphicsSettings() => GraphicsFramePacing.Apply(_optionsMenu.Settings);
+
+    public void EnsureStartupDisplay()
+    {
+        WindowDisplayMode.ReapplyFullscreenIfNeeded(_optionsMenu.Settings);
+        WindowDisplayMode.SyncRenderDataFromWindow();
+
+        if (KnownResolutions.FindById(_optionsMenu.Settings.GameResolutionPresetId).IsNative)
+            ApplyGameResolution();
     }
 
     public void OnWindowResize()
     {
-        RecreateSceneRenderTexture();
+        WindowDisplayMode.SyncRenderDataFromWindow();
+        if (KnownResolutions.FindById(_optionsMenu.Settings.GameResolutionPresetId).IsNative)
+            ApplyGameResolution();
+    }
+
+    private static int ResolveWindowWidth()
+    {
+        int width = (int)RenderData.Resolution.X;
+        return width > 0 ? width : GetScreenWidth();
+    }
+
+    private static int ResolveWindowHeight()
+    {
+        int height = (int)RenderData.Resolution.Y;
+        return height > 0 ? height : GetScreenHeight();
     }
 
     private void RecreateSceneRenderTexture()
     {
-        int newScreenWidth = (int)RenderData.Resolution.X / RenderData.ResolutionDownScaleMultiplier;
-        int newScreenHeight = (int)RenderData.Resolution.Y / RenderData.ResolutionDownScaleMultiplier;
+        int newScreenWidth = RenderData.InternalWidth;
+        int newScreenHeight = RenderData.InternalHeight;
 
-        if (_sceneRenderTexture.Texture.Width == newScreenWidth &&
+        if (_hasSceneRenderTexture &&
+            _sceneRenderTexture.Texture.Width == newScreenWidth &&
             _sceneRenderTexture.Texture.Height == newScreenHeight)
             return;
 
-        UnloadRenderTexture(_sceneRenderTexture);
+        if (_hasSceneRenderTexture)
+            UnloadRenderTexture(_sceneRenderTexture);
+
         _sceneRenderTexture = LoadRenderTexture(newScreenWidth, newScreenHeight);
+        _hasSceneRenderTexture = true;
     }
 
     public void OnEnter()
@@ -277,6 +364,7 @@ public class World : IScene
 
     public void OnExit()
     {
+        _optionsMenu.Dismiss();
         _inputSystem.EnableMouse();
     }
 
@@ -289,6 +377,46 @@ public class World : IScene
     {
         _soundSystem.Update();
         bool toggledConsoleThisFrame = false;
+
+        if (_consoleOverlay.IsOpen && IsKeyPressed(KeyboardKey.Escape))
+        {
+            _consoleOverlay.Close();
+            if (!_optionsMenu.IsOpen)
+                _inputSystem.DisableMouse();
+            return;
+        }
+
+        if (_optionsMenu.IsOpen)
+        {
+            var inputResult = _optionsMenu.HandleInput(GetScreenWidth(), GetScreenHeight());
+
+            if (inputResult.WindowDisplayChanged)
+            {
+                ApplyWindowDisplay();
+                ApplyGameResolution();
+            }
+
+            if (inputResult.GameResolutionChanged)
+                ApplyGameResolution();
+            if (inputResult.GraphicsChanged)
+                ApplyGraphicsSettings();
+
+            if (IsKeyPressed(KeyboardKey.Escape))
+                _optionsMenu.Close(_inputSystem);
+            else if (IsKeyPressed(KeyboardKey.Q))
+                CloseWindow();
+
+            return;
+        }
+
+        if (IsKeyPressed(KeyboardKey.Escape) && !_highscoreIntermission.CapturesEscapeKey)
+        {
+            if (_consoleOverlay.IsOpen)
+                _consoleOverlay.Close();
+
+            _optionsMenu.Open(_inputSystem);
+            return;
+        }
 
         if (IsKeyPressed(KeyboardKey.Grave) ||
             (OperatingSystem.IsBrowser() && IsKeyPressed(KeyboardKey.Period)))
@@ -319,49 +447,34 @@ public class World : IScene
 
         _inputSystem.Update();
 
-        if (IsKeyPressed(KeyboardKey.PageDown) && RenderData.ResolutionDownScaleMultiplier > 1)
-        {
-            RenderData.ResolutionDownScaleMultiplier /= 2;
-            SetResolutionDownScaleMultiplier(RenderData.ResolutionDownScaleMultiplier);
-        }
+        if (!_exitSystem.IsBlockingGameplay)
+            _scoreSystem.Tick(deltaTime);
 
-        if (IsKeyPressed(KeyboardKey.PageUp))
-        {
-            RenderData.ResolutionDownScaleMultiplier *= 2;
-            SetResolutionDownScaleMultiplier(RenderData.ResolutionDownScaleMultiplier);
-        }
+        _effectSystem.Update(deltaTime);
 
-        if (!_inputState.IsPaused)
+        int screenWidth = GetScreenWidth();
+        int screenHeight = GetScreenHeight();
+
+        if (_player.IsAlive)
         {
+            _playerSystem.UpdateAlive(deltaTime, _inputState, mouseDelta, screenWidth, screenHeight);
             if (!_exitSystem.IsBlockingGameplay)
-                _scoreSystem.Tick(deltaTime);
-
-            _effectSystem.Update(deltaTime);
-
-            int screenWidth = GetScreenWidth();
-            int screenHeight = GetScreenHeight();
-
-            if (_player.IsAlive)
-            {
-                _playerSystem.UpdateAlive(deltaTime, _inputState, mouseDelta, screenWidth, screenHeight);
-                if (!_exitSystem.IsBlockingGameplay)
-                    _enemySystem.Update(deltaTime);
-            }
-            else
-            {
-                _playerSystem.UpdateDead(deltaTime, _inputState, mouseDelta);
                 _enemySystem.Update(deltaTime);
-            }
-
-            if (_exitSystem.IsLevelComplete && !_highscoreIntermissionStarted)
-            {
-                _highscoreIntermissionStarted = true;
-                _highscoreIntermission.Begin(_currentLevelPath, _scoreSystem);
-            }
-
-            if (_exitSystem.IsLevelComplete)
-                _highscoreIntermission.Update();
         }
+        else
+        {
+            _playerSystem.UpdateDead(deltaTime, _inputState, mouseDelta);
+            _enemySystem.Update(deltaTime);
+        }
+
+        if (_exitSystem.IsLevelComplete && !_highscoreIntermissionStarted)
+        {
+            _highscoreIntermissionStarted = true;
+            _highscoreIntermission.Begin(_currentLevelPath, _scoreSystem);
+        }
+
+        if (_exitSystem.IsLevelComplete)
+            _highscoreIntermission.Update();
     }
 
     public ConsoleCommandResult ExecuteConsoleLine(string line)
@@ -434,6 +547,10 @@ public class World : IScene
         RenderMinimapAndDebugOverlays();
 
         _consoleOverlay.Render();
+
+        if (_optionsMenu.IsOpen)
+            OptionsMenuHud.Draw(_optionsMenu.Settings, screenWidth, screenHeight);
+
         EndDrawing();
     }
 
@@ -441,8 +558,8 @@ public class World : IScene
     {
         DrawFPS(10, screenHeight - 120);
 
-        var mouseLabel = _inputState.IsMouseFree ? "MOUSE: FREE" : "MOUSE: LOCKED";
-        var mouseColor = _inputState.IsMouseFree ? Color.Green : Color.Red;
+        var mouseLabel = _optionsMenu.IsOpen || _inputState.IsMouseFree ? "MOUSE: FREE" : "MOUSE: LOCKED";
+        var mouseColor = _optionsMenu.IsOpen || _inputState.IsMouseFree ? Color.Green : Color.Red;
         int mouseLabelWidth = MeasureText(mouseLabel, 20);
         DrawText(mouseLabel, screenWidth - mouseLabelWidth - 10, 10, 20, mouseColor);
 
@@ -453,8 +570,9 @@ public class World : IScene
     private void RenderPlayHud(int screenWidth, int screenHeight)
     {
         bool consoleOpen = _consoleOverlay.IsOpen;
+        bool optionsOpen = _optionsMenu.IsOpen;
         bool inActiveLevel = _player.IsAlive && !_exitSystem.IsLevelComplete;
-        bool showWeaponView = _player.IsAlive && !consoleOpen && !_exitSystem.IsBlockingGameplay;
+        bool showWeaponView = _player.IsAlive && !consoleOpen && !optionsOpen && !_exitSystem.IsBlockingGameplay;
 
         if (inActiveLevel)
         {
@@ -510,8 +628,8 @@ public class World : IScene
         if (_inputState.IsMinimapEnabled)
             _minimapSystem.Render(_player);
 
-        int renderW = (int)RenderData.Resolution.X / RenderData.ResolutionDownScaleMultiplier;
-        int renderH = (int)RenderData.Resolution.Y / RenderData.ResolutionDownScaleMultiplier;
+        int renderW = RenderData.InternalWidth;
+        int renderH = RenderData.InternalHeight;
         Debug.DrawWorldOverlays(_inputState.IsDebugEnabled, _player.Camera, renderW, renderH);
         Debug.Draw(_inputState.IsDebugEnabled);
     }

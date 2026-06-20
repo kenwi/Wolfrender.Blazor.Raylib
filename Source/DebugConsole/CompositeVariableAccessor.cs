@@ -7,7 +7,8 @@ public sealed class CompositeVariableAccessor : IConsoleVariableAccessor
     private readonly Dictionary<string, string> _aliases = new(StringComparer.OrdinalIgnoreCase)
     {
         ["volume"] = "Audio.Volume",
-        ["ResolutionDownScaleMultiplier"] = "RenderData.ResolutionDownScaleMultiplier"
+        ["GameResolutionPresetId"] = "RenderData.GameResolutionPresetId",
+        ["WindowResolutionPresetId"] = "RenderData.WindowResolutionPresetId"
     };
 
     public CompositeVariableAccessor(RuntimeVariableAccessor runtimeAccessor, StringVariableStore stringStore)
