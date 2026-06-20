@@ -291,6 +291,7 @@ public class World : IScene
 
         if (OperatingSystem.IsBrowser())
         {
+            _highscoreClient.PrefetchLeaderboardAccess(_currentLevelPath);
             BrowserPointerLockBridge.PointerLockLost = HandleBrowserPointerLockLost;
             _inputSystem.EnableMouse();
         }
@@ -377,6 +378,9 @@ public class World : IScene
         _highscoreIntermission.ResetForLevel();
         _highscoreIntermissionStarted = false;
         _effectSystem.Clear();
+
+        if (OperatingSystem.IsBrowser())
+            _highscoreClient.PrefetchLeaderboardAccess(_currentLevelPath);
     }
 
     public void OnExit()

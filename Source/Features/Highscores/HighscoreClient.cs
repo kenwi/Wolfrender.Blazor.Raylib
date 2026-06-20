@@ -72,6 +72,31 @@ public sealed class HighscoreClient
         return entries ?? [];
     }
 
+    /// <summary>
+    /// Fire-and-forget leaderboard fetch at level start so the browser can prompt
+    /// for cross-origin access before level-complete score submission.
+    /// </summary>
+    public void PrefetchLeaderboardAccess(string levelPath)
+    {
+        var levelId = ScoreSanitizer.LevelIdFromPath(levelPath);
+        if (string.IsNullOrEmpty(levelId))
+            return;
+
+        _ = PrefetchLeaderboardAccessAsync(levelId);
+    }
+
+    private async Task PrefetchLeaderboardAccessAsync(string levelId)
+    {
+        try
+        {
+            await GetTopAsync(levelId);
+        }
+        catch
+        {
+            // Browser may deny cross-origin access or the server may be offline.
+        }
+    }
+
     public void Dispose()
     {
         if (_ownsHttpClient)
