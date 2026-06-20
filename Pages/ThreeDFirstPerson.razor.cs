@@ -82,7 +82,7 @@ public partial class ThreeDFirstPerson : IDisposable
         SetExitKey(KeyboardKey.Null);
         InitAudioDevice();
 
-        GraphicsFramePacing.BrowserApply = Raylib.SetFramePacing;
+        GraphicsFramePacing.BrowserApply = Components.Raylib.SetFramePacing;
 
         await OnResize((_screenWidth, _screenHeight));
 
