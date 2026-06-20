@@ -22,7 +22,7 @@ public sealed class OptionsMenuSystem
             return;
 
         IsOpen = false;
-        input.DisableMouse();
+        input.RestoreGameplayMouse();
     }
 
     public void Dismiss() => IsOpen = false;

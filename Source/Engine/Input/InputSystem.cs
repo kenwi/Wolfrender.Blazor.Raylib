@@ -52,6 +52,23 @@ public class InputSystem
     private bool _isDebugEnabled = false;
     private bool _isMinimapEnabled = false;
 
+    public bool IsMouseFree => _isMouseFree;
+
+    /// <summary>Sync state when the browser releases pointer lock (e.g. ESC) without going through Raylib.</summary>
+    public void SyncPointerLockReleased()
+    {
+        _isMouseFree = true;
+    }
+
+    /// <summary>After closing an overlay: desktop re-captures; browser waits for click-to-capture.</summary>
+    public void RestoreGameplayMouse()
+    {
+        if (OperatingSystem.IsBrowser())
+            EnableMouse();
+        else
+            DisableMouse();
+    }
+
     public void Update(bool suppressClickToCapture = false)
     {
         // Click-to-capture: locks the cursor on first click so the browser's

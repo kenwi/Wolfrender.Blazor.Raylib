@@ -276,7 +276,10 @@ public class World : IScene
         _exitSystem.Rebuild(_mapData);
 
         if (OperatingSystem.IsBrowser())
+        {
+            BrowserPointerLockBridge.PointerLockLost = HandleBrowserPointerLockLost;
             _inputSystem.EnableMouse();
+        }
         else
             _inputSystem.DisableMouse();
     }
@@ -364,6 +367,7 @@ public class World : IScene
 
     public void OnExit()
     {
+        BrowserPointerLockBridge.PointerLockLost = null;
         _optionsMenu.Dismiss();
         _inputSystem.EnableMouse();
     }
@@ -371,6 +375,16 @@ public class World : IScene
     public void ToggleMouse()
     {
         _inputSystem.ToggleMouse();
+    }
+
+    private void HandleBrowserPointerLockLost(bool escapeHeld)
+    {
+        _inputSystem.SyncPointerLockReleased();
+
+        if (!escapeHeld || _consoleOverlay.IsOpen || _optionsMenu.IsOpen || _highscoreIntermission.CapturesEscapeKey)
+            return;
+
+        _optionsMenu.Open(_inputSystem);
     }
 
     public void Update(float deltaTime)
@@ -382,7 +396,7 @@ public class World : IScene
         {
             _consoleOverlay.Close();
             if (!_optionsMenu.IsOpen)
-                _inputSystem.DisableMouse();
+                _inputSystem.RestoreGameplayMouse();
             return;
         }
 
@@ -414,6 +428,10 @@ public class World : IScene
             if (_consoleOverlay.IsOpen)
                 _consoleOverlay.Close();
 
+            // Locked pointer: browser consumes ESC to exit pointer lock; menu opens via BrowserPointerLockBridge.
+            if (OperatingSystem.IsBrowser() && !_inputSystem.IsMouseFree)
+                return;
+
             _optionsMenu.Open(_inputSystem);
             return;
         }
@@ -426,7 +444,7 @@ public class World : IScene
             if (_consoleOverlay.IsOpen)
                 _inputSystem.EnableMouse();
             else
-                _inputSystem.DisableMouse();
+                _inputSystem.RestoreGameplayMouse();
         }
 
         if (_consoleOverlay.IsOpen)

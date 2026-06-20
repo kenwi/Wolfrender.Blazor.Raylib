@@ -2,6 +2,7 @@ using Microsoft.JSInterop;
 using System.Runtime.Versioning;
 using Microsoft.AspNetCore.Components;
 using System.Runtime.InteropServices.JavaScript;
+using Game.Engine.Input;
 using Wolfrender.Blazor.Raylib.Extensions;
 
 namespace Wolfrender.Blazor.Raylib.Components;
@@ -91,6 +92,12 @@ public partial class Raylib : IDisposable
             await rl.OnResize.InvokeAsync((width, height));
 
         await Task.CompletedTask;
+    }
+
+    [JSExport]
+    public static void OnPointerLockLost()
+    {
+        BrowserPointerLockBridge.NotifyLost();
     }
     
     #endregion

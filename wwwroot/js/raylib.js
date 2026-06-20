@@ -38,6 +38,13 @@ class Raylib {
                     e.preventDefault();
                 }
             });
+
+            document.addEventListener('pointerlockchange', () => {
+                if (document.pointerLockElement)
+                    return;
+
+                this.onPointerLockLost();
+            });
             
             if (dotnetObject) {
                 Blazor.runtime.Module['canvasInstance'] = dotnetObject;
@@ -62,6 +69,12 @@ class Raylib {
     
     syncCanvasSize() {
         this.resize({});
+    }
+
+    async onPointerLockLost() {
+        const { getAssemblyExports } = await globalThis.getDotnetRuntime(0);
+        const exports = await getAssemblyExports("Wolfrender.Blazor.Raylib.dll");
+        exports.Wolfrender.Blazor.Raylib.Components.Raylib.OnPointerLockLost();
     }
 
     setFramePacing(vsyncEnabled, targetFps) {
