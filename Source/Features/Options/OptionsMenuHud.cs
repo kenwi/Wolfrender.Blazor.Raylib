@@ -63,15 +63,30 @@ public static class OptionsMenuHud
         string gameLabel = KnownResolutions.FormatLabel(gamePreset, windowW, windowH);
         DrawCenteredValue(gameLabel, centerX, layout.PanelY + 174, LabelSize, valueColor);
 
-        DrawText("VSync", contentX, layout.PanelY + 220, LabelSize, labelColor);
+        DrawText("VSync", contentX, layout.PanelY + 212, LabelSize, labelColor);
         DrawCheckbox(layout.VSyncCheckbox, settings.VSyncEnabled);
 
-        DrawText("FPS limit", contentX, layout.PanelY + 270, LabelSize, settings.VSyncEnabled ? DisabledColor : labelColor);
+        DrawText("FPS limit", contentX, layout.PanelY + 258, LabelSize, settings.VSyncEnabled ? DisabledColor : labelColor);
         DrawFpsSlider(layout.FpsSliderTrack, settings.TargetFps, enabled: !settings.VSyncEnabled);
 
         string fpsValue = settings.VSyncEnabled ? "display" : settings.TargetFps.ToString();
-        DrawText(fpsValue, (int)(layout.FpsSliderTrack.X + layout.FpsSliderTrack.Width + 12), layout.PanelY + 266, LabelSize,
+        DrawText(fpsValue, (int)(layout.FpsSliderTrack.X + layout.FpsSliderTrack.Width + 12), layout.PanelY + 254, LabelSize,
             settings.VSyncEnabled ? DisabledColor : valueColor);
+
+        DrawText("Mouse sensitivity", contentX, layout.PanelY + 304, LabelSize, labelColor);
+        DrawButton(layout.MouseSensitivityPrev, "<");
+        DrawButton(layout.MouseSensitivityNext, ">");
+        DrawCenteredValue(settings.MouseSensitivity.ToString("0.0"), centerX, layout.PanelY + 312, LabelSize, valueColor);
+
+        DrawText("Audio", contentX, layout.PanelY + 350, LabelSize, labelColor);
+        DrawVolumeSlider(layout.AudioSliderTrack, settings.AudioLevel);
+        DrawText(settings.AudioLevel.ToString("0.0"), (int)(layout.AudioSliderTrack.X + layout.AudioSliderTrack.Width + 12),
+            layout.PanelY + 346, LabelSize, valueColor);
+
+        DrawText("Music", contentX, layout.PanelY + 396, LabelSize, labelColor);
+        DrawVolumeSlider(layout.MusicSliderTrack, settings.MusicLevel);
+        DrawText(settings.MusicLevel.ToString("0.0"), (int)(layout.MusicSliderTrack.X + layout.MusicSliderTrack.Width + 12),
+            layout.PanelY + 392, LabelSize, valueColor);
 
         int hintY = layout.PanelY + layout.PanelH - 88;
         DrawCenteredLine("Left/Right: game res  |  Shift+Left/Right: window res", screenWidth, hintY, HintSize, DisabledColor);
@@ -106,6 +121,18 @@ public static class OptionsMenuHud
         int thumbX = (int)(track.X + t * (track.Width - thumbW));
         var thumbColor = enabled ? Color.RayWhite : DisabledColor;
         DrawRectangle(thumbX, (int)track.Y - 2, thumbW, (int)track.Height + 4, thumbColor);
+    }
+
+    private static void DrawVolumeSlider(Rectangle track, float level)
+    {
+        DrawRectangleRec(track, new Color(50, 50, 50, 255));
+
+        float t = AudioVolumeLevel.Max > 0f ? AudioVolumeLevel.Clamp(level) / AudioVolumeLevel.Max : 0f;
+        t = Math.Clamp(t, 0f, 1f);
+
+        int thumbW = 12;
+        int thumbX = (int)(track.X + t * (track.Width - thumbW));
+        DrawRectangle(thumbX, (int)track.Y - 2, thumbW, (int)track.Height + 4, Color.RayWhite);
     }
 
     private static void DrawCenteredValue(string text, int centerX, int y, int size, Color color)

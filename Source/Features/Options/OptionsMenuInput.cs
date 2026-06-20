@@ -11,6 +11,8 @@ public static class OptionsMenuInput
         public bool WindowDisplayChanged { get; init; }
         public bool GameResolutionChanged { get; init; }
         public bool GraphicsChanged { get; init; }
+        public bool ControlsChanged { get; init; }
+        public bool AudioChanged { get; init; }
     }
 
     public static Result Update(GameSettings settings, int screenWidth, int screenHeight)
@@ -19,6 +21,8 @@ public static class OptionsMenuInput
         bool windowDisplayChanged = false;
         bool gameResolutionChanged = false;
         bool graphicsChanged = false;
+        bool controlsChanged = false;
+        bool audioChanged = false;
         bool shift = IsKeyDown(KeyboardKey.LeftShift) || IsKeyDown(KeyboardKey.RightShift);
 
         if (IsKeyPressed(KeyboardKey.F))
@@ -135,11 +139,39 @@ public static class OptionsMenuInput
             graphicsChanged = true;
         }
 
+        if (click && OptionsMenuLayout.Contains(layout.MouseSensitivityPrev, mouse))
+        {
+            settings.MouseSensitivity = MouseSensitivitySetting.Adjust(settings.MouseSensitivity, -1);
+            controlsChanged = true;
+        }
+
+        if (click && OptionsMenuLayout.Contains(layout.MouseSensitivityNext, mouse))
+        {
+            settings.MouseSensitivity = MouseSensitivitySetting.Adjust(settings.MouseSensitivity, 1);
+            controlsChanged = true;
+        }
+
+        if ((click || drag) && OptionsMenuLayout.Contains(layout.AudioSliderTrack, mouse))
+        {
+            float t = (mouse.X - layout.AudioSliderTrack.X) / layout.AudioSliderTrack.Width;
+            settings.AudioLevel = AudioVolumeLevel.FromSliderPosition(t);
+            audioChanged = true;
+        }
+
+        if ((click || drag) && OptionsMenuLayout.Contains(layout.MusicSliderTrack, mouse))
+        {
+            float t = (mouse.X - layout.MusicSliderTrack.X) / layout.MusicSliderTrack.Width;
+            settings.MusicLevel = AudioVolumeLevel.FromSliderPosition(t);
+            audioChanged = true;
+        }
+
         return new Result
         {
             WindowDisplayChanged = windowDisplayChanged,
             GameResolutionChanged = gameResolutionChanged,
             GraphicsChanged = graphicsChanged,
+            ControlsChanged = controlsChanged,
+            AudioChanged = audioChanged,
         };
     }
 }

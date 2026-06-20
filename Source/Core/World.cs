@@ -142,6 +142,8 @@ public class World : IScene
         _hasSceneRenderTexture = true;
         Debug.Setup(_doorSystem.Doors, _player, _animationSystem, _enemySystem);
         ApplyGraphicsSettings();
+        ApplyControlSettings();
+        ApplyAudioSettings();
         EnsureStartupDisplay();
 #if DEBUG
         ConsoleSelfTests.RunOnce();
@@ -161,6 +163,18 @@ public class World : IScene
     public void SetMouseSensitivity(float sensitivity)
     {
         _cameraSystem.SetMouseSensitivity(sensitivity);
+    }
+
+    public void ApplyControlSettings()
+    {
+        SetMouseSensitivity(_optionsMenu.Settings.MouseSensitivity);
+    }
+
+    public void ApplyAudioSettings()
+    {
+        var settings = _optionsMenu.Settings;
+        _soundSystem.SetSfxLevel(settings.AudioLevel);
+        _soundSystem.SetMusicLevel(settings.MusicLevel);
     }
 
     public void ApplyWindowDisplay()
@@ -414,6 +428,10 @@ public class World : IScene
                 ApplyGameResolution();
             if (inputResult.GraphicsChanged)
                 ApplyGraphicsSettings();
+            if (inputResult.ControlsChanged)
+                ApplyControlSettings();
+            if (inputResult.AudioChanged)
+                ApplyAudioSettings();
 
             if (IsKeyPressed(KeyboardKey.Escape))
                 _optionsMenu.Close(_inputSystem);
