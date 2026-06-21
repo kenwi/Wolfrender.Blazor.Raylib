@@ -1,7 +1,19 @@
 using Game.Features.Highscores.Shared;
+using Microsoft.AspNetCore.HttpOverrides;
 using Wolfrender.Highscores.Server;
 
 var builder = WebApplication.CreateBuilder(args);
+
+const string dataConfigPath = "/data/appsettings.json";
+if (File.Exists(dataConfigPath))
+    builder.Configuration.AddJsonFile(dataConfigPath, optional: false, reloadOnChange: true);
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 builder.Services.AddSingleton<JsonFileScoreStore>();
 builder.Services.AddCors(options =>
@@ -23,6 +35,8 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 var startupLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Wolfrender.Highscores.Server");
 var scoreFilePath = app.Configuration["Highscores:FilePath"] ?? "highscores.json";

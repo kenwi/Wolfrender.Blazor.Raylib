@@ -34,7 +34,7 @@ public sealed class JsonFileScoreStore
                 data.Levels[submission.LevelId] = entries;
             }
 
-            var submittedAt = DateTimeOffset.UtcNow;
+            var submittedAt = DateTimeOffset.Now;
             var newEntry = new StoredScoreEntry
             {
                 PlayerName = submission.PlayerName,

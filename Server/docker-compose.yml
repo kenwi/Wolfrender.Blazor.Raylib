@@ -1,0 +1,36 @@
+services:
+  highscores:
+    build:
+      context: ..
+      dockerfile: Server/Dockerfile
+    container_name: wolfrender-highscores
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://0.0.0.0:5080
+      Highscores__FilePath: /data/highscores.json
+      TZ: ${TZ:-UTC}
+    volumes:
+      - ./data:/data
+    ports:
+      - "${HIGHSCORES_PORT:-5080}:5080"
+    networks:
+      - highscores
+
+  cloudflared:
+    profiles:
+      - tunnel
+    image: cloudflare/cloudflared:latest
+    container_name: wolfrender-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    depends_on:
+      - highscores
+    networks:
+      - highscores
+
+networks:
+  highscores:
+    name: wolfrender-highscores
