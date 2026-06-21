@@ -22,12 +22,27 @@ public sealed class JsonFileScoreStore
         _logger.LogInformation("JsonFileScoreStore initialized. FilePath={FilePath}", Path.GetFullPath(_filePath));
     }
 
-    public async Task AddScoreAsync(ScoreSubmission submission, CancellationToken cancellationToken = default)
+    public async Task<bool> TryAddScoreAsync(ScoreSubmission submission, CancellationToken cancellationToken = default)
     {
         await _lock.WaitAsync(cancellationToken);
         try
         {
+            var checksum = ScoreChecksum.Compute(submission);
             var data = await ReadAsync(cancellationToken);
+
+            if (ContainsChecksum(data, checksum))
+            {
+                _logger.LogWarning(
+                    "Score rejected (duplicate checksum): LevelId={LevelId}, PlayerName={PlayerName}, " +
+                    "FinalScore={FinalScore}, Checksum={Checksum}, FilePath={FilePath}",
+                    submission.LevelId,
+                    submission.PlayerName,
+                    submission.FinalScore,
+                    checksum,
+                    _filePath);
+                return false;
+            }
+
             if (!data.Levels.TryGetValue(submission.LevelId, out var entries))
             {
                 entries = [];
@@ -44,7 +59,8 @@ public sealed class JsonFileScoreStore
                 TreasuresCollected = submission.TreasuresCollected,
                 SecretsFound = submission.SecretsFound,
                 ElapsedSeconds = submission.ElapsedSeconds,
-                SubmittedAt = submittedAt
+                SubmittedAt = submittedAt,
+                Checksum = checksum
             };
             entries.Add(newEntry);
 
@@ -66,6 +82,7 @@ public sealed class JsonFileScoreStore
                 _filePath);
 
             await WriteAsync(data, cancellationToken);
+            return true;
         }
         finally
         {
@@ -116,6 +133,12 @@ public sealed class JsonFileScoreStore
         }
     }
 
+    private static bool ContainsChecksum(HighscoreStoreData data, string checksum) =>
+        data.Levels.Values
+            .SelectMany(entries => entries)
+            .Any(entry => !string.IsNullOrEmpty(entry.Checksum) &&
+                          string.Equals(entry.Checksum, checksum, StringComparison.OrdinalIgnoreCase));
+
     private async Task<HighscoreStoreData> ReadAsync(CancellationToken cancellationToken)
     {
         if (!File.Exists(_filePath))
@@ -151,5 +174,6 @@ public sealed class JsonFileScoreStore
         public int SecretsFound { get; set; }
         public float ElapsedSeconds { get; set; }
         public DateTimeOffset SubmittedAt { get; set; }
+        public string Checksum { get; set; } = string.Empty;
     }
 }

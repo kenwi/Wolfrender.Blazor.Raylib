@@ -78,7 +78,17 @@ app.MapPost("/api/scores", async (
         return Results.BadRequest(new { error });
     }
 
-    await store.AddScoreAsync(normalized, cancellationToken);
+    if (!await store.TryAddScoreAsync(normalized, cancellationToken))
+    {
+        logger.LogWarning(
+            "POST /api/scores rejected (duplicate): ClientIp={ClientIp}, LevelId={LevelId}, PlayerName={PlayerName}, FinalScore={FinalScore}",
+            clientIp,
+            normalized.LevelId,
+            normalized.PlayerName,
+            normalized.FinalScore);
+        return Results.Conflict(new { error = "This score has already been submitted." });
+    }
+
     logger.LogInformation(
         "POST /api/scores succeeded: ClientIp={ClientIp}, LevelId={LevelId}, PlayerName={PlayerName}, FinalScore={FinalScore}",
         clientIp,
