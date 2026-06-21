@@ -265,18 +265,37 @@ public sealed class HighscoreIntermission
         }
         else
         {
+            int contentLeft = layout.ContentX;
+            int contentRight = layout.PanelX + layout.PanelW - 40;
+            const int columnGap = 20;
+
+            int rankColWidth = MeasureText($"{_leaderboard.Max(e => e.Rank)}.", lineSize);
+            int maxTimeWidth = MeasureText("999:59", lineSize);
+            int timeColRight = contentRight;
+            int scoreColRight = timeColRight - maxTimeWidth - columnGap;
+            int nameColLeft = contentLeft + rankColWidth + columnGap;
+
             foreach (var entry in _leaderboard)
             {
                 int minutes = (int)entry.ElapsedSeconds / 60;
                 int seconds = (int)entry.ElapsedSeconds % 60;
-                string line = $"{entry.Rank,2}. {entry.PlayerName,-16} {entry.FinalScore,8}  {minutes}:{seconds:D2}";
 
                 bool highlightEntry = _submittedFinalScore.HasValue
                     && entry.FinalScore == _submittedFinalScore.Value
                     && string.Equals(entry.PlayerName, _submittedPlayerName, StringComparison.Ordinal)
                     && MathF.Abs(entry.ElapsedSeconds - (_submittedElapsedSeconds ?? 0f)) < 0.05f;
 
-                DrawText(line, layout.ContentX, y, lineSize, highlightEntry ? highlight : Color.RayWhite);
+                var color = highlightEntry ? highlight : Color.RayWhite;
+
+                DrawText($"{entry.Rank}.", contentLeft, y, lineSize, color);
+                DrawText(entry.PlayerName, nameColLeft, y, lineSize, color);
+
+                string scoreText = entry.FinalScore.ToString();
+                DrawText(scoreText, scoreColRight - MeasureText(scoreText, lineSize), y, lineSize, color);
+
+                string timeText = $"{minutes}:{seconds:D2}";
+                DrawText(timeText, timeColRight - MeasureText(timeText, lineSize), y, lineSize, color);
+
                 y += 22;
             }
         }
