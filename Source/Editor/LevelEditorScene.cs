@@ -72,15 +72,23 @@ public class LevelEditorScene : IScene
         _state.TickSoundPropagationOverlay((float)GetTime());
         _gui.HandleScalingInput();
 
+        // Read ImGui IO before keyboard routing
+        bool imGuiWantsMouse = ImGui.GetIO().WantCaptureMouse;
+        bool imGuiWantsKeyboard = ImGui.GetIO().WantCaptureKeyboard;
+
         // Toggle simulation with P key
         if (IsKeyPressed(KeyboardKey.P))
         {
             _state.ToggleSimulation();
         }
 
-        // Read ImGui IO state before simulation tick (E must not fire while typing in a panel)
-        bool imGuiWantsMouse = ImGui.GetIO().WantCaptureMouse;
-        bool imGuiWantsKeyboard = ImGui.GetIO().WantCaptureKeyboard;
+        if (!imGuiWantsKeyboard)
+        {
+            if (IsKeyPressed(KeyboardKey.B))
+                _state.SetToolMode(EditorState.EditorToolMode.Paint);
+            if (IsKeyPressed(KeyboardKey.V))
+                _state.SetToolMode(EditorState.EditorToolMode.Select);
+        }
 
         // Tick game systems when simulating
         if (_state.IsSimulating)
@@ -224,6 +232,14 @@ public class LevelEditorScene : IScene
             _mapRenderer.DrawTileHighlight(tileX, tileY, _state.Camera);
         }
 
+        if (_state.HasSelectedWall)
+        {
+            _mapRenderer.DrawSelectedWallHighlight(_state.SelectedWallTileX, _state.SelectedWallTileY, _state.Camera);
+            var secret = _state.GetSelectedSecretPlacement();
+            if (secret != null)
+                _mapRenderer.DrawSecretWallPreview(secret, _state.Camera);
+        }
+
         // ImGui panels
         rlImGui.Begin();
         bool menuToggleSim = _gui.RenderMenuBar(_state.IsSimulating, _state, _state.EnemySystem, _state.DoorSystem, _state.ClearLevel, _state.RefreshLayerReferences);
@@ -235,6 +251,7 @@ public class LevelEditorScene : IScene
         _gui.RenderInfoPanel(tileX, tileY, worldPos, tileInBounds, _state.CursorInfoFollowsMouse, _state.Layers);
         _gui.RenderEntityPropertiesPanel(_state, ref _state.SelectedEnemyIndex, ref _state.IsEditingPatrolPath, ref _state.PatrolEditEnemyIndex, _state.PatrolPathInProgress);
         _gui.RenderPickupPropertiesPanel(ref _state.SelectedPickupIndex);
+        _gui.RenderWallPropertiesPanel(_state);
         _gui.RenderDebugLogPanel();
         _gui.RenderPathfindingPanel(_state);
         _gui.RenderSoundPropagationPanel(_state);
@@ -262,6 +279,12 @@ public class LevelEditorScene : IScene
             const string msg = "TEST SOUND PROPAGATION - LMB: Set origin | Esc: Cancel";
             int msgW = MeasureText(msg, 24);
             DrawText(msg, (GetScreenWidth() - msgW) / 2, GetScreenHeight() - 100, 24, Color.Yellow);
+        }
+        else if (_state.IsWallSelectMode)
+        {
+            const string msg = "SELECT MODE - LMB: Select wall | B: Paint mode";
+            int msgW = MeasureText(msg, 24);
+            DrawText(msg, (GetScreenWidth() - msgW) / 2, GetScreenHeight() - 100, 24, Color.SkyBlue);
         }
 
         _gui.DrawStatusMessage();
@@ -372,13 +395,17 @@ public class LevelEditorScene : IScene
         {
             HandlePickupInput();
         }
-        else if (!mouseOverUI && IsMouseButtonDown(MouseButton.Left) && !isEnemyLayer && !isPickupLayer
-                 && !_state.IsDraggingPlayer)
+        else if (!mouseOverUI && !_state.IsDraggingPlayer && !isEnemyLayer && !isPickupLayer)
         {
-            var paintPos = _state.Camera.ScreenToWorld(GetMousePosition());
-            int px = (int)MathF.Floor(paintPos.X);
-            int py = (int)MathF.Floor(paintPos.Y);
-            _state.PaintTile(px, py);
+            if (_state.IsWallSelectMode)
+                HandleWallSelectInput(mouseOverUI);
+            else if (IsMouseButtonDown(MouseButton.Left))
+            {
+                var paintPos = _state.Camera.ScreenToWorld(GetMousePosition());
+                int px = (int)MathF.Floor(paintPos.X);
+                int py = (int)MathF.Floor(paintPos.Y);
+                _state.PaintTile(px, py);
+            }
         }
 
         if (isEnemyLayer && _state.SelectedEnemyIndex >= 0 && _state.SelectedEnemyIndex < _state.MapData.Enemies.Count
@@ -392,6 +419,20 @@ public class LevelEditorScene : IScene
         {
             _state.DeleteSelectedPickup();
         }
+    }
+
+    private void HandleWallSelectInput(bool mouseOverUI)
+    {
+        if (mouseOverUI || !IsMouseButtonPressed(MouseButton.Left)) return;
+
+        var clickPos = _state.Camera.ScreenToWorld(GetMousePosition());
+        int px = (int)MathF.Floor(clickPos.X);
+        int py = (int)MathF.Floor(clickPos.Y);
+
+        if (_state.GetWallTileAt(px, py) > 0)
+            _state.SelectWallTile(px, py);
+        else
+            _state.ClearWallSelection();
     }
 
     private void HandlePickupInput()

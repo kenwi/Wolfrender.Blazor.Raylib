@@ -1,6 +1,7 @@
 using System.Numerics;
 using Game.Features.Doors;
 using Game.Features.Enemies;
+using Game.Features.LevelProgress;
 using Game.Features.Pickups;
 using Game.Features.Players;
 using Game.Features.SoundPropagation;
@@ -25,9 +26,14 @@ public class EditorState
     public readonly EditorCamera Camera;
     public readonly List<EditorLayer> Layers;
 
-    // Tile painting
+    public enum EditorToolMode { Paint, Select }
+
+    // Tile painting / wall selection
     public int ActiveLayerIndex;
     public uint SelectedTileId = 1;
+    public EditorToolMode ToolMode = EditorToolMode.Paint;
+    public int SelectedWallTileX = -1;
+    public int SelectedWallTileY = -1;
 
     // Cursor info
     public bool CursorInfoFollowsMouse;
@@ -127,6 +133,10 @@ public class EditorState
     public bool IsOnPickupLayer => Layers[ActiveLayerIndex].Name == PickupsLayerName;
     public bool IsOnDoorLayer => Layers[ActiveLayerIndex].Name == DoorsLayerName;
     public bool IsOnObjectLayer => Layers[ActiveLayerIndex].Name == ObjectsLayerName;
+    public bool IsOnWallsLayer => Layers[ActiveLayerIndex].Name == WallsLayerName;
+    public bool IsOnTileLayer => !IsOnEnemyLayer && !IsOnPickupLayer;
+    public bool HasSelectedWall => SelectedWallTileX >= 0 && SelectedWallTileY >= 0;
+    public bool IsWallSelectMode => ToolMode == EditorToolMode.Select && IsOnWallsLayer;
 
     public const string DoorsLayerName = "Doors";
 
@@ -182,6 +192,92 @@ public class EditorState
     public bool ShouldShowEnemyPropertiesPanel(bool windowVisible) =>
         windowVisible && SelectedEnemyIndex >= 0 && !IsPlayerSelected;
 
+    public bool ShouldShowWallPropertiesPanel(bool windowVisible) =>
+        windowVisible && IsWallSelectMode && HasSelectedWall;
+
+    public void SetToolMode(EditorToolMode mode)
+    {
+        if (ToolMode == mode) return;
+        ToolMode = mode;
+        if (mode == EditorToolMode.Paint)
+            ClearWallSelection();
+        SetStatus(mode == EditorToolMode.Paint ? "Paint mode" : "Select mode (Walls layer)");
+        NotifyStateChanged();
+    }
+
+    public void SelectWallTile(int tileX, int tileY)
+    {
+        if (GetWallTileAt(tileX, tileY) == 0) return;
+
+        DeselectEnemy();
+        DeselectPickup();
+        DeselectPlayer();
+        SelectedWallTileX = tileX;
+        SelectedWallTileY = tileY;
+        NotifyStateChanged();
+    }
+
+    public void ClearWallSelection()
+    {
+        if (SelectedWallTileX < 0) return;
+        SelectedWallTileX = -1;
+        SelectedWallTileY = -1;
+        NotifyStateChanged();
+    }
+
+    public SecretWallPlacement? FindSecretWallAt(int tileX, int tileY) =>
+        MapData.SecretWalls.FirstOrDefault(s => s.TileX == tileX && s.TileY == tileY);
+
+    public SecretWallPlacement? GetSelectedSecretPlacement() =>
+        HasSelectedWall ? FindSecretWallAt(SelectedWallTileX, SelectedWallTileY) : null;
+
+    public bool IsSelectedWallSecret => GetSelectedSecretPlacement() != null;
+
+    public void SetWallSecret(bool isSecret, SecretWallDirection direction, int travelTiles)
+    {
+        if (!HasSelectedWall) return;
+
+        RemoveSecretWallAt(SelectedWallTileX, SelectedWallTileY);
+        if (isSecret)
+        {
+            MapData.SecretWalls.Add(new SecretWallPlacement
+            {
+                TileX = SelectedWallTileX,
+                TileY = SelectedWallTileY,
+                Direction = direction,
+                TravelTiles = ClampSecretTravelTiles(SelectedWallTileX, SelectedWallTileY, direction, travelTiles)
+            });
+        }
+
+        NotifyStateChanged();
+    }
+
+    public void RemoveSecretWallAt(int tileX, int tileY)
+    {
+        int index = MapData.SecretWalls.FindIndex(s => s.TileX == tileX && s.TileY == tileY);
+        if (index >= 0)
+            MapData.SecretWalls.RemoveAt(index);
+    }
+
+    public int GetMaxSecretTravelTiles(int tileX, int tileY, SecretWallDirection direction)
+    {
+        var (dx, dy) = SecretWallDirectionHelper.ToTileDelta(direction);
+        int count = 0;
+        int x = tileX + dx;
+        int y = tileY + dy;
+        while (x >= 0 && x < MapData.Width && y >= 0 && y < MapData.Height)
+        {
+            count++;
+            x += dx;
+            y += dy;
+        }
+
+        return Math.Max(1, count);
+    }
+
+    public int ClampSecretTravelTiles(int tileX, int tileY, SecretWallDirection direction, int travelTiles) =>
+        Math.Clamp(travelTiles, 1, GetMaxSecretTravelTiles(tileX, tileY, direction));
+
     public void PaintTile(int x, int y)
     {
         if (IsOnEnemyLayer || IsOnPickupLayer) return;
@@ -201,6 +297,9 @@ public class EditorState
 
         var layer = Layers[ActiveLayerIndex];
         layer.Tiles[MapData.Width * y + x] = SelectedTileId;
+
+        if (IsOnWallsLayer && SelectedTileId == 0)
+            RemoveSecretWallAt(x, y);
     }
 
     public void PlaceEnemy(int x, int y)
@@ -415,6 +514,7 @@ public class EditorState
         HoveredEnemyIndex = -1;
         SelectedPickupIndex = -1;
         HoveredPickupIndex = -1;
+        ClearWallSelection();
         RefreshLayerReferences();
         SetStatus("New empty level created");
     }
@@ -425,6 +525,7 @@ public class EditorState
         HoveredEnemyIndex = -1;
         SelectedPickupIndex = -1;
         HoveredPickupIndex = -1;
+        ClearWallSelection();
         DeselectPlayer();
 
         foreach (var layer in Layers)
