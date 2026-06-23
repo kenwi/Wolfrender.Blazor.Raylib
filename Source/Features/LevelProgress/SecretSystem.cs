@@ -17,6 +17,7 @@ public sealed class SecretSystem
 
     public void Rebuild(MapData mapData)
     {
+        RestoreAuthoredSecretWalls(mapData);
         _mapData = mapData;
         _secrets.Clear();
 
@@ -128,6 +129,39 @@ public sealed class SecretSystem
         Debug.Log(
             $"Secret wall opened at tile ({secret.TileX}, {secret.TileY}) " +
             $"-> ({endX}, {endY}), travel={secret.TravelTiles} {secret.Direction}.");
+    }
+
+    /// <summary>
+    /// Puts moved secret walls back on their authored tile before a rebuild (level restart, reload, re-enter play).
+    /// </summary>
+    private static void RestoreAuthoredSecretWalls(MapData mapData)
+    {
+        foreach (var placement in mapData.SecretWalls)
+        {
+            if (placement.TileX < 0 || placement.TileX >= mapData.Width
+                || placement.TileY < 0 || placement.TileY >= mapData.Height)
+                continue;
+
+            int travel = Math.Max(1, placement.TravelTiles);
+            var (dx, dy) = SecretWallDirectionHelper.ToTileDelta(placement.Direction);
+            int startIndex = LevelData.GetIndex(placement.TileX, placement.TileY, mapData.Width);
+            uint wallTileId = mapData.Walls[startIndex];
+
+            int endX = placement.TileX + dx * travel;
+            int endY = placement.TileY + dy * travel;
+            if (wallTileId == 0
+                && endX >= 0 && endX < mapData.Width
+                && endY >= 0 && endY < mapData.Height)
+            {
+                int endIndex = LevelData.GetIndex(endX, endY, mapData.Width);
+                wallTileId = mapData.Walls[endIndex];
+                if (wallTileId > 0)
+                    mapData.Walls[endIndex] = 0;
+            }
+
+            if (wallTileId > 0)
+                mapData.Walls[startIndex] = wallTileId;
+        }
     }
 
     private sealed class RuntimeSecretWall
