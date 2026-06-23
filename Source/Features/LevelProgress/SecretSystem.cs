@@ -1,19 +1,33 @@
 using System.Numerics;
+using Game.Engine.Movement;
+using Game.Engine.Rendering;
 using Game.Features.Players;
+using Raylib_cs;
 
 namespace Game.Features.LevelProgress;
 
 /// <summary>
 /// Push-wall secrets authored in <see cref="MapData.SecretWalls"/>.
-/// Player presses E near an adjacent secret tile to open it (instant slide in phase 3).
+/// Player presses E near an adjacent secret tile to slide the wall aside.
 /// </summary>
-public sealed class SecretSystem
+public sealed class SecretSystem : IMovementBlocker
 {
-    private readonly ScoreSystem _scoreSystem;
-    private MapData _mapData = null!;
-    private readonly List<RuntimeSecretWall> _secrets = new();
+    private const float SlideSpeedTilesPerSecond = 1f;
 
-    public SecretSystem(ScoreSystem scoreSystem) => _scoreSystem = scoreSystem;
+    private readonly ScoreSystem _scoreSystem;
+    private readonly List<Texture2D> _textures;
+    private MapData _mapData = null!;
+    private readonly List<SecretWall> _secrets = new();
+    private readonly int _quadSize;
+
+    public IReadOnlyList<SecretWall> Secrets => _secrets;
+
+    public SecretSystem(ScoreSystem scoreSystem, List<Texture2D> textures)
+    {
+        _scoreSystem = scoreSystem;
+        _textures = textures;
+        _quadSize = LevelData.QuadSize;
+    }
 
     public void Rebuild(MapData mapData)
     {
@@ -32,10 +46,13 @@ public sealed class SecretSystem
             if (wallTileId == 0)
                 continue;
 
-            _secrets.Add(new RuntimeSecretWall
+            var start = new Vector2(placement.TileX, placement.TileY);
+            _secrets.Add(new SecretWall
             {
                 TileX = placement.TileX,
                 TileY = placement.TileY,
+                StartPosition = start,
+                Position = start,
                 Direction = placement.Direction,
                 TravelTiles = Math.Max(1, placement.TravelTiles),
                 WallTileId = wallTileId
@@ -48,11 +65,80 @@ public sealed class SecretSystem
     /// </summary>
     public bool Update(float deltaTime, InputState input, Player player)
     {
-        _ = deltaTime;
+        Animate(deltaTime);
+
         if (!input.IsInteractPressed || !player.IsAlive)
             return false;
 
         return TryActivateSecret(player);
+    }
+
+    public void Render(Vector3 playerPosition)
+    {
+        foreach (var secret in _secrets)
+        {
+            if (secret.State != SecretWallState.Sliding)
+                continue;
+
+            int texIndex = (int)secret.WallTileId - 1;
+            if (texIndex < 0 || texIndex >= _textures.Count)
+                continue;
+
+            var worldPos = new Vector3(
+                secret.Position.X * _quadSize,
+                2,
+                secret.Position.Y * _quadSize);
+            PrimitiveRenderer.DrawCubeTexture(
+                _textures[texIndex],
+                worldPos,
+                _quadSize,
+                _quadSize,
+                _quadSize,
+                Color.White,
+                playerPosition);
+        }
+    }
+
+    public bool IsBlocking(Vector3 position, float radius)
+    {
+        var (entityTileX, entityTileY) = LevelData.GetEntityTileFromWorld(position.X, position.Z);
+
+        foreach (var secret in _secrets)
+        {
+            if (secret.State != SecretWallState.Sliding)
+                continue;
+
+            var occupied = GetOccupiedTile(secret.Position);
+            if (occupied.x == entityTileX && occupied.y == entityTileY)
+                return true;
+        }
+
+        return false;
+    }
+
+    private void Animate(float deltaTime)
+    {
+        foreach (var secret in _secrets)
+        {
+            if (secret.State != SecretWallState.Sliding)
+                continue;
+
+            var (dx, dy) = SecretWallDirectionHelper.ToTileDelta(secret.Direction);
+            var step = new Vector2(dx, dy) * (SlideSpeedTilesPerSecond * deltaTime);
+            var nextPosition = secret.Position + step;
+            var nextOccupied = GetOccupiedTile(nextPosition);
+
+            if (!CanOccupyTile(nextOccupied.x, nextOccupied.y, secret))
+            {
+                CompleteSlide(secret, secret.Position);
+                continue;
+            }
+
+            secret.Position = nextPosition;
+            float traveled = Vector2.Distance(secret.StartPosition, secret.Position);
+            if (traveled + 0.001f >= secret.TravelTiles)
+                CompleteSlide(secret, secret.EndPosition);
+        }
     }
 
     private bool TryActivateSecret(Player player)
@@ -61,11 +147,11 @@ public sealed class SecretSystem
         if (secret is null)
             return false;
 
-        ActivateSecret(secret);
+        BeginSlide(secret);
         return true;
     }
 
-    private RuntimeSecretWall? FindClosestActivatableSecret(Player player)
+    private SecretWall? FindClosestActivatableSecret(Player player)
     {
         if (_secrets.Count == 0)
             return null;
@@ -75,12 +161,12 @@ public sealed class SecretSystem
         int playerTileX = (int)MathF.Floor(playerTile.X);
         int playerTileY = (int)MathF.Floor(playerTile.Y);
 
-        RuntimeSecretWall? closest = null;
+        SecretWall? closest = null;
         float closestDistance = float.MaxValue;
 
         foreach (var secret in _secrets)
         {
-            if (secret.IsActivated)
+            if (secret.State != SecretWallState.Idle)
                 continue;
 
             if (!IsAdjacentToPlayerTile(secret.TileX, secret.TileY, playerTileX, playerTileY))
@@ -105,35 +191,60 @@ public sealed class SecretSystem
         return dx <= 1 && dy <= 1 && (dx > 0 || dy > 0);
     }
 
-    private void ActivateSecret(RuntimeSecretWall secret)
+    private void BeginSlide(SecretWall secret)
     {
-        int startIndex = LevelData.GetIndex(secret.TileX, secret.TileY, _mapData.Width);
-        uint wallTileId = _mapData.Walls[startIndex];
-        if (wallTileId == 0)
-            wallTileId = secret.WallTileId;
+        secret.State = SecretWallState.Sliding;
+        secret.StartPosition = new Vector2(secret.TileX, secret.TileY);
+        secret.Position = secret.StartPosition;
 
+        int startIndex = LevelData.GetIndex(secret.TileX, secret.TileY, _mapData.Width);
         _mapData.Walls[startIndex] = 0;
 
-        var (dx, dy) = SecretWallDirectionHelper.ToTileDelta(secret.Direction);
-        int endX = secret.TileX + dx * secret.TravelTiles;
-        int endY = secret.TileY + dy * secret.TravelTiles;
-        if (endX >= 0 && endX < _mapData.Width && endY >= 0 && endY < _mapData.Height)
+        if (!secret.HasScored)
         {
-            int endIndex = LevelData.GetIndex(endX, endY, _mapData.Width);
-            _mapData.Walls[endIndex] = wallTileId;
+            secret.HasScored = true;
+            _scoreSystem.OnSecretFound();
         }
 
-        secret.IsActivated = true;
-        _scoreSystem.OnSecretFound();
-
         Debug.Log(
-            $"Secret wall opened at tile ({secret.TileX}, {secret.TileY}) " +
-            $"-> ({endX}, {endY}), travel={secret.TravelTiles} {secret.Direction}.");
+            $"Secret wall sliding from ({secret.TileX}, {secret.TileY}) " +
+            $"travel={secret.TravelTiles} {secret.Direction}.");
     }
 
-    /// <summary>
-    /// Puts moved secret walls back on their authored tile before a rebuild (level restart, reload, re-enter play).
-    /// </summary>
+    private void CompleteSlide(SecretWall secret, Vector2 finalPosition)
+    {
+        secret.Position = finalPosition;
+        secret.State = SecretWallState.Open;
+
+        var occupied = GetOccupiedTile(finalPosition);
+        if (occupied.x >= 0 && occupied.x < _mapData.Width
+            && occupied.y >= 0 && occupied.y < _mapData.Height)
+        {
+            int endIndex = LevelData.GetIndex(occupied.x, occupied.y, _mapData.Width);
+            _mapData.Walls[endIndex] = secret.WallTileId;
+        }
+
+        Debug.Log(
+            $"Secret wall opened at tile ({occupied.x}, {occupied.y}).");
+    }
+
+    private bool CanOccupyTile(int tileX, int tileY, SecretWall secret)
+    {
+        if (tileX < 0 || tileX >= _mapData.Width || tileY < 0 || tileY >= _mapData.Height)
+            return false;
+
+        int index = LevelData.GetIndex(tileX, tileY, _mapData.Width);
+        uint wall = _mapData.Walls[index];
+        if (wall == 0)
+            return true;
+
+        var end = GetOccupiedTile(secret.EndPosition);
+        return tileX == end.x && tileY == end.y && wall == secret.WallTileId;
+    }
+
+    private static (int x, int y) GetOccupiedTile(Vector2 position) =>
+        ((int)MathF.Floor(position.X + 0.5f), (int)MathF.Floor(position.Y + 0.5f));
+
     private static void RestoreAuthoredSecretWalls(MapData mapData)
     {
         foreach (var placement in mapData.SecretWalls)
@@ -162,15 +273,5 @@ public sealed class SecretSystem
             if (wallTileId > 0)
                 mapData.Walls[startIndex] = wallTileId;
         }
-    }
-
-    private sealed class RuntimeSecretWall
-    {
-        public int TileX { get; init; }
-        public int TileY { get; init; }
-        public SecretWallDirection Direction { get; init; }
-        public int TravelTiles { get; init; }
-        public uint WallTileId { get; init; }
-        public bool IsActivated { get; set; }
     }
 }

@@ -1,6 +1,7 @@
 using System.Numerics;
 using Game.DebugConsole;
 using Game.Editor;
+using Game.Engine.Movement;
 using Game.Features.Animation;
 using Game.Features.Combat;
 using Game.Features.Doors;
@@ -81,14 +82,14 @@ public class World : IScene
         _combatFeedback = new CombatFeedback(_soundSystem, _effectSystem);
         _inputSystem = new InputSystem();
         _doorSystem = new DoorSystem(mapData.Doors, mapData.Width, _tileTextures);
-        _collisionSystem = new CollisionSystem(_level, _doorSystem);
+        _scoreSystem = new ScoreSystem();
+        _secretSystem = new SecretSystem(_scoreSystem, _tileTextures);
+        _collisionSystem = new CollisionSystem(_level, new CompositeMovementBlocker(_doorSystem, _secretSystem));
         _soundPropagationSystem = new SoundPropagationSystem(mapData, _doorSystem);
         _cameraSystem = new CameraSystem(_collisionSystem);
         _renderSystem = new RenderSystem(_level, _tileTextures);
         _minimapSystem = new MinimapSystem(_level, _renderSystem);
-        _scoreSystem = new ScoreSystem();
         _exitSystem = new ExitSystem(_scoreSystem);
-        _secretSystem = new SecretSystem(_scoreSystem);
         _highscoreClient = new HighscoreClient();
         _highscoreIntermission = new HighscoreIntermission(_highscoreClient);
         _pickupSystem = new PickupSystem(_scoreSystem);
@@ -559,6 +560,7 @@ public class World : IScene
             _player.Camera,
             _sceneRenderTexture.Texture.Width,
             _sceneRenderTexture.Texture.Height);
+        _secretSystem.Render(_player.Camera.Position);
         _doorSystem.Render();
         _animationSystem.Render();
 

@@ -94,6 +94,7 @@ public partial class ThreeDFirstPerson : IDisposable
             mapData,
             ((World)_gameScene).EnemySystem,
             ((World)_gameScene).DoorSystem,
+            ((World)_gameScene).SecretSystem,
             ((World)_gameScene).Player);
 
         _activeScene = _gameScene;

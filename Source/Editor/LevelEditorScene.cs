@@ -1,6 +1,8 @@
 using System.Numerics;
+using Game.Engine.Movement;
 using Game.Features.Doors;
 using Game.Features.Enemies;
+using Game.Features.LevelProgress;
 using Game.Features.Players;
 using ImGuiNET;
 using Raylib_cs;
@@ -23,12 +25,14 @@ public class LevelEditorScene : IScene
     /// </summary>
     private bool _suppressMapClickUntilRelease;
 
-    public LevelEditorScene(MapData mapData, EnemySystem enemySystem, DoorSystem doorSystem, Player player)
+    public LevelEditorScene(MapData mapData, EnemySystem enemySystem, DoorSystem doorSystem, SecretSystem secretSystem, Player player)
     {
-        _state = new EditorState(mapData, enemySystem, doorSystem, player);
+        _state = new EditorState(mapData, enemySystem, doorSystem, secretSystem, player);
         _mapRenderer = new EditorMapRenderer(mapData);
         _gui = new EditorGui(mapData);
-        _collisionSystem = new CollisionSystem(new LevelData(mapData), doorSystem);
+        _collisionSystem = new CollisionSystem(
+            new LevelData(mapData),
+            new CompositeMovementBlocker(doorSystem, secretSystem));
     }
 
     public void OnEnter()
@@ -96,7 +100,7 @@ public class LevelEditorScene : IScene
             UpdatePlayerMovement(deltaTime);
             _state.EnemySystem.Update(deltaTime);
             bool interactPressed = !imGuiWantsKeyboard && IsKeyPressed(KeyboardKey.E);
-            _state.UpdateDoorsDuringSimulation(deltaTime, interactPressed);
+            _state.UpdateInteractablesDuringSimulation(deltaTime, interactPressed);
         }
         _state.IsMouseOverUI = imGuiWantsMouse;
 

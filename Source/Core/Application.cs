@@ -26,7 +26,7 @@ public class Application
 
         _gameScene = new World(mapData);
         var world = (World)_gameScene;
-        _editorScene = new Editor.LevelEditorScene(mapData, world.EnemySystem, world.DoorSystem, world.Player);
+        _editorScene = new Editor.LevelEditorScene(mapData, world.EnemySystem, world.DoorSystem, world.SecretSystem, world.Player);
 
         _activeScene = _gameScene;
 #if EDITOR

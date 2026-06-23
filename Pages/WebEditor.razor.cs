@@ -78,7 +78,7 @@ public partial class WebEditor : IDisposable
 
         _gameScene = new World(mapData);
         var world = (World)_gameScene;
-        _editorScene = new WebEditorScene(mapData, world.EnemySystem, world.DoorSystem, world.Player);
+        _editorScene = new WebEditorScene(mapData, world.EnemySystem, world.DoorSystem, world.SecretSystem, world.Player);
 
         _activeScene = _editorScene;
         _activeScene.OnEnter();

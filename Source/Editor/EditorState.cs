@@ -22,6 +22,7 @@ public class EditorState
     public readonly MapData MapData;
     public readonly EnemySystem EnemySystem;
     public readonly DoorSystem DoorSystem;
+    public readonly SecretSystem SecretSystem;
     public readonly Player Player;
     public readonly EditorCamera Camera;
     public readonly List<EditorLayer> Layers;
@@ -105,11 +106,12 @@ public class EditorState
     // Fires when state changes that the Blazor UI should reflect
     public event Action? StateChanged;
 
-    public EditorState(MapData mapData, EnemySystem enemySystem, DoorSystem doorSystem, Player player)
+    public EditorState(MapData mapData, EnemySystem enemySystem, DoorSystem doorSystem, SecretSystem secretSystem, Player player)
     {
         MapData = mapData;
         EnemySystem = enemySystem;
         DoorSystem = doorSystem;
+        SecretSystem = secretSystem;
         Player = player;
         Camera = new EditorCamera();
         Camera.CenterOnMap(mapData.Width, mapData.Height);
@@ -484,8 +486,18 @@ public class EditorState
         {
             EnemySystem.Rebuild(MapData.Enemies, MapData);
             DoorSystem.Rebuild(MapData.Doors, MapData.Width);
+            SecretSystem.Rebuild(MapData);
         }
         NotifyStateChanged();
+    }
+
+    /// <summary>
+    /// Secret wall interaction + slide animation during editor simulation.
+    /// </summary>
+    public bool UpdateSecretsDuringSimulation(float deltaTime, bool interactPressed)
+    {
+        var input = new InputState { IsInteractPressed = interactPressed };
+        return SecretSystem.Update(deltaTime, input, Player);
     }
 
     /// <summary>
@@ -495,6 +507,15 @@ public class EditorState
     {
         var input = new InputState { IsInteractPressed = interactPressed };
         DoorSystem.Update(deltaTime, input, Player, EnemySystem.Enemies);
+    }
+
+    /// <summary>Runs secret then door interact with the same priority as play mode.</summary>
+    public void UpdateInteractablesDuringSimulation(float deltaTime, bool interactPressed)
+    {
+        var input = new InputState { IsInteractPressed = interactPressed };
+        bool secretConsumed = SecretSystem.Update(deltaTime, input, Player);
+        var doorInput = secretConsumed ? input.WithoutInteract() : input;
+        DoorSystem.Update(deltaTime, doorInput, Player, EnemySystem.Enemies);
     }
 
     public void ClearLevel()
