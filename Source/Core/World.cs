@@ -48,6 +48,7 @@ public class World : IScene
     private readonly PlayerSystem _playerSystem;
     private readonly ScoreSystem _scoreSystem;
     private readonly ExitSystem _exitSystem;
+    private readonly SecretSystem _secretSystem;
     private readonly HighscoreClient _highscoreClient;
     private readonly HighscoreIntermission _highscoreIntermission;
     private readonly OptionsMenuSystem _optionsMenu = new();
@@ -64,6 +65,7 @@ public class World : IScene
     public SoundPropagationSystem SoundPropagationSystem => _soundPropagationSystem;
     public ScoreSystem ScoreSystem => _scoreSystem;
     public ExitSystem ExitSystem => _exitSystem;
+    public SecretSystem SecretSystem => _secretSystem;
     public string CurrentLevelPath => _currentLevelPath;
 
     public World(MapData mapData)
@@ -86,6 +88,7 @@ public class World : IScene
         _minimapSystem = new MinimapSystem(_level, _renderSystem);
         _scoreSystem = new ScoreSystem();
         _exitSystem = new ExitSystem(_scoreSystem);
+        _secretSystem = new SecretSystem(_scoreSystem);
         _highscoreClient = new HighscoreClient();
         _highscoreIntermission = new HighscoreIntermission(_highscoreClient);
         _pickupSystem = new PickupSystem(_scoreSystem);
@@ -122,7 +125,8 @@ public class World : IScene
             _enemySystem,
             _weaponSystem,
             _effectSystem,
-            _exitSystem);
+            _exitSystem,
+            _secretSystem);
 
         _consoleOverlay = new ConsoleOverlay();
         _runtimeConsole = WorldConsoleBindings.CreateConsole(this, _player, _enemySystem, _scoreSystem, _consoleOverlay);
@@ -132,6 +136,7 @@ public class World : IScene
             () => _highscoreIntermission.IsBlockingRestart);
         _playerSystem.ResetForLevelLoad(_mapData);
         _exitSystem.Rebuild(_mapData);
+        _secretSystem.Rebuild(_mapData);
 
         WindowDisplayMode.SyncRenderDataFromWindow();
         GameRenderResolution.Apply(
@@ -288,6 +293,7 @@ public class World : IScene
         _placedObjectSystem.Rebuild(_mapData);
         _scoreSystem.ResetForLevel(_mapData);
         _exitSystem.Rebuild(_mapData);
+        _secretSystem.Rebuild(_mapData);
 
         if (OperatingSystem.IsBrowser())
         {
@@ -374,6 +380,7 @@ public class World : IScene
         _placedObjectSystem.Rebuild(_mapData);
         _scoreSystem.ResetForLevel(_mapData);
         _exitSystem.Rebuild(_mapData);
+        _secretSystem.Rebuild(_mapData);
         _soundPropagationSystem.ClearPendingEvents();
         _highscoreIntermission.ResetForLevel();
         _highscoreIntermissionStarted = false;

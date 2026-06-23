@@ -46,7 +46,7 @@ public sealed class ScoreSystem
 
         TotalKillableEnemies = mapData.Enemies.Count(e => !e.StartsAsCorpse);
         TotalTreasures = mapData.Pickups.Count(p => TreasureScoreCatalog.IsTreasure(p.Type));
-        TotalSecrets = 0;
+        TotalSecrets = mapData.SecretWalls.Count;
     }
 
     public void Tick(float deltaTime)
