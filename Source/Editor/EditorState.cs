@@ -408,6 +408,7 @@ public class EditorState
         MapData.Objects = new uint[tileCount];
         MapData.Enemies.Clear();
         MapData.Pickups.Clear();
+        MapData.SecretWalls.Clear();
         MapData.Spawn = new PlayerSpawnPlacement();
         DeselectPlayer();
         SelectedEnemyIndex = -1;
