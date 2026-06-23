@@ -1,6 +1,7 @@
 using System.Numerics;
 using Game.Features.Doors;
 using Game.Features.Enemies;
+using Game.Features.LevelProgress;
 using Game.Features.Pickups;
 using ImGuiNET;
 using Raylib_cs;
@@ -51,6 +52,7 @@ public class EditorGui
     private bool _showPlayerProperties = true;
     private bool _showPickupPalette = true;
     private bool _showPickupProperties = true;
+    private bool _showWallProperties = true;
     private bool _showDebugLog = false;
     private bool _showPathfinding;
     private bool _showSoundPropagation;
@@ -169,6 +171,17 @@ public class EditorGui
                 ImGui.EndMenu();
             }
 
+            if (editorState != null && ImGui.BeginMenu("Edit"))
+            {
+                if (ImGui.MenuItem("Paint Mode", "B", editorState.ToolMode == EditorState.EditorToolMode.Paint))
+                    editorState.SetToolMode(EditorState.EditorToolMode.Paint);
+
+                if (ImGui.MenuItem("Select Mode", "V", editorState.ToolMode == EditorState.EditorToolMode.Select))
+                    editorState.SetToolMode(EditorState.EditorToolMode.Select);
+
+                ImGui.EndMenu();
+            }
+
             if (ImGui.BeginMenu("Window"))
             {
                 if (ImGui.MenuItem("Layers", null, _showLayers))
@@ -191,6 +204,9 @@ public class EditorGui
 
                 if (ImGui.MenuItem("Pickup Properties", null, _showPickupProperties))
                     _showPickupProperties = !_showPickupProperties;
+
+                if (ImGui.MenuItem("Wall Properties", null, _showWallProperties))
+                    _showWallProperties = !_showWallProperties;
 
                 if (ImGui.MenuItem("Debug Log", null, _showDebugLog))
                     _showDebugLog = !_showDebugLog;
@@ -480,6 +496,7 @@ public class EditorGui
         ImGui.Separator();
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "RMB drag: Pan");
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "LMB: Paint tile / Place enemy");
+        ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "B / V: Paint / Select mode");
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Scroll / +/-: Zoom");
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "1-9: Activate layer");
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Ctrl+1-9: Toggle visibility");
@@ -503,6 +520,30 @@ public class EditorGui
 
         ImGui.Text($"Active Layer: {layers[activeLayerIndex].Name}");
         ImGui.Separator();
+
+        string modeLabel = editorState.ToolMode == EditorState.EditorToolMode.Paint ? "Paint" : "Select";
+        ImGui.Text($"Tool: {modeLabel}");
+        if (ImGui.Button("Paint (B)"))
+            editorState.SetToolMode(EditorState.EditorToolMode.Paint);
+        ImGui.SameLine();
+        if (ImGui.Button("Select (V)"))
+            editorState.SetToolMode(EditorState.EditorToolMode.Select);
+        ImGui.Separator();
+
+        if (editorState.ToolMode == EditorState.EditorToolMode.Select
+            && layers[activeLayerIndex].Name != EditorState.WallsLayerName)
+        {
+            ImGui.TextWrapped("Select mode applies on the Walls layer. Switch to Walls and click a wall tile.");
+            ImGui.End();
+            return;
+        }
+
+        if (editorState.IsWallSelectMode)
+        {
+            ImGui.TextWrapped("Click a wall on the map to edit secret properties.");
+            ImGui.End();
+            return;
+        }
 
         float buttonSize = PickupSprites.PaletteIconSize;
 
@@ -1026,6 +1067,66 @@ public class EditorGui
         {
             _mapData.Pickups.RemoveAt(selectedPickupIndex);
             selectedPickupIndex = -1;
+        }
+
+        ImGui.End();
+    }
+
+    // ─── Wall Properties Panel ─────────────────────────────────────────────────────
+
+    public void RenderWallPropertiesPanel(EditorState state)
+    {
+        if (!state.ShouldShowWallPropertiesPanel(_showWallProperties))
+            return;
+
+        uint wallTileId = state.GetWallTileAt(state.SelectedWallTileX, state.SelectedWallTileY);
+        var secret = state.GetSelectedSecretPlacement();
+        bool isSecret = secret != null;
+        SecretWallDirection direction = secret?.Direction ?? SecretWallDirection.North;
+        int travelTiles = secret?.TravelTiles ?? 1;
+
+        ImGui.SetNextWindowPos(new Vector2(GetScreenWidth() - 300, 420), ImGuiCond.FirstUseEver);
+        ImGui.Begin("Wall Properties", ref _showWallProperties, ImGuiWindowFlags.AlwaysAutoResize);
+        ImGui.SetWindowFontScale(_guiScale);
+
+        ImGui.Text($"Wall ({state.SelectedWallTileX}, {state.SelectedWallTileY})");
+        ImGui.Text($"Sprite ID: {wallTileId}");
+        ImGui.Separator();
+
+        if (ImGui.Checkbox("Secret wall", ref isSecret))
+        {
+            state.SetWallSecret(isSecret, direction, travelTiles);
+            secret = state.GetSelectedSecretPlacement();
+            isSecret = secret != null;
+            direction = secret?.Direction ?? SecretWallDirection.North;
+            travelTiles = secret?.TravelTiles ?? 1;
+        }
+
+        if (isSecret)
+        {
+            ImGui.Spacing();
+            ImGui.Text("Travel direction:");
+            foreach (SecretWallDirection value in Enum.GetValues<SecretWallDirection>())
+            {
+                if (ImGui.RadioButton(value.ToString(), direction == value))
+                {
+                    direction = value;
+                    travelTiles = state.ClampSecretTravelTiles(
+                        state.SelectedWallTileX, state.SelectedWallTileY, direction, travelTiles);
+                    state.SetWallSecret(true, direction, travelTiles);
+                }
+            }
+
+            int maxTravel = state.GetMaxSecretTravelTiles(
+                state.SelectedWallTileX, state.SelectedWallTileY, direction);
+            if (ImGui.InputInt("Travel tiles", ref travelTiles))
+            {
+                travelTiles = state.ClampSecretTravelTiles(
+                    state.SelectedWallTileX, state.SelectedWallTileY, direction, travelTiles);
+                state.SetWallSecret(true, direction, travelTiles);
+            }
+
+            ImGui.TextDisabled($"Max in direction: {maxTravel}");
         }
 
         ImGui.End();

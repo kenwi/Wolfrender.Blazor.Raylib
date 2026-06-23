@@ -1,4 +1,5 @@
 using Game.Features.Enemies;
+using Game.Features.LevelProgress;
 using Game.Features.Pickups;
 using Game.Features.Players;
 using Raylib_cs;
@@ -8,7 +9,7 @@ namespace Game.Core.Level;
 /// <summary>
 /// Shared level data stored as raw tile ID arrays.
 /// Both the game and editor scenes reference this, and serialization operates on these arrays directly.
-/// Feature placement records live in <see cref="Game.Features.Enemies"/>, <see cref="Game.Features.Pickups"/>, and <see cref="Game.Features.Players"/>.
+/// Feature placement records live in <see cref="Game.Features.Enemies"/>, <see cref="Game.Features.Pickups"/>, <see cref="Game.Features.LevelProgress"/>, and <see cref="Game.Features.Players"/>.
 /// </summary>
 public class MapData
 {
@@ -20,6 +21,7 @@ public class MapData
     public uint[] Objects { get; set; } = Array.Empty<uint>();
     public List<EnemyPlacement> Enemies { get; set; } = new();
     public List<PickupPlacement> Pickups { get; set; } = new();
+    public List<SecretWallPlacement> SecretWalls { get; set; } = new();
     public PlayerSpawnPlacement Spawn { get; set; } = new();
     /// <summary>64 baked tiles from <see cref="Rendering.TileSpriteSheet"/> (index 0 = tile ID 1).</summary>
     public List<Texture2D> TileTextures { get; set; } = new();

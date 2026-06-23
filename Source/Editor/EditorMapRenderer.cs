@@ -1,6 +1,7 @@
 using System.Numerics;
 using Game.Features.Doors;
 using Game.Features.Enemies;
+using Game.Features.LevelProgress;
 using Game.Features.Pickups;
 using Game.Features.Players;
 using Raylib_cs;
@@ -647,5 +648,41 @@ public class EditorMapRenderer
         DrawRectangleLinesEx(
             new Rectangle(highlightX, highlightY, tileSize, tileSize),
             2f, Color.Yellow);
+    }
+
+    /// <summary>Draw a cyan highlight around the selected wall tile.</summary>
+    public void DrawSelectedWallHighlight(int tileX, int tileY, EditorCamera camera)
+    {
+        float tileSize = camera.TileSize;
+        float highlightX = tileX * tileSize + camera.Offset.X;
+        float highlightY = tileY * tileSize + camera.Offset.Y;
+        DrawRectangleLinesEx(
+            new Rectangle(highlightX, highlightY, tileSize, tileSize),
+            3f, Color.SkyBlue);
+    }
+
+    /// <summary>Preview secret wall slide path from the selected placement.</summary>
+    public void DrawSecretWallPreview(SecretWallPlacement secret, EditorCamera camera)
+    {
+        float tileSize = camera.TileSize;
+        var fill = new Color(120, 200, 255, 90);
+        var border = new Color(120, 200, 255, 200);
+        var arrowColor = new Color(255, 220, 80, 230);
+
+        var (dx, dy) = SecretWallDirectionHelper.ToTileDelta(secret.Direction);
+        int x = secret.TileX;
+        int y = secret.TileY;
+        var start = TileCenter(new Vector2(x, y), tileSize, camera.Offset);
+
+        for (int step = 1; step <= secret.TravelTiles; step++)
+        {
+            x += dx;
+            y += dy;
+            FillTile(new Vector2(x, y), tileSize, camera.Offset, fill, border);
+        }
+
+        var end = TileCenter(new Vector2(x, y), tileSize, camera.Offset);
+        DrawLineEx(start, end, 3f, arrowColor);
+        DrawCircle((int)end.X, (int)end.Y, tileSize * 0.12f, arrowColor);
     }
 }

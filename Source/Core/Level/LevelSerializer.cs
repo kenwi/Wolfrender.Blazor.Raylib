@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Game.Features.Enemies;
+using Game.Features.LevelProgress;
 using Game.Features.Pickups;
 using Game.Features.Players;
 using Raylib_cs;
@@ -18,6 +19,7 @@ public class LevelFileData
     public uint[] Objects { get; set; } = Array.Empty<uint>();
     public List<EnemyPlacementData> Enemies { get; set; } = new();
     public List<PickupPlacementData> Pickups { get; set; } = new();
+    public List<SecretWallPlacementData> SecretWalls { get; set; } = new();
     public PlayerSpawnData? PlayerSpawn { get; set; }
 }
 
@@ -88,6 +90,7 @@ public static class LevelSerializer
             Objects = mapData.Objects,
             Enemies = mapData.Enemies.Select(EnemyPlacementData.FromPlacement).ToList(),
             Pickups = mapData.Pickups.Select(PickupPlacementData.FromPlacement).ToList(),
+            SecretWalls = mapData.SecretWalls.Select(SecretWallPlacementData.FromPlacement).ToList(),
             PlayerSpawn = PlayerSpawnData.FromPlacement(mapData.Spawn)
         };
 
@@ -113,6 +116,9 @@ public static class LevelSerializer
         mapData.Enemies = fileData.Enemies.Select(e => e.ToPlacement()).ToList();
         mapData.Pickups = (fileData.Pickups ?? new List<PickupPlacementData>())
             .Select(p => p.ToPlacement())
+            .ToList();
+        mapData.SecretWalls = (fileData.SecretWalls ?? new List<SecretWallPlacementData>())
+            .Select(s => s.ToPlacement())
             .ToList();
         fileData.PlayerSpawn?.ApplyTo(mapData.Spawn);
     }
@@ -148,6 +154,7 @@ public static class LevelSerializer
         mapData.Doors = (uint[])doors.Data!.Value.GlobalTileIDs!.Value.Clone();
         mapData.Objects = new uint[mapData.Width * mapData.Height];
         mapData.Pickups = new List<PickupPlacement>();
+        mapData.SecretWalls = new List<SecretWallPlacement>();
     }
 
     public static void LoadFromBmp(MapData mapData, string path)
@@ -175,6 +182,7 @@ public static class LevelSerializer
         mapData.Objects = new uint[tileCount];
         mapData.Enemies = new List<EnemyPlacement>();
         mapData.Pickups = new List<PickupPlacement>();
+        mapData.SecretWalls = new List<SecretWallPlacement>();
 
         for (int tileY = 0; tileY < mapHeight; tileY++)
         {

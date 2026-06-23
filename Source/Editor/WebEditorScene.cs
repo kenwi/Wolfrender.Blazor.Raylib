@@ -1,6 +1,8 @@
 using System.Numerics;
+using Game.Engine.Movement;
 using Game.Features.Doors;
 using Game.Features.Enemies;
+using Game.Features.LevelProgress;
 using Game.Features.Players;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
@@ -20,11 +22,13 @@ public class WebEditorScene : IScene
     private readonly CollisionSystem _collisionSystem;
 
     public WebEditorScene(MapData mapData, EnemySystem enemySystem,
-        DoorSystem doorSystem, Player player)
+        DoorSystem doorSystem, SecretSystem secretSystem, Player player)
     {
-        State = new EditorState(mapData, enemySystem, doorSystem, player);
+        State = new EditorState(mapData, enemySystem, doorSystem, secretSystem, player);
         _mapRenderer = new EditorMapRenderer(mapData);
-        _collisionSystem = new CollisionSystem(new LevelData(mapData), doorSystem);
+        _collisionSystem = new CollisionSystem(
+            new LevelData(mapData),
+            new CompositeMovementBlocker(doorSystem, secretSystem));
     }
 
     public void OnEnter()
@@ -72,7 +76,7 @@ public class WebEditorScene : IScene
         {
             UpdatePlayerMovement(deltaTime);
             State.EnemySystem.Update(deltaTime);
-            State.UpdateDoorsDuringSimulation(deltaTime, IsKeyPressed(KeyboardKey.E));
+            State.UpdateInteractablesDuringSimulation(deltaTime, IsKeyPressed(KeyboardKey.E));
         }
 
         State.Camera.HandleInput(deltaTime, ctrlHeld, State.IsMouseOverUI, disableKeyboardPan: State.IsSimulating);

@@ -12,7 +12,7 @@ namespace Game.Features.Players;
 
 /// <summary>
 /// Orchestrates player update order.
-/// Alive order: cooldown → velocity (accel/decel) → movement → collision → pickup → camera → doors → animation → weapon switch → fire.
+/// Alive order: exit → secret → cooldown → velocity → movement → collision → pickup → camera → doors → animation → weapon switch → fire.
 /// </summary>
 public sealed class PlayerSystem
 {
@@ -27,6 +27,7 @@ public sealed class PlayerSystem
     private readonly WeaponSystem _weaponSystem;
     private readonly EffectSystem _effectSystem;
     private readonly ExitSystem _exitSystem;
+    private readonly SecretSystem _secretSystem;
 
     private bool _deathHandled;
     private bool _levelCompleteHandled;
@@ -45,7 +46,8 @@ public sealed class PlayerSystem
         EnemySystem enemySystem,
         WeaponSystem weaponSystem,
         EffectSystem effectSystem,
-        ExitSystem exitSystem)
+        ExitSystem exitSystem,
+        SecretSystem secretSystem)
     {
         _player = player;
         _inputSystem = inputSystem;
@@ -58,6 +60,7 @@ public sealed class PlayerSystem
         _weaponSystem = weaponSystem;
         _effectSystem = effectSystem;
         _exitSystem = exitSystem;
+        _secretSystem = secretSystem;
     }
 
     public Player Player => _player;
@@ -93,7 +96,9 @@ public sealed class PlayerSystem
         if (_exitSystem.IsBlockingGameplay)
             return;
 
-        var doorInput = exitConsumedInteract ? input.WithoutInteract() : input;
+        var secretInput = exitConsumedInteract ? input.WithoutInteract() : input;
+        bool secretConsumedInteract = _secretSystem.Update(deltaTime, secretInput, _player);
+        var doorInput = secretConsumedInteract ? secretInput.WithoutInteract() : secretInput;
 
         _weaponSystem.Update(deltaTime);
         _player.WeaponCooldownRemaining = MathF.Max(0f, _player.WeaponCooldownRemaining - deltaTime);

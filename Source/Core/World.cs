@@ -1,6 +1,7 @@
 using System.Numerics;
 using Game.DebugConsole;
 using Game.Editor;
+using Game.Engine.Movement;
 using Game.Features.Animation;
 using Game.Features.Combat;
 using Game.Features.Doors;
@@ -48,6 +49,7 @@ public class World : IScene
     private readonly PlayerSystem _playerSystem;
     private readonly ScoreSystem _scoreSystem;
     private readonly ExitSystem _exitSystem;
+    private readonly SecretSystem _secretSystem;
     private readonly HighscoreClient _highscoreClient;
     private readonly HighscoreIntermission _highscoreIntermission;
     private readonly OptionsMenuSystem _optionsMenu = new();
@@ -64,6 +66,7 @@ public class World : IScene
     public SoundPropagationSystem SoundPropagationSystem => _soundPropagationSystem;
     public ScoreSystem ScoreSystem => _scoreSystem;
     public ExitSystem ExitSystem => _exitSystem;
+    public SecretSystem SecretSystem => _secretSystem;
     public string CurrentLevelPath => _currentLevelPath;
 
     public World(MapData mapData)
@@ -79,12 +82,13 @@ public class World : IScene
         _combatFeedback = new CombatFeedback(_soundSystem, _effectSystem);
         _inputSystem = new InputSystem();
         _doorSystem = new DoorSystem(mapData.Doors, mapData.Width, _tileTextures);
-        _collisionSystem = new CollisionSystem(_level, _doorSystem);
+        _scoreSystem = new ScoreSystem();
+        _secretSystem = new SecretSystem(_scoreSystem, _tileTextures);
+        _collisionSystem = new CollisionSystem(_level, new CompositeMovementBlocker(_doorSystem, _secretSystem));
         _soundPropagationSystem = new SoundPropagationSystem(mapData, _doorSystem);
         _cameraSystem = new CameraSystem(_collisionSystem);
         _renderSystem = new RenderSystem(_level, _tileTextures);
         _minimapSystem = new MinimapSystem(_level, _renderSystem);
-        _scoreSystem = new ScoreSystem();
         _exitSystem = new ExitSystem(_scoreSystem);
         _highscoreClient = new HighscoreClient();
         _highscoreIntermission = new HighscoreIntermission(_highscoreClient);
@@ -122,7 +126,8 @@ public class World : IScene
             _enemySystem,
             _weaponSystem,
             _effectSystem,
-            _exitSystem);
+            _exitSystem,
+            _secretSystem);
 
         _consoleOverlay = new ConsoleOverlay();
         _runtimeConsole = WorldConsoleBindings.CreateConsole(this, _player, _enemySystem, _scoreSystem, _consoleOverlay);
@@ -132,6 +137,7 @@ public class World : IScene
             () => _highscoreIntermission.IsBlockingRestart);
         _playerSystem.ResetForLevelLoad(_mapData);
         _exitSystem.Rebuild(_mapData);
+        _secretSystem.Rebuild(_mapData);
 
         WindowDisplayMode.SyncRenderDataFromWindow();
         GameRenderResolution.Apply(
@@ -288,6 +294,7 @@ public class World : IScene
         _placedObjectSystem.Rebuild(_mapData);
         _scoreSystem.ResetForLevel(_mapData);
         _exitSystem.Rebuild(_mapData);
+        _secretSystem.Rebuild(_mapData);
 
         if (OperatingSystem.IsBrowser())
         {
@@ -374,6 +381,7 @@ public class World : IScene
         _placedObjectSystem.Rebuild(_mapData);
         _scoreSystem.ResetForLevel(_mapData);
         _exitSystem.Rebuild(_mapData);
+        _secretSystem.Rebuild(_mapData);
         _soundPropagationSystem.ClearPendingEvents();
         _highscoreIntermission.ResetForLevel();
         _highscoreIntermissionStarted = false;
@@ -552,6 +560,7 @@ public class World : IScene
             _player.Camera,
             _sceneRenderTexture.Texture.Width,
             _sceneRenderTexture.Texture.Height);
+        _secretSystem.Render(_player.Camera.Position);
         _doorSystem.Render();
         _animationSystem.Render();
 

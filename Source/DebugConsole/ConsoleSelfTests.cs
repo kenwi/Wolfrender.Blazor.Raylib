@@ -1,4 +1,6 @@
 using System.Numerics;
+using Game.Core.Level;
+using Game.Features.LevelProgress;
 
 namespace Game.DebugConsole;
 
@@ -17,6 +19,7 @@ public static class ConsoleSelfTests
         TestRuntimeAccessorGetSet();
         TestLevelCatalogNormalizePath();
         TestObjectSpritesLayout();
+        TestSecretWallJsonRoundTrip();
     }
 
     private static void TestParserQuotedArgs()
@@ -97,6 +100,51 @@ public static class ConsoleSelfTests
         if (!ObjectSprites.IsValidObjectId(1) || !ObjectSprites.IsValidObjectId(20)
             || ObjectSprites.IsValidObjectId(0) || ObjectSprites.IsValidObjectId(21))
             throw new InvalidOperationException("ObjectSprites.IsValidObjectId range mismatch.");
+    }
+
+    private static void TestSecretWallJsonRoundTrip()
+    {
+        var mapData = new MapData
+        {
+            Width = 4,
+            Height = 4,
+            Floor = new uint[16],
+            Walls = new uint[16],
+            Ceiling = new uint[16],
+            Doors = new uint[16],
+            Objects = new uint[16],
+            SecretWalls =
+            {
+                new SecretWallPlacement
+                {
+                    TileX = 2,
+                    TileY = 1,
+                    Direction = SecretWallDirection.East,
+                    TravelTiles = 3
+                }
+            }
+        };
+
+        var json = LevelSerializer.SerializeToJson(mapData);
+        var loaded = new MapData
+        {
+            Floor = new uint[16],
+            Walls = new uint[16],
+            Ceiling = new uint[16],
+            Doors = new uint[16],
+            Objects = new uint[16]
+        };
+        LevelSerializer.DeserializeFromJson(loaded, json);
+
+        if (loaded.SecretWalls.Count != 1)
+            throw new InvalidOperationException("SecretWalls count mismatch after JSON round-trip.");
+        var secret = loaded.SecretWalls[0];
+        if (secret.TileX != 2 || secret.TileY != 1 || secret.Direction != SecretWallDirection.East || secret.TravelTiles != 3)
+            throw new InvalidOperationException("SecretWalls field mismatch after JSON round-trip.");
+
+        LevelSerializer.DeserializeFromJson(loaded, """{"Width":4,"Height":4,"Floor":[],"Walls":[],"Ceiling":[],"Doors":[],"Objects":[]}""");
+        if (loaded.SecretWalls.Count != 0)
+            throw new InvalidOperationException("Missing SecretWalls key should deserialize to empty list.");
     }
 
     private sealed class TestTarget
