@@ -95,7 +95,8 @@ public class DoorSystem : IMovementBlocker
         if (closestDoor == null)
             return;
 
-        if (Vector2.Distance(_playerPosition, closestDoor.Position) >= 1.5f)
+        var doorCenter = closestDoor.Position + new Vector2(0.5f, 0.5f);
+        if (Vector2.Distance(_playerPosition, doorCenter) >= 1.5f)
             return;
 
         if (!CanPlayerOpen(closestDoor, player))

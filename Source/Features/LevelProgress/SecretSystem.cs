@@ -172,7 +172,7 @@ public sealed class SecretSystem : IMovementBlocker
             if (!IsAdjacentToPlayerTile(secret.TileX, secret.TileY, playerTileX, playerTileY))
                 continue;
 
-            var secretCenter = new Vector2(secret.TileX, secret.TileY);
+            var secretCenter = LevelData.GetTileCenterTileSpace(secret.TileX, secret.TileY);
             float distance = Vector2.Distance(playerTile, secretCenter);
             if (distance > ExitTileIds.InteractRadiusTiles || distance >= closestDistance)
                 continue;

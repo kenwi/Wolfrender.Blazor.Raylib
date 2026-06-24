@@ -88,8 +88,8 @@ public sealed class ExitSystem
             if (exit.IsActivated)
                 continue;
 
-            var exitTile = new Vector2(exit.TileX, exit.TileY);
-            float distance = Vector2.Distance(playerTile, exitTile);
+            var exitCenter = LevelData.GetTileCenterTileSpace(exit.TileX, exit.TileY);
+            float distance = Vector2.Distance(playerTile, exitCenter);
             if (distance > ExitTileIds.InteractRadiusTiles || distance >= closestDistance)
                 continue;
 

@@ -62,6 +62,10 @@ public class LevelData
     public static (float worldX, float worldZ) GetTileCenterWorldXZ(int tileX, int tileY) =>
         ((tileX + 0.5f) * QuadSize, (tileY + 0.5f) * QuadSize);
 
+    /// <summary>Center of tile (tileX, tileY) in tile-space units (world / QuadSize).</summary>
+    public static Vector2 GetTileCenterTileSpace(int tileX, int tileY) =>
+        new(tileX + 0.5f, tileY + 0.5f);
+
     public bool IsWallAt(float worldX, float worldZ)
     {
         int tileX = (int)(worldX / 4 + 0.5f);
