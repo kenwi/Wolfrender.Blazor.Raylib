@@ -27,8 +27,12 @@ public sealed class OptionsMenuSystem
 
     public void Dismiss() => IsOpen = false;
 
-    public OptionsMenuInput.Result HandleInput(int screenWidth, int screenHeight)
+    public OptionsMenuInput.Result HandleInput(
+        int renderWidth,
+        int renderHeight,
+        int windowWidth,
+        int windowHeight)
     {
-        return OptionsMenuInput.Update(Settings, screenWidth, screenHeight);
+        return OptionsMenuInput.Update(Settings, renderWidth, renderHeight, windowWidth, windowHeight);
     }
 }

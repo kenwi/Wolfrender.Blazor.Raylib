@@ -1,4 +1,5 @@
 using System.Numerics;
+using Game.Features.Hud;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 
@@ -15,9 +16,14 @@ public static class OptionsMenuInput
         public bool AudioChanged { get; init; }
     }
 
-    public static Result Update(GameSettings settings, int screenWidth, int screenHeight)
+    public static Result Update(
+        GameSettings settings,
+        int renderWidth,
+        int renderHeight,
+        int windowWidth,
+        int windowHeight)
     {
-        var layout = OptionsMenuLayout.Compute(screenWidth, screenHeight);
+        var layout = OptionsMenuLayout.Compute(renderWidth, renderHeight);
         bool windowDisplayChanged = false;
         bool gameResolutionChanged = false;
         bool graphicsChanged = false;
@@ -79,7 +85,7 @@ public static class OptionsMenuInput
             }
         }
 
-        var mouse = GetMousePosition();
+        var mouse = GameRenderSpace.WindowToInternal(GetMousePosition(), windowWidth, windowHeight);
         bool click = IsMouseButtonPressed(MouseButton.Left);
         bool drag = IsMouseButtonDown(MouseButton.Left);
 

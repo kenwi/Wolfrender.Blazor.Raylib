@@ -56,7 +56,9 @@ public class World : IScene
     private bool _highscoreIntermissionStarted;
 
     private RenderTexture2D _sceneRenderTexture;
+    private RenderTexture2D _hudRenderTexture;
     private bool _hasSceneRenderTexture;
+    private bool _hasHudRenderTexture;
     private InputState _inputState = new();
 
     public Player Player => _player;
@@ -145,7 +147,9 @@ public class World : IScene
             ResolveWindowWidth(),
             ResolveWindowHeight());
         _sceneRenderTexture = LoadRenderTexture(RenderData.InternalWidth, RenderData.InternalHeight);
+        _hudRenderTexture = LoadRenderTexture(RenderData.InternalWidth, RenderData.InternalHeight);
         _hasSceneRenderTexture = true;
+        _hasHudRenderTexture = true;
         Debug.Setup(_doorSystem.Doors, _player, _animationSystem, _enemySystem);
         ApplyGraphicsSettings();
         ApplyControlSettings();
@@ -194,7 +198,7 @@ public class World : IScene
             _optionsMenu.Settings,
             ResolveWindowWidth(),
             ResolveWindowHeight());
-        RecreateSceneRenderTexture();
+        RecreateRenderTextures();
     }
 
     public bool GetFullscreenEnabled() => _optionsMenu.Settings.FullscreenEnabled;
@@ -269,21 +273,28 @@ public class World : IScene
         return height > 0 ? height : GetScreenHeight();
     }
 
-    private void RecreateSceneRenderTexture()
+    private void RecreateRenderTextures()
     {
-        int newScreenWidth = RenderData.InternalWidth;
-        int newScreenHeight = RenderData.InternalHeight;
+        int newWidth = RenderData.InternalWidth;
+        int newHeight = RenderData.InternalHeight;
 
         if (_hasSceneRenderTexture &&
-            _sceneRenderTexture.Texture.Width == newScreenWidth &&
-            _sceneRenderTexture.Texture.Height == newScreenHeight)
+            _sceneRenderTexture.Texture.Width == newWidth &&
+            _sceneRenderTexture.Texture.Height == newHeight &&
+            _hasHudRenderTexture &&
+            _hudRenderTexture.Texture.Width == newWidth &&
+            _hudRenderTexture.Texture.Height == newHeight)
             return;
 
         if (_hasSceneRenderTexture)
             UnloadRenderTexture(_sceneRenderTexture);
+        if (_hasHudRenderTexture)
+            UnloadRenderTexture(_hudRenderTexture);
 
-        _sceneRenderTexture = LoadRenderTexture(newScreenWidth, newScreenHeight);
+        _sceneRenderTexture = LoadRenderTexture(newWidth, newHeight);
+        _hudRenderTexture = LoadRenderTexture(newWidth, newHeight);
         _hasSceneRenderTexture = true;
+        _hasHudRenderTexture = true;
     }
 
     public void OnEnter()
@@ -428,7 +439,11 @@ public class World : IScene
 
         if (_optionsMenu.IsOpen)
         {
-            var inputResult = _optionsMenu.HandleInput(GetScreenWidth(), GetScreenHeight());
+            var inputResult = _optionsMenu.HandleInput(
+                RenderData.InternalWidth,
+                RenderData.InternalHeight,
+                GetScreenWidth(),
+                GetScreenHeight());
 
             if (inputResult.WindowDisplayChanged)
             {
@@ -500,8 +515,8 @@ public class World : IScene
 
         _effectSystem.Update(deltaTime);
 
-        int screenWidth = GetScreenWidth();
-        int screenHeight = GetScreenHeight();
+        int screenWidth = RenderData.InternalWidth;
+        int screenHeight = RenderData.InternalHeight;
 
         if (_player.IsAlive)
         {
@@ -533,6 +548,7 @@ public class World : IScene
     public void Render()
     {
         RenderSceneToTexture();
+        RenderHudToTexture();
         RenderToScreen();
     }
 
@@ -575,6 +591,28 @@ public class World : IScene
         EndTextureMode();
     }
 
+    private void RenderHudToTexture()
+    {
+        int renderWidth = RenderData.InternalWidth;
+        int renderHeight = RenderData.InternalHeight;
+        bool consoleOpen = _consoleOverlay.IsOpen;
+        bool optionsOpen = _optionsMenu.IsOpen;
+        bool showWeaponView = _player.IsAlive && !consoleOpen && !optionsOpen && !_exitSystem.IsBlockingGameplay;
+
+        BeginTextureMode(_hudRenderTexture);
+        ClearBackground(new Color(0, 0, 0, 0));
+
+        RenderNotificationOverlays(renderWidth, renderHeight, consoleOpen);
+
+        if (!consoleOpen && !_inputState.IsMouseFree && showWeaponView)
+            PlaySessionOverlayHud.DrawReticle(_effectSystem, renderWidth, renderHeight);
+
+        if (optionsOpen)
+            OptionsMenuHud.Draw(_optionsMenu.Settings, renderWidth, renderHeight);
+
+        EndTextureMode();
+    }
+
     private void RenderToScreen()
     {
         int screenWidth = GetScreenWidth();
@@ -583,22 +621,14 @@ public class World : IScene
         BeginDrawing();
         ClearBackground(Color.Black);
 
-        DrawTexturePro(
-            _sceneRenderTexture.Texture,
-            new Rectangle(0, 0, (float)_sceneRenderTexture.Texture.Width, (float)-_sceneRenderTexture.Texture.Height),
-            new Rectangle(0, 0, screenWidth, screenHeight),
-            new Vector2(0, 0),
-            0,
-            Color.White);
+        GameRenderSpace.DrawTextureToWindow(_sceneRenderTexture.Texture, screenWidth, screenHeight);
+        GameRenderSpace.DrawTextureToWindow(_hudRenderTexture.Texture, screenWidth, screenHeight);
 
         RenderDebugLabels(screenWidth, screenHeight);
         RenderPlayHud(screenWidth, screenHeight);
         RenderMinimapAndDebugOverlays();
 
         _consoleOverlay.Render();
-
-        if (_optionsMenu.IsOpen)
-            OptionsMenuHud.Draw(_optionsMenu.Settings, screenWidth, screenHeight);
 
         EndDrawing();
     }
@@ -633,43 +663,40 @@ public class World : IScene
             _animationSystem.RenderWeaponOverlay(screenWidth, screenHeight);
 
         _effectSystem.RenderScreenOverlay(screenWidth, screenHeight);
-        RenderModalOverlay(screenWidth, screenHeight, consoleOpen);
+        RenderIntermissionOverlay(screenWidth, screenHeight, consoleOpen);
 
         if (!_player.IsAlive && !consoleOpen)
             PlaySessionOverlayHud.DrawGameOver(screenWidth, screenHeight);
-
-        if (!consoleOpen && !_inputState.IsMouseFree && showWeaponView)
-            PlaySessionOverlayHud.DrawReticle(_effectSystem, screenWidth, screenHeight);
     }
 
-    /// <summary>Mutually exclusive banners: level complete, exit countdown, door hint, no-ammo hint.</summary>
-    private void RenderModalOverlay(int screenWidth, int screenHeight, bool consoleOpen)
+    /// <summary>Centered banner notifications drawn at internal resolution.</summary>
+    private void RenderNotificationOverlays(int renderWidth, int renderHeight, bool consoleOpen)
     {
-        if (consoleOpen)
+        if (consoleOpen || _exitSystem.IsLevelComplete || !_player.IsAlive)
             return;
-
-        if (_exitSystem.IsLevelComplete)
-        {
-            if (_highscoreIntermission.IsActive)
-                _highscoreIntermission.Draw(_scoreSystem, screenWidth, screenHeight);
-            else
-                LevelProgressOverlayHud.DrawLevelComplete(_scoreSystem, screenWidth, screenHeight);
-            return;
-        }
 
         if (_exitSystem.IsExitPending)
         {
-            LevelProgressOverlayHud.DrawExitCountdown(_exitSystem.ExitCountdownRemaining, screenWidth, screenHeight);
+            LevelProgressOverlayHud.DrawExitCountdown(_exitSystem.ExitCountdownRemaining, renderWidth, renderHeight);
             return;
         }
 
-        if (!_player.IsAlive)
+        if (_doorSystem.HasLockedHint)
+            DoorOverlayHud.DrawLockedHint(_doorSystem, renderWidth, renderHeight);
+        else if (_weaponSystem.HasNoAmmoHint)
+            CombatOverlayHud.DrawNoAmmoHint(_weaponSystem, renderWidth, renderHeight);
+    }
+
+    /// <summary>Full-screen intermission panels remain in window space.</summary>
+    private void RenderIntermissionOverlay(int screenWidth, int screenHeight, bool consoleOpen)
+    {
+        if (consoleOpen || !_exitSystem.IsLevelComplete)
             return;
 
-        if (_doorSystem.HasLockedHint)
-            DoorOverlayHud.DrawLockedHint(_doorSystem, screenWidth, screenHeight);
-        else if (_weaponSystem.HasNoAmmoHint)
-            CombatOverlayHud.DrawNoAmmoHint(_weaponSystem, screenWidth, screenHeight);
+        if (_highscoreIntermission.IsActive)
+            _highscoreIntermission.Draw(_scoreSystem, screenWidth, screenHeight);
+        else
+            LevelProgressOverlayHud.DrawLevelComplete(_scoreSystem, screenWidth, screenHeight);
     }
 
     private void RenderMinimapAndDebugOverlays()
