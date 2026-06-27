@@ -1,5 +1,7 @@
 using Game.Features.Highscores.Shared;
+using Game.Features.Recording;
 using Microsoft.AspNetCore.HttpOverrides;
+using System.Text.Json;
 using Wolfrender.Highscores.Server;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,6 +18,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 });
 
 builder.Services.AddSingleton<JsonFileScoreStore>();
+builder.Services.AddSingleton<FileRecordingStore>();
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -40,12 +43,15 @@ app.UseForwardedHeaders();
 
 var startupLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Wolfrender.Highscores.Server");
 var scoreFilePath = app.Configuration["Highscores:FilePath"] ?? "highscores.json";
+var recordingsDirectory = app.Configuration["Recordings:Directory"] ?? "recordings";
 startupLogger.LogInformation(
-    "Highscores server starting. ScoreFile={ScoreFile}, CorsOrigins={CorsOrigins}",
+    "Highscores server starting. ScoreFile={ScoreFile}, RecordingsDirectory={RecordingsDirectory}, CorsOrigins={CorsOrigins}",
     Path.GetFullPath(scoreFilePath),
+    Path.GetFullPath(recordingsDirectory),
     string.Join(", ", app.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? []));
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+    app.UseHttpsRedirection();
 app.UseCors();
 
 app.MapPost("/api/scores", async (
@@ -143,6 +149,74 @@ app.MapGet("/api/scores/{levelId}", async (
         clientIp,
         entries.Count);
     return Results.Ok(entries);
+});
+
+app.MapPost("/api/recordings", async (
+    HttpRequest httpRequest,
+    FileRecordingStore store,
+    HttpContext httpContext,
+    ILogger<Program> logger,
+    CancellationToken cancellationToken) =>
+{
+    var clientIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    var origin = httpContext.Request.Headers.Origin.ToString();
+
+    RecordingUploadWireRequest request;
+    try
+    {
+        request = await httpRequest.ReadFromJsonAsync<RecordingUploadWireRequest>(
+            RecFileSerializer.JsonOptions,
+            cancellationToken) ?? throw new JsonException("Recording upload body is empty.");
+    }
+    catch (JsonException ex)
+    {
+        logger.LogWarning(ex, "POST /api/recordings rejected: invalid JSON");
+        return Results.BadRequest(new { error = $"Invalid recording JSON: {ex.Message}" });
+    }
+
+    logger.LogInformation(
+        "POST /api/recordings request: ClientIp={ClientIp}, Origin={Origin}, Name={Name}",
+        clientIp,
+        string.IsNullOrEmpty(origin) ? "(none)" : origin,
+        request.Name);
+
+    RecFile recording;
+    try
+    {
+        recording = request.Recording.ToRecFile();
+    }
+    catch (Exception ex)
+    {
+        logger.LogWarning(ex, "POST /api/recordings rejected: invalid recording payload");
+        return Results.BadRequest(new { error = ex.Message });
+    }
+
+    var upload = new RecordingUploadRequest
+    {
+        Name = request.Name,
+        Recording = recording
+    };
+
+    if (!RecordingSubmissionHandler.TryPrepare(upload, logger, out var normalized, out var error))
+    {
+        logger.LogWarning(
+            "POST /api/recordings rejected: ClientIp={ClientIp}, Name={Name}, Error={Error}",
+            clientIp,
+            request.Name,
+            error);
+        return Results.BadRequest(new { error });
+    }
+
+    await store.SaveAsync(normalized, cancellationToken);
+
+    logger.LogInformation(
+        "POST /api/recordings succeeded: ClientIp={ClientIp}, Name={Name}, LevelPath={LevelPath}, EventCount={EventCount}",
+        clientIp,
+        normalized.Name,
+        normalized.Recording.LevelPath,
+        normalized.Recording.Events.Count);
+
+    return Results.Ok(new { message = "Recording accepted.", name = normalized.Name });
 });
 
 app.Run();

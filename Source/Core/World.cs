@@ -12,6 +12,7 @@ using Game.Features.LevelProgress;
 using Game.Features.Options;
 using Game.Features.Pickups;
 using Game.Features.Players;
+using Game.Features.Recording;
 using Game.Features.WorldObjects;
 using Game.Features.SoundPropagation;
 using ImGuiNET;
@@ -33,6 +34,7 @@ public class World : IScene
     private readonly List<Texture2D> _tileTextures;
     private readonly List<Texture2D> _gameTextures;
     private readonly InputSystem _inputSystem;
+    private readonly RecordingSystem _recordingSystem;
     private readonly CollisionSystem _collisionSystem;
     private readonly CameraSystem _cameraSystem;
     private readonly DoorSystem _doorSystem;
@@ -83,6 +85,7 @@ public class World : IScene
         _effectSystem = new EffectSystem();
         _combatFeedback = new CombatFeedback(_soundSystem, _effectSystem);
         _inputSystem = new InputSystem();
+        _recordingSystem = new RecordingSystem(_inputSystem);
         _doorSystem = new DoorSystem(mapData.Doors, mapData.Width, _tileTextures);
         _scoreSystem = new ScoreSystem();
         _secretSystem = new SecretSystem(_scoreSystem, _tileTextures);
@@ -132,7 +135,26 @@ public class World : IScene
             _secretSystem);
 
         _consoleOverlay = new ConsoleOverlay();
-        _runtimeConsole = WorldConsoleBindings.CreateConsole(this, _player, _enemySystem, _scoreSystem, _consoleOverlay);
+        _runtimeConsole = WorldConsoleBindings.CreateConsole(
+            this,
+            _player,
+            _enemySystem,
+            _scoreSystem,
+            _consoleOverlay,
+            _recordingSystem,
+            () => _optionsMenu.Settings.MouseSensitivity);
+        _recordingSystem.Configure(
+            LoadLevel,
+            RestartCurrentLevel,
+            () => _currentLevelPath,
+            SetMouseSensitivity,
+            () =>
+            {
+                ApplyControlSettings();
+                _inputSystem.RestoreGameplayMouse();
+            },
+            () => PlayerSnapshotApplication.From(_player),
+            snapshot => snapshot.ApplyTo(_player));
         _playerSystem.ConfigureLifecycle(
             () => _consoleOverlay.IsOpen,
             () => _ = RestartCurrentLevel(),
@@ -502,13 +524,14 @@ public class World : IScene
             return;
         }
 
-        _inputState = _inputSystem.GetInputState();
-        var mouseDelta = _inputState.MouseDelta;
+        var poll = _recordingSystem.ActiveProvider.Poll(deltaTime);
+        _inputState = poll.InputState;
+        var mouseDelta = poll.MouseDelta;
 
-        if (_inputState.IsMouseFree)
-            mouseDelta = new Vector2(0, 0);
+        if (!_recordingSystem.IsReplaying)
+            _inputSystem.Update();
 
-        _inputSystem.Update();
+        _recordingSystem.Update(deltaTime);
 
         if (!_exitSystem.IsBlockingGameplay)
             _scoreSystem.Tick(deltaTime);
@@ -522,12 +545,12 @@ public class World : IScene
         {
             _playerSystem.UpdateAlive(deltaTime, _inputState, mouseDelta, screenWidth, screenHeight);
             if (!_exitSystem.IsBlockingGameplay)
-                _enemySystem.Update(deltaTime);
+                _enemySystem.Update(deltaTime, _inputState);
         }
         else
         {
             _playerSystem.UpdateDead(deltaTime, _inputState, mouseDelta);
-            _enemySystem.Update(deltaTime);
+            _enemySystem.Update(deltaTime, _inputState);
         }
 
         if (_exitSystem.IsLevelComplete && !_highscoreIntermissionStarted)
@@ -538,6 +561,30 @@ public class World : IScene
 
         if (_exitSystem.IsLevelComplete)
             _highscoreIntermission.Update();
+    }
+
+    public ConsoleCommandResult StartRecordingForConsole(string filename, float mouseSensitivity)
+    {
+        var result = _recordingSystem.StartRecording(filename, mouseSensitivity);
+        if (result.Success)
+        {
+            _consoleOverlay.Close();
+            _inputSystem.DisableMouse();
+        }
+
+        return result;
+    }
+
+    public ConsoleCommandResult StartReplayForConsole(string filename)
+    {
+        var result = _recordingSystem.StartReplay(filename);
+        if (result.Success)
+        {
+            _consoleOverlay.Close();
+            _inputSystem.DisableMouse();
+        }
+
+        return result;
     }
 
     public ConsoleCommandResult ExecuteConsoleLine(string line)

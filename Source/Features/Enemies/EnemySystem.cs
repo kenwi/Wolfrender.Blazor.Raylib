@@ -110,8 +110,9 @@ public class EnemySystem
         }
     }
 
-    public void Update(float deltaTime)
+    public void Update(float deltaTime, InputState? inputState = null)
     {
+        inputState ??= _inputSystem.GetInputState();
         UpdateHearing();
 
         // Throttled line-of-sight and FOV polygon update
@@ -133,7 +134,7 @@ public class EnemySystem
         RemoveDeadEnemies();
 
         // Debug: cycle enemy state
-        if (_inputSystem.GetInputState().IsChangeStatePressed)
+        if (inputState.IsChangeStatePressed)
         {
             foreach (var enemy in _enemies)
             {

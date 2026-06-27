@@ -171,11 +171,13 @@ public class InputSystem
         return 0;
     }
 
-    public Vector3 GetMoveDirection(Camera3D camera)
+    public Vector3 GetMoveDirection(Camera3D camera) =>
+        GetMoveDirection(camera, GetInputState());
+
+    public Vector3 GetMoveDirection(Camera3D camera, InputState input)
     {
         Vector3 direction = Vector3.Zero;
 
-        // Calculate forward direction (camera look direction)
         Vector3 targetToPosition = camera.Target - camera.Position;
         float targetDistance = targetToPosition.Length();
 
@@ -184,7 +186,6 @@ public class InputSystem
 
         Vector3 forward = targetToPosition / targetDistance;
 
-        // Project forward onto horizontal plane
         Vector3 forwardHorizontal = new Vector3(forward.X, 0, forward.Z);
         float forwardLength = forwardHorizontal.Length();
 
@@ -197,25 +198,22 @@ public class InputSystem
             forwardHorizontal = Vector3.UnitZ;
         }
 
-        // Calculate right direction
         Vector3 rightVec = Vector3.Cross(forwardHorizontal, -Vector3.UnitY);
         float rightLength = rightVec.Length();
         Vector3 right = rightLength > 0.001f ? rightVec / rightLength : Vector3.UnitX;
 
-        if (IsKeyDown(KeyboardKey.W))
+        if (input.MoveForward)
             direction += forwardHorizontal;
-        if (IsKeyDown(KeyboardKey.S))
+        if (input.MoveBackward)
             direction -= forwardHorizontal;
-        if (IsKeyDown(KeyboardKey.D))
+        if (input.MoveRight)
             direction -= right;
-        if (IsKeyDown(KeyboardKey.A))
+        if (input.MoveLeft)
             direction += right;
 
         float directionLength = direction.Length();
         if (directionLength > 0.001f)
-        {
             return direction / directionLength;
-        }
 
         return Vector3.Zero;
     }

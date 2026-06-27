@@ -2,6 +2,7 @@ using System.Numerics;
 using Game.Features.Enemies;
 using Game.Features.LevelProgress;
 using Game.Features.Players;
+using Game.Features.Recording;
 
 namespace Game.DebugConsole;
 
@@ -12,7 +13,9 @@ public static class WorldConsoleBindings
         Player player,
         EnemySystem enemySystem,
         ScoreSystem scoreSystem,
-        ConsoleOverlay overlay)
+        ConsoleOverlay overlay,
+        RecordingSystem recordingSystem,
+        Func<float> getMouseSensitivity)
     {
         var runtimeAccessor = new RuntimeVariableAccessor(
             CreateRoots(world, player, enemySystem, scoreSystem),
@@ -37,7 +40,12 @@ public static class WorldConsoleBindings
                 return ConsoleCommandResult.Ok("Console output cleared. History (↑/↓) is unchanged.");
             },
             () => world.CurrentLevelPath,
-            world.ListPickupsForConsole);
+            world.ListPickupsForConsole,
+            filename => world.StartRecordingForConsole(filename, getMouseSensitivity()),
+            recordingSystem.StopRecording,
+            world.StartReplayForConsole,
+            recordingSystem.StopReplay,
+            recordingSystem.SendRecording);
     }
 
     private static IReadOnlyList<RootBinding> CreateRoots(

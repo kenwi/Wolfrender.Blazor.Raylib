@@ -28,6 +28,8 @@ docker compose up -d --build
 
 API: `http://localhost:5080/api/scores/{levelId}`
 
+Recordings: `POST http://localhost:5080/api/recordings` (JSON body with `name` and `recording` payload). Files are stored under `data/recordings/` when using Docker.
+
 ## Timezone
 
 Score `SubmittedAt` timestamps use the container's OS timezone. Set `TZ` in `.env` to an [IANA timezone name](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) before starting the stack:

@@ -1,0 +1,75 @@
+namespace Game.Features.Recording;
+
+public sealed class RecordingUploadWireRequest
+{
+    public required string Name { get; init; }
+    public required RecFileWire Recording { get; init; }
+}
+
+public sealed class RecFileWire
+{
+    public int Version { get; init; }
+    public string LevelPath { get; init; } = string.Empty;
+    public float MouseSensitivity { get; init; }
+    public PlayerSnapshot? Player { get; init; }
+    public List<RecEventWire> Events { get; init; } = new();
+
+    public static RecFileWire From(RecFile file) => new()
+    {
+        Version = file.Version,
+        LevelPath = file.LevelPath,
+        MouseSensitivity = file.MouseSensitivity,
+        Player = file.PlayerSnapshot,
+        Events = file.Events.Select(RecEventWire.From).ToList()
+    };
+
+    public RecFile ToRecFile()
+    {
+        if (Version is not 1 and not RecFile.CurrentVersion)
+            throw new InvalidDataException($"Unsupported recording version {Version} (expected {RecFile.CurrentVersion}).");
+
+        if (string.IsNullOrWhiteSpace(LevelPath))
+            throw new InvalidDataException("Recording is missing levelPath.");
+
+        var events = Events.Select(e => e.ToEvent()).OrderBy(e => e.Time).ToList();
+        return new RecFile
+        {
+            Version = Version,
+            LevelPath = LevelPath,
+            MouseSensitivity = MouseSensitivity,
+            PlayerSnapshot = Player,
+            Events = events
+        };
+    }
+}
+
+public sealed class RecEventWire
+{
+    public InputEventKind Kind { get; init; }
+    public float Time { get; init; }
+    public GameplayKey? Key { get; init; }
+    public float? Dx { get; init; }
+    public float? Dy { get; init; }
+
+    public static RecEventWire From(InputEvent evt) => evt switch
+    {
+        KeyDownEvent down => new RecEventWire { Kind = InputEventKind.KeyDown, Time = down.Time, Key = down.Key },
+        KeyUpEvent up => new RecEventWire { Kind = InputEventKind.KeyUp, Time = up.Time, Key = up.Key },
+        MouseDeltaEvent delta => new RecEventWire
+        {
+            Kind = InputEventKind.MouseDelta,
+            Time = delta.Time,
+            Dx = delta.Dx,
+            Dy = delta.Dy
+        },
+        _ => throw new InvalidOperationException("Unknown input event type.")
+    };
+
+    public InputEvent ToEvent() => Kind switch
+    {
+        InputEventKind.KeyDown when Key.HasValue => new KeyDownEvent(Time, Key.Value),
+        InputEventKind.KeyUp when Key.HasValue => new KeyUpEvent(Time, Key.Value),
+        InputEventKind.MouseDelta when Dx.HasValue && Dy.HasValue => new MouseDeltaEvent(Time, Dx.Value, Dy.Value),
+        _ => throw new InvalidDataException($"Invalid event payload for kind '{Kind}'.")
+    };
+}

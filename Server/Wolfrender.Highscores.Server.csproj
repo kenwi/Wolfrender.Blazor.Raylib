@@ -9,6 +9,14 @@
 
   <ItemGroup>
     <Compile Include="..\Source\Features\Highscores\Shared\*.cs" Link="Shared\%(Filename)%(Extension)" />
+    <Compile Include="..\Source\Features\Recording\GameplayKey.cs" Link="Recording\GameplayKey.cs" />
+    <Compile Include="..\Source\Features\Recording\InputEvent.cs" Link="Recording\InputEvent.cs" />
+    <Compile Include="..\Source\Features\Recording\PlayerSnapshot.cs" Link="Recording\PlayerSnapshot.cs" />
+    <Compile Include="..\Source\Features\Recording\RecFile.cs" Link="Recording\RecFile.cs" />
+    <Compile Include="..\Source\Features\Recording\RecFileSerializer.cs" Link="Recording\RecFileSerializer.cs" />
+    <Compile Include="..\Source\Features\Recording\RecordingNameSanitizer.cs" Link="Recording\RecordingNameSanitizer.cs" />
+    <Compile Include="..\Source\Features\Recording\RecordingWire.cs" Link="Recording\RecordingWire.cs" />
+    <Compile Include="..\Source\Features\Recording\RecordingUploadRequest.cs" Link="Recording\RecordingUploadRequest.cs" />
   </ItemGroup>
 
 </Project>

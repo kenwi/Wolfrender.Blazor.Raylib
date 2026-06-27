@@ -9,4 +9,9 @@ public sealed class ConsoleCommandContext
     public required Func<IReadOnlyCollection<IConsoleCommand>> GetAllCommands { get; init; }
     public required Func<string> GetCurrentLevelPath { get; init; }
     public required Func<ConsoleCommandResult> ListPickups { get; init; }
+    public required Func<string, ConsoleCommandResult> StartRecording { get; init; }
+    public required Func<ConsoleCommandResult> StopRecording { get; init; }
+    public required Func<string, ConsoleCommandResult> StartReplay { get; init; }
+    public required Func<ConsoleCommandResult> StopReplay { get; init; }
+    public required Func<string, ConsoleCommandResult> SendRecording { get; init; }
 }
