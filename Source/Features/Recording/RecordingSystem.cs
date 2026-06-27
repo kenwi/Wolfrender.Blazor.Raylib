@@ -20,7 +20,10 @@ public sealed class RecordingSystem
     private Action? _restoreControlSettings;
     private Func<PlayerSnapshot>? _capturePlayerSnapshot;
     private Action<PlayerSnapshot>? _applyPlayerSnapshot;
+    private Action<ConsoleCommandResult>? _onUploadCompleted;
 
+    private Task? _pendingUpload;
+    private string? _pendingUploadName;
     private IInputProvider _activeProvider;
     private string? _recordingPath;
     private string? _recordingLevelPath;
@@ -46,7 +49,8 @@ public sealed class RecordingSystem
         Action<float> applyMouseSensitivity,
         Action restoreControlSettings,
         Func<PlayerSnapshot> capturePlayerSnapshot,
-        Action<PlayerSnapshot> applyPlayerSnapshot)
+        Action<PlayerSnapshot> applyPlayerSnapshot,
+        Action<ConsoleCommandResult>? onUploadCompleted = null)
     {
         _loadLevel = loadLevel;
         _restartLevel = restartLevel;
@@ -55,6 +59,7 @@ public sealed class RecordingSystem
         _restoreControlSettings = restoreControlSettings;
         _capturePlayerSnapshot = capturePlayerSnapshot;
         _applyPlayerSnapshot = applyPlayerSnapshot;
+        _onUploadCompleted = onUploadCompleted;
     }
 
     public ConsoleCommandResult StartRecording(string filename, float mouseSensitivity)
@@ -194,21 +199,40 @@ public sealed class RecordingSystem
         if (!File.Exists(path))
             return ConsoleCommandResult.Fail($"Recording not found: '{path}'.");
 
-        try
-        {
-            _uploadClient.SendAsync(sanitizedName, path).GetAwaiter().GetResult();
-            return ConsoleCommandResult.Ok($"Uploaded recording '{sanitizedName}' to server.");
-        }
-        catch (Exception ex)
-        {
-            return ConsoleCommandResult.Fail($"sendrecording: {ex.Message}");
-        }
+        if (_pendingUpload is { IsCompleted: false })
+            return ConsoleCommandResult.Fail("Recording upload already in progress.");
+
+        _pendingUploadName = sanitizedName;
+        _pendingUpload = _uploadClient.SendAsync(sanitizedName, path);
+        return ConsoleCommandResult.Ok($"Uploading recording '{sanitizedName}'...");
     }
 
     public void Update(float deltaTime)
     {
         if (IsReplaying && _replayProvider.IsFinished)
             StopReplayInternal(restoreControls: true);
+
+        CompletePendingUpload();
+    }
+
+    private void CompletePendingUpload()
+    {
+        if (_pendingUpload is not { IsCompleted: true } task)
+            return;
+
+        string name = _pendingUploadName ?? "recording";
+        _pendingUpload = null;
+        _pendingUploadName = null;
+
+        ConsoleCommandResult result;
+        if (task.IsCompletedSuccessfully)
+            result = ConsoleCommandResult.Ok($"Uploaded recording '{name}' to server.");
+        else if (task.IsFaulted)
+            result = ConsoleCommandResult.Fail($"sendrecording: {task.Exception?.GetBaseException().Message ?? "Upload failed."}");
+        else
+            result = ConsoleCommandResult.Fail("sendrecording: Upload was cancelled.");
+
+        _onUploadCompleted?.Invoke(result);
     }
 
     private void OnLivePolled(InputPollResult poll, float deltaTime)

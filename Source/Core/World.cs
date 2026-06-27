@@ -154,7 +154,8 @@ public class World : IScene
                 _inputSystem.RestoreGameplayMouse();
             },
             () => PlayerSnapshotApplication.From(_player),
-            snapshot => snapshot.ApplyTo(_player));
+            snapshot => snapshot.ApplyTo(_player),
+            result => _runtimeConsole.WriteFeedback(result));
         _playerSystem.ConfigureLifecycle(
             () => _consoleOverlay.IsOpen,
             () => _ = RestartCurrentLevel(),
