@@ -78,6 +78,13 @@ public sealed class RuntimeConsoleService
         return result;
     }
 
+    public void WriteFeedback(ConsoleCommandResult result)
+    {
+        _output.WriteLine(result.Message);
+        foreach (var row in result.Rows)
+            _output.WriteLine(row);
+    }
+
     public IReadOnlyList<string> GetCompletions(string line, int cursor)
     {
         cursor = Math.Clamp(cursor, 0, line.Length);
