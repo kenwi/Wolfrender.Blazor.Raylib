@@ -1,5 +1,4 @@
 using System.Net.Http.Json;
-using System.Text.Json;
 
 namespace Game.Features.Recording;
 
@@ -30,10 +29,10 @@ public sealed class RecordingUploadClient
             throw new InvalidOperationException(sanitizeError);
 
         var recording = RecFileSerializer.Read(localFilePath);
-        var payload = new RecordingUploadRequest
+        var payload = new RecordingUploadWireRequest
         {
             Name = sanitizedName,
-            Recording = recording
+            Recording = RecFileWire.From(recording)
         };
 
         using var response = await _httpClient.PostAsJsonAsync(
@@ -55,7 +54,7 @@ public sealed class RecordingUploadClient
         {
             try
             {
-                using var doc = JsonDocument.Parse(body);
+                using var doc = System.Text.Json.JsonDocument.Parse(body);
                 if (doc.RootElement.TryGetProperty("error", out var errorProp))
                 {
                     var message = errorProp.GetString();
@@ -63,7 +62,7 @@ public sealed class RecordingUploadClient
                         return message;
                 }
             }
-            catch (JsonException)
+            catch (System.Text.Json.JsonException)
             {
                 return body;
             }

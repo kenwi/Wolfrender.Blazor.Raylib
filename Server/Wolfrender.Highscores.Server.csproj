@@ -15,6 +15,7 @@
     <Compile Include="..\Source\Features\Recording\RecFile.cs" Link="Recording\RecFile.cs" />
     <Compile Include="..\Source\Features\Recording\RecFileSerializer.cs" Link="Recording\RecFileSerializer.cs" />
     <Compile Include="..\Source\Features\Recording\RecordingNameSanitizer.cs" Link="Recording\RecordingNameSanitizer.cs" />
+    <Compile Include="..\Source\Features\Recording\RecordingWire.cs" Link="Recording\RecordingWire.cs" />
     <Compile Include="..\Source\Features\Recording\RecordingUploadRequest.cs" Link="Recording\RecordingUploadRequest.cs" />
   </ItemGroup>
 

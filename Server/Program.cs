@@ -1,6 +1,7 @@
 using Game.Features.Highscores.Shared;
 using Game.Features.Recording;
 using Microsoft.AspNetCore.HttpOverrides;
+using System.Text.Json;
 using Wolfrender.Highscores.Server;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -49,7 +50,8 @@ startupLogger.LogInformation(
     Path.GetFullPath(recordingsDirectory),
     string.Join(", ", app.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? []));
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+    app.UseHttpsRedirection();
 app.UseCors();
 
 app.MapPost("/api/scores", async (
@@ -150,7 +152,7 @@ app.MapGet("/api/scores/{levelId}", async (
 });
 
 app.MapPost("/api/recordings", async (
-    RecordingUploadRequest request,
+    HttpRequest httpRequest,
     FileRecordingStore store,
     HttpContext httpContext,
     ILogger<Program> logger,
@@ -159,13 +161,43 @@ app.MapPost("/api/recordings", async (
     var clientIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
     var origin = httpContext.Request.Headers.Origin.ToString();
 
+    RecordingUploadWireRequest request;
+    try
+    {
+        request = await httpRequest.ReadFromJsonAsync<RecordingUploadWireRequest>(
+            RecFileSerializer.JsonOptions,
+            cancellationToken) ?? throw new JsonException("Recording upload body is empty.");
+    }
+    catch (JsonException ex)
+    {
+        logger.LogWarning(ex, "POST /api/recordings rejected: invalid JSON");
+        return Results.BadRequest(new { error = $"Invalid recording JSON: {ex.Message}" });
+    }
+
     logger.LogInformation(
         "POST /api/recordings request: ClientIp={ClientIp}, Origin={Origin}, Name={Name}",
         clientIp,
         string.IsNullOrEmpty(origin) ? "(none)" : origin,
         request.Name);
 
-    if (!RecordingSubmissionHandler.TryPrepare(request, logger, out var normalized, out var error))
+    RecFile recording;
+    try
+    {
+        recording = request.Recording.ToRecFile();
+    }
+    catch (Exception ex)
+    {
+        logger.LogWarning(ex, "POST /api/recordings rejected: invalid recording payload");
+        return Results.BadRequest(new { error = ex.Message });
+    }
+
+    var upload = new RecordingUploadRequest
+    {
+        Name = request.Name,
+        Recording = recording
+    };
+
+    if (!RecordingSubmissionHandler.TryPrepare(upload, logger, out var normalized, out var error))
     {
         logger.LogWarning(
             "POST /api/recordings rejected: ClientIp={ClientIp}, Name={Name}, Error={Error}",
