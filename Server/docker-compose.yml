@@ -9,6 +9,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://0.0.0.0:5080
       Highscores__FilePath: /data/highscores.json
+      Recordings__Directory: /data/recordings
       TZ: ${TZ:-UTC}
     volumes:
       - ./data:/data

@@ -1,6 +1,7 @@
 using System.Numerics;
 using Game.Core.Level;
 using Game.Features.LevelProgress;
+using Game.Features.Recording;
 
 namespace Game.DebugConsole;
 
@@ -20,6 +21,7 @@ public static class ConsoleSelfTests
         TestLevelCatalogNormalizePath();
         TestObjectSpritesLayout();
         TestSecretWallJsonRoundTrip();
+        TestRecFileRoundTrip();
     }
 
     private static void TestParserQuotedArgs()
@@ -145,6 +147,51 @@ public static class ConsoleSelfTests
         LevelSerializer.DeserializeFromJson(loaded, """{"Width":4,"Height":4,"Floor":[],"Walls":[],"Ceiling":[],"Doors":[],"Objects":[]}""");
         if (loaded.SecretWalls.Count != 0)
             throw new InvalidOperationException("Missing SecretWalls key should deserialize to empty list.");
+    }
+
+    private static void TestRecFileRoundTrip()
+    {
+        var events = new InputEvent[]
+        {
+            new KeyDownEvent(0f, GameplayKey.MoveForward),
+            new MouseDeltaEvent(0.016f, 2f, -1f),
+            new KeyUpEvent(0.5f, GameplayKey.MoveForward)
+        };
+
+        var file = new RecFile
+        {
+            Version = RecFile.CurrentVersion,
+            LevelPath = "resources/test.json",
+            MouseSensitivity = 1.25f,
+            PlayerSnapshot = new PlayerSnapshot
+            {
+                PositionX = 1f,
+                PositionY = 2f,
+                PositionZ = 3f,
+                ForwardX = 0f,
+                ForwardY = 0f,
+                ForwardZ = 1f
+            },
+            Events = events
+        };
+
+        string path = Path.Combine(Path.GetTempPath(), $"wolfrender-rec-test-{Guid.NewGuid():N}.rec");
+        try
+        {
+            RecFileSerializer.Write(path, file);
+            var loaded = RecFileSerializer.Read(path);
+            if (loaded.LevelPath != file.LevelPath || loaded.MouseSensitivity != file.MouseSensitivity)
+                throw new InvalidOperationException("RecFile header round-trip mismatch.");
+            if (loaded.PlayerSnapshot?.PositionX != 1f || loaded.PlayerSnapshot?.ForwardZ != 1f)
+                throw new InvalidOperationException("RecFile player snapshot round-trip mismatch.");
+            if (loaded.Events.Count != events.Length)
+                throw new InvalidOperationException("RecFile event count round-trip mismatch.");
+        }
+        finally
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
     }
 
     private sealed class TestTarget

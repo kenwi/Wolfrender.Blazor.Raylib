@@ -16,7 +16,12 @@ public sealed class RuntimeConsoleService
         Func<ConsoleCommandResult> restartCurrentLevel,
         Func<ConsoleCommandResult> clearConsoleScrollback,
         Func<string> getCurrentLevelPath,
-        Func<ConsoleCommandResult> listPickups)
+        Func<ConsoleCommandResult> listPickups,
+        Func<string, ConsoleCommandResult> startRecording,
+        Func<ConsoleCommandResult> stopRecording,
+        Func<string, ConsoleCommandResult> startReplay,
+        Func<ConsoleCommandResult> stopReplay,
+        Func<string, ConsoleCommandResult> sendRecording)
     {
         _output = output;
 
@@ -29,7 +34,12 @@ public sealed class RuntimeConsoleService
             new LoadCommand(),
             new ListLevelsCommand(),
             new RestartLevelCommand(),
-            new ClearCommand()
+            new ClearCommand(),
+            new RecordCommand(),
+            new StopRecordCommand(),
+            new ReplayCommand(),
+            new StopReplayCommand(),
+            new SendRecordingCommand()
         };
 
         _dispatcher = new ConsoleCommandDispatcher(commands);
@@ -41,7 +51,12 @@ public sealed class RuntimeConsoleService
             ClearConsoleScrollback = clearConsoleScrollback,
             GetAllCommands = () => _dispatcher.Commands,
             GetCurrentLevelPath = getCurrentLevelPath,
-            ListPickups = listPickups
+            ListPickups = listPickups,
+            StartRecording = startRecording,
+            StopRecording = stopRecording,
+            StartReplay = startReplay,
+            StopReplay = stopReplay,
+            SendRecording = sendRecording
         };
     }
 

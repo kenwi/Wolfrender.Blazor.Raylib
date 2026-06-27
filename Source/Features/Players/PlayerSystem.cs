@@ -103,7 +103,7 @@ public sealed class PlayerSystem
         _weaponSystem.Update(deltaTime);
         _player.WeaponCooldownRemaining = MathF.Max(0f, _player.WeaponCooldownRemaining - deltaTime);
 
-        UpdateVelocity(deltaTime);
+        UpdateVelocity(deltaTime, input);
         MoveWithCollision(deltaTime);
         _pickupSystem.Update(_player);
 
@@ -137,9 +137,9 @@ public sealed class PlayerSystem
         TryRestartFromGameOver();
     }
 
-    private void UpdateVelocity(float deltaTime)
+    private void UpdateVelocity(float deltaTime, InputState input)
     {
-        Vector3 moveDirection = _inputSystem.GetMoveDirection(_player.Camera);
+        Vector3 moveDirection = _inputSystem.GetMoveDirection(_player.Camera, input);
         Vector3 targetVelocity = moveDirection * _player.MoveSpeed;
         float rate = targetVelocity.LengthSquared() > 0f ? _player.MoveAcceleration : _player.MoveDeceleration;
         _player.Velocity = MoveToward(_player.Velocity, targetVelocity, rate * deltaTime);
