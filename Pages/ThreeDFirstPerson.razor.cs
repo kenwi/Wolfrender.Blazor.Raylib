@@ -103,12 +103,12 @@ public partial class ThreeDFirstPerson : IDisposable
 
     private async void Render(float delta)
     {
-        if (IsKeyPressed(KeyboardKey.I))
-        {
-            ShowDebugLogUI = !ShowDebugLogUI;
-            await InvokeAsync(ScrollLogToBottom);
-            await InvokeAsync(StateHasChanged);
-        }
+        // if (IsKeyPressed(KeyboardKey.I))
+        // {
+        //     ShowDebugLogUI = !ShowDebugLogUI;
+        //     await InvokeAsync(ScrollLogToBottom);
+        //     await InvokeAsync(StateHasChanged);
+        // }
 
         var deltaTime = GetFrameTime();
         _activeScene?.Update(deltaTime);
