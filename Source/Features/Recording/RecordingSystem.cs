@@ -207,6 +207,13 @@ public sealed class RecordingSystem
         return ConsoleCommandResult.Ok($"Uploading recording '{sanitizedName}'...");
     }
 
+    public static IReadOnlyList<string> ListRecordings()
+    {
+        return Directory.GetFiles(DemosFolder, "*.rec")
+            .Select(path => Path.GetFileNameWithoutExtension(path))
+            .ToList();
+    }
+
     public void Update(float deltaTime)
     {
         if (IsReplaying && _replayProvider.IsFinished)

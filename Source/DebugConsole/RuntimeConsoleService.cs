@@ -39,7 +39,8 @@ public sealed class RuntimeConsoleService
             new StopRecordCommand(),
             new ReplayCommand(),
             new StopReplayCommand(),
-            new SendRecordingCommand()
+            new SendRecordingCommand(),
+            new ListRecordingsCommand()
         };
 
         _dispatcher = new ConsoleCommandDispatcher(commands);
