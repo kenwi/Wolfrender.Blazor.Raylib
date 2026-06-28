@@ -3,6 +3,7 @@ WORKDIR /src
 
 COPY Server/Wolfrender.Highscores.Server.csproj Server/
 COPY Source/Features/Highscores/Shared/ Source/Features/Highscores/Shared/
+COPY Source/Features/Recording/ Source/Features/Recording/
 
 WORKDIR /src/Server
 RUN dotnet restore Wolfrender.Highscores.Server.csproj
