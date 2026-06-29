@@ -5,7 +5,7 @@ namespace Game.Features.Recording;
 
 public sealed class RecordingSystem
 {
-    private const string DemosFolder = "demos";
+    private const string RecordingsFolder = "recordings";
 
     private readonly InputSystem _inputSystem;
     private readonly LiveInputProvider _liveProvider;
@@ -82,7 +82,7 @@ public sealed class RecordingSystem
 
         _recorder.Reset();
         _recordingPlayerSnapshot = _capturePlayerSnapshot();
-        _recordingPath = ResolveDemoPath(filename);
+        _recordingPath = ResolveRecordingPath(filename);
         _recordingLevelPath = _getCurrentLevelPath();
         _recordingMouseSensitivity = mouseSensitivity;
 
@@ -139,7 +139,7 @@ public sealed class RecordingSystem
         if (string.IsNullOrWhiteSpace(filename))
             return ConsoleCommandResult.Fail("Usage: replay <filename>");
 
-        string path = ResolveDemoPath(filename);
+        string path = ResolveRecordingPath(filename);
 
         try
         {
@@ -195,7 +195,7 @@ public sealed class RecordingSystem
         if (!RecordingNameSanitizer.TrySanitize(filename, out var sanitizedName, out var sanitizeError))
             return ConsoleCommandResult.Fail(sanitizeError);
 
-        string path = ResolveDemoPath(filename);
+        string path = ResolveRecordingPath(filename);
         if (!File.Exists(path))
             return ConsoleCommandResult.Fail($"Recording not found: '{path}'.");
 
@@ -209,7 +209,8 @@ public sealed class RecordingSystem
 
     public static IReadOnlyList<string> ListRecordings()
     {
-        return Directory.GetFiles(DemosFolder, "*.rec")
+        EnsureRecordingsFolderExists();
+        return Directory.GetFiles(RecordingsFolder, "*.rec")
             .Select(path => Path.GetFileNameWithoutExtension(path))
             .ToList();
     }
@@ -266,7 +267,12 @@ public sealed class RecordingSystem
         _recorder.Reset();
     }
 
-    private static string ResolveDemoPath(string filename)
+    private static void EnsureRecordingsFolderExists()
+    {
+        Directory.CreateDirectory(RecordingsFolder);
+    }
+
+    private static string ResolveRecordingPath(string filename)
     {
         filename = filename.Trim();
         if (Path.IsPathRooted(filename) || filename.Contains(Path.DirectorySeparatorChar) || filename.Contains('/'))
@@ -275,6 +281,6 @@ public sealed class RecordingSystem
         if (!filename.EndsWith(".rec", StringComparison.OrdinalIgnoreCase))
             filename += ".rec";
 
-        return Path.Combine(DemosFolder, filename);
+        return Path.Combine(RecordingsFolder, filename);
     }
 }
