@@ -41,6 +41,7 @@ public sealed class RuntimeConsoleService
             new RecordCommand(),
             new StopRecordCommand(),
             new ReplayCommand(),
+            new DemoCommand(),
             new StopReplayCommand(),
             new SendRecordingCommand(),
             new ListRecordingsCommand(),

@@ -772,6 +772,11 @@ public class World : IScene
 
         if (_tickDiagnostics.OverlayEnabled)
             TickDiagnosticsHud.Draw(_tickDiagnostics);
+
+        RecordingStatusHud.Draw(
+            _recordingSystem.IsRecording,
+            _recordingSystem.IsReplaying,
+            screenWidth);
     }
 
     private void RenderPlayHud(int screenWidth, int screenHeight)

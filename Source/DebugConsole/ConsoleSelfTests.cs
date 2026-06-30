@@ -22,6 +22,7 @@ public static class ConsoleSelfTests
         TestObjectSpritesLayout();
         TestSecretWallJsonRoundTrip();
         TestRecFileRoundTrip();
+        TestRecFileValidator();
     }
 
     private static void TestParserQuotedArgs()
@@ -199,6 +200,43 @@ public static class ConsoleSelfTests
             if (File.Exists(path))
                 File.Delete(path);
         }
+    }
+
+    private static void TestRecFileValidator()
+    {
+        var valid = new RecFile
+        {
+            Version = RecFile.CurrentVersion,
+            LevelPath = LevelCatalog.DefaultLevelPath,
+            MouseSensitivity = 1f,
+            TickHz = 60,
+            Events = new InputEvent[] { new KeyDownEvent(0f, GameplayKey.MoveForward) { Tick = 1 } }
+        };
+
+        if (!RecFileValidator.TryValidateForReplay(valid, _ => true, out _))
+            throw new InvalidOperationException("Valid recording should pass validation.");
+
+        var badVersion = new RecFile
+        {
+            Version = 99,
+            LevelPath = valid.LevelPath,
+            MouseSensitivity = valid.MouseSensitivity,
+            TickHz = valid.TickHz,
+            Events = valid.Events
+        };
+        if (RecFileValidator.TryValidateForReplay(badVersion, _ => true, out _))
+            throw new InvalidOperationException("Unsupported version should fail validation.");
+
+        var badTick = new RecFile
+        {
+            Version = valid.Version,
+            LevelPath = valid.LevelPath,
+            MouseSensitivity = valid.MouseSensitivity,
+            TickHz = valid.TickHz,
+            Events = new InputEvent[] { new KeyDownEvent(0f, GameplayKey.MoveForward) { Tick = 0 } }
+        };
+        if (RecFileValidator.TryValidateForReplay(badTick, _ => true, out _))
+            throw new InvalidOperationException("Invalid tick index should fail validation.");
     }
 
     private sealed class TestTarget

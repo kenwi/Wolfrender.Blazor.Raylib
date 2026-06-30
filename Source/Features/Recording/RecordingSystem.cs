@@ -1,3 +1,4 @@
+using Game.Core.Level;
 using Game.DebugConsole;
 using Game.Engine.Input;
 
@@ -157,6 +158,9 @@ public sealed class RecordingSystem
         {
             var rec = RecFileSerializer.Read(path);
 
+            if (!RecFileValidator.TryValidateForReplay(rec, LevelExists, out string validationError))
+                return ConsoleCommandResult.Fail($"replay: {validationError}");
+
             if (!string.Equals(rec.LevelPath, _getCurrentLevelPath(), StringComparison.OrdinalIgnoreCase))
             {
                 var loadResult = _loadLevel(rec.LevelPath);
@@ -194,6 +198,11 @@ public sealed class RecordingSystem
 
             return ConsoleCommandResult.Ok(
                 $"Replaying '{path}' ({rec.Events.Count} events, level '{rec.LevelPath}', {tickNote}, {timingNote}, {snapshotNote}).");
+        }
+        catch (InvalidDataException ex)
+        {
+            StopReplayInternal(restoreControls: true);
+            return ConsoleCommandResult.Fail($"replay: {ex.Message}");
         }
         catch (Exception ex)
         {
@@ -298,6 +307,9 @@ public sealed class RecordingSystem
     {
         Directory.CreateDirectory(RecordingsFolder);
     }
+
+    private static bool LevelExists(string levelPath) =>
+        LevelCatalog.TryResolve(levelPath, out _, out _);
 
     private static string ResolveRecordingPath(string filename)
     {
