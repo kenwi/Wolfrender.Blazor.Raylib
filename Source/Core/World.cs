@@ -565,6 +565,7 @@ public class World : IScene
     private void SimulateGameplayTick(float fixedDeltaTime)
     {
         var poll = _recordingSystem.ActiveProvider.Poll(fixedDeltaTime);
+        _recordingSystem.CaptureTick(poll, _simulationClock.TickIndex);
         _inputState = poll.InputState;
         var mouseDelta = poll.MouseDelta;
 

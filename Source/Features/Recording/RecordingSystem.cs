@@ -38,7 +38,6 @@ public sealed class RecordingSystem
         _inputSystem = inputSystem;
         _liveProvider = new LiveInputProvider(inputSystem);
         _activeProvider = _liveProvider;
-        _liveProvider.Polled += OnLivePolled;
     }
 
     public IInputProvider ActiveProvider => _activeProvider;
@@ -110,6 +109,7 @@ public sealed class RecordingSystem
             float duration = _recorder.Duration;
             int eventCount = _recorder.Events.Count;
             int tickHz = _getSimulationTickHz();
+            long durationTicks = _recorder.DurationTicks;
             var file = new RecFile
             {
                 Version = RecFile.CurrentVersion,
@@ -124,7 +124,7 @@ public sealed class RecordingSystem
             RecFileSerializer.Write(path, file);
             ClearRecordingState();
             return ConsoleCommandResult.Ok(
-                $"Saved recording '{path}' ({eventCount} events, {duration:F2}s, {tickHz} Hz).");
+                $"Saved recording '{path}' ({eventCount} events, {durationTicks} ticks, {duration:F2}s, {tickHz} Hz).");
         }
         catch (Exception ex)
         {
@@ -177,7 +177,7 @@ public sealed class RecordingSystem
 
             _applyMouseSensitivity(rec.MouseSensitivity);
             _inputSystem.DisableMouse();
-            _replayProvider.Reset(rec.Events);
+            _replayProvider.Reset(rec.Events, rec.UsesTickIndexedEvents);
             _activeProvider = _replayProvider;
 
             string snapshotNote = rec.PlayerSnapshot != null
@@ -188,8 +188,12 @@ public sealed class RecordingSystem
                 ? $"{replayTickHz} Hz"
                 : $"{replayTickHz} Hz (legacy, assumed default)";
 
+            string timingNote = rec.UsesTickIndexedEvents
+                ? "tick-indexed events"
+                : "time-indexed events (legacy)";
+
             return ConsoleCommandResult.Ok(
-                $"Replaying '{path}' ({rec.Events.Count} events, level '{rec.LevelPath}', {tickNote}, {snapshotNote}).");
+                $"Replaying '{path}' ({rec.Events.Count} events, level '{rec.LevelPath}', {tickNote}, {timingNote}, {snapshotNote}).");
         }
         catch (Exception ex)
         {
@@ -263,12 +267,12 @@ public sealed class RecordingSystem
         _onUploadCompleted?.Invoke(result);
     }
 
-    private void OnLivePolled(InputPollResult poll, float deltaTime)
+    public void CaptureTick(InputPollResult poll, long tickIndex)
     {
-        if (!IsRecording)
+        if (!IsRecording || _getSimulationTickHz == null)
             return;
 
-        _recorder.CaptureFrame(poll, deltaTime);
+        _recorder.CaptureTick(poll, tickIndex, _getSimulationTickHz());
     }
 
     private void StopReplayInternal(bool restoreControls)

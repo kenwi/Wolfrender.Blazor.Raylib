@@ -153,9 +153,9 @@ public static class ConsoleSelfTests
     {
         var events = new InputEvent[]
         {
-            new KeyDownEvent(0f, GameplayKey.MoveForward),
-            new MouseDeltaEvent(0.016f, 2f, -1f),
-            new KeyUpEvent(0.5f, GameplayKey.MoveForward)
+            new KeyDownEvent(0f, GameplayKey.MoveForward) { Tick = 1 },
+            new MouseDeltaEvent(0.016f, 2f, -1f) { Tick = 2 },
+            new KeyUpEvent(0.5f, GameplayKey.MoveForward) { Tick = 30 }
         };
 
         var file = new RecFile
@@ -185,6 +185,10 @@ public static class ConsoleSelfTests
                 throw new InvalidOperationException("RecFile header round-trip mismatch.");
             if (loaded.ResolveTickHz() != 60)
                 throw new InvalidOperationException("RecFile tickHz round-trip mismatch.");
+            if (!loaded.UsesTickIndexedEvents)
+                throw new InvalidOperationException("RecFile should use tick-indexed events.");
+            if (loaded.Events[0].Tick != 1 || loaded.Events[^1].Tick != 30)
+                throw new InvalidOperationException("RecFile event tick round-trip mismatch.");
             if (loaded.PlayerSnapshot?.PositionX != 1f || loaded.PlayerSnapshot?.ForwardZ != 1f)
                 throw new InvalidOperationException("RecFile player snapshot round-trip mismatch.");
             if (loaded.Events.Count != events.Length)

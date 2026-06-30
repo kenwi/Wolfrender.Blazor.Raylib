@@ -11,8 +11,6 @@ public sealed class LiveInputProvider : IInputProvider
         _inputSystem = inputSystem;
     }
 
-    public event Action<InputPollResult, float>? Polled;
-
     public InputPollResult Poll(float deltaTime)
     {
         var state = _inputSystem.GetInputState();
@@ -20,8 +18,6 @@ public sealed class LiveInputProvider : IInputProvider
         if (state.IsMouseFree)
             mouseDelta = System.Numerics.Vector2.Zero;
 
-        var result = new InputPollResult(state, mouseDelta);
-        Polled?.Invoke(result, deltaTime);
-        return result;
+        return new InputPollResult(state, mouseDelta);
     }
 }

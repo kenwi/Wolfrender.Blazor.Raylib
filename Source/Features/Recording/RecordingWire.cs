@@ -40,7 +40,11 @@ public sealed class RecFileWire
                 RecordingSimulationDefaults.MaxTickHz)
             : RecordingSimulationDefaults.DefaultTickHz;
 
-        var events = Events.Select(e => e.ToEvent()).OrderBy(e => e.Time).ToList();
+        var events = Events.Select(e => e.ToEvent()).ToList();
+        if (Version >= 4)
+            events = events.OrderBy(e => e.Tick).ThenBy(e => e.Time).ToList();
+        else
+            events = events.OrderBy(e => e.Time).ToList();
         return new RecFile
         {
             Version = Version,
@@ -56,6 +60,7 @@ public sealed class RecFileWire
 public sealed class RecEventWire
 {
     public InputEventKind Kind { get; init; }
+    public long Tick { get; init; } = -1;
     public float Time { get; init; }
     public GameplayKey? Key { get; init; }
     public float? Dx { get; init; }
@@ -63,11 +68,12 @@ public sealed class RecEventWire
 
     public static RecEventWire From(InputEvent evt) => evt switch
     {
-        KeyDownEvent down => new RecEventWire { Kind = InputEventKind.KeyDown, Time = down.Time, Key = down.Key },
-        KeyUpEvent up => new RecEventWire { Kind = InputEventKind.KeyUp, Time = up.Time, Key = up.Key },
+        KeyDownEvent down => new RecEventWire { Kind = InputEventKind.KeyDown, Tick = down.Tick, Time = down.Time, Key = down.Key },
+        KeyUpEvent up => new RecEventWire { Kind = InputEventKind.KeyUp, Tick = up.Tick, Time = up.Time, Key = up.Key },
         MouseDeltaEvent delta => new RecEventWire
         {
             Kind = InputEventKind.MouseDelta,
+            Tick = delta.Tick,
             Time = delta.Time,
             Dx = delta.Dx,
             Dy = delta.Dy
@@ -77,9 +83,9 @@ public sealed class RecEventWire
 
     public InputEvent ToEvent() => Kind switch
     {
-        InputEventKind.KeyDown when Key.HasValue => new KeyDownEvent(Time, Key.Value),
-        InputEventKind.KeyUp when Key.HasValue => new KeyUpEvent(Time, Key.Value),
-        InputEventKind.MouseDelta when Dx.HasValue && Dy.HasValue => new MouseDeltaEvent(Time, Dx.Value, Dy.Value),
+        InputEventKind.KeyDown when Key.HasValue => new KeyDownEvent(Time, Key.Value) { Tick = Tick },
+        InputEventKind.KeyUp when Key.HasValue => new KeyUpEvent(Time, Key.Value) { Tick = Tick },
+        InputEventKind.MouseDelta when Dx.HasValue && Dy.HasValue => new MouseDeltaEvent(Time, Dx.Value, Dy.Value) { Tick = Tick },
         _ => throw new InvalidDataException($"Invalid event payload for kind '{Kind}'.")
     };
 }

@@ -2,7 +2,7 @@ namespace Game.Features.Recording;
 
 public sealed class RecFile
 {
-    public const int CurrentVersion = 3;
+    public const int CurrentVersion = 4;
 
     public required int Version { get; init; }
     public required string LevelPath { get; init; }
@@ -15,4 +15,6 @@ public sealed class RecFile
         Version >= 3
             ? Math.Clamp(TickHz, RecordingSimulationDefaults.MinTickHz, RecordingSimulationDefaults.MaxTickHz)
             : RecordingSimulationDefaults.DefaultTickHz;
+
+    public bool UsesTickIndexedEvents => Version >= 4;
 }

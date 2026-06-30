@@ -7,7 +7,12 @@ public enum InputEventKind
     MouseDelta
 }
 
-public abstract record InputEvent(float Time, InputEventKind Kind);
+public abstract record InputEvent(float Time, InputEventKind Kind)
+{
+    public long Tick { get; init; } = -1;
+
+    public bool UsesTickTiming => Tick >= 0;
+}
 
 public sealed record KeyDownEvent(float Time, GameplayKey Key) : InputEvent(Time, InputEventKind.KeyDown);
 
