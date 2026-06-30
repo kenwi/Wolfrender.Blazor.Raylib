@@ -65,6 +65,8 @@ public class World : IScene
     private bool _hasSceneRenderTexture;
     private bool _hasHudRenderTexture;
     private InputState _inputState = new();
+    private SimulationPose _previousSimulationPose;
+    private SimulationPose _currentSimulationPose;
 
     public Player Player => _player;
     public PlayerSystem PlayerSystem => _playerSystem;
@@ -157,13 +159,20 @@ public class World : IScene
                 _inputSystem.RestoreGameplayMouse();
             },
             () => PlayerSnapshotApplication.From(_player),
-            snapshot => snapshot.ApplyTo(_player),
+            snapshot =>
+            {
+                snapshot.ApplyTo(_player);
+                ResetSimulationPoses();
+            },
+            () => _simulationClock.TickHz,
+            tickHz => _simulationClock.SetTickHz(tickHz),
             result => _runtimeConsole.WriteFeedback(result));
         _playerSystem.ConfigureLifecycle(
             () => _consoleOverlay.IsOpen,
             () => _ = RestartCurrentLevel(),
             () => _highscoreIntermission.IsBlockingRestart);
         _playerSystem.ResetForLevelLoad(_mapData);
+        ResetSimulationPoses();
         _exitSystem.Rebuild(_mapData);
         _secretSystem.Rebuild(_mapData);
 
@@ -425,6 +434,7 @@ public class World : IScene
         _effectSystem.Clear();
         _simulationClock.Reset();
         _tickDiagnostics.Reset();
+        ResetSimulationPoses();
 
         if (OperatingSystem.IsBrowser())
             _highscoreClient.PrefetchLeaderboardAccess(_currentLevelPath);
@@ -577,6 +587,31 @@ public class World : IScene
             _playerSystem.UpdateDead(fixedDeltaTime, _inputState, mouseDelta);
             _enemySystem.Update(fixedDeltaTime, _inputState);
         }
+
+        AdvanceSimulationPose();
+    }
+
+    private void ResetSimulationPoses()
+    {
+        _previousSimulationPose = SimulationPose.FromPlayer(_player);
+        _currentSimulationPose = _previousSimulationPose;
+    }
+
+    private void AdvanceSimulationPose()
+    {
+        _previousSimulationPose = _currentSimulationPose;
+        _currentSimulationPose = SimulationPose.FromPlayer(_player);
+    }
+
+    private SimulationPose GetRenderPose()
+    {
+        if (!_player.IsAlive || _exitSystem.IsBlockingGameplay)
+            return SimulationPose.FromPlayer(_player);
+
+        return SimulationPose.Lerp(
+            _previousSimulationPose,
+            _currentSimulationPose,
+            _simulationClock.InterpolationAlpha);
     }
 
     public ConsoleCommandResult ToggleTickDiagnostics()
@@ -638,16 +673,21 @@ public class World : IScene
 
     private void RenderSceneToTexture()
     {
+        var renderPose = GetRenderPose();
+        var renderCamera = renderPose.ToCamera(_player.Camera);
+        var renderPosition = renderPose.Position;
+        var renderTarget = renderCamera.Target;
+
         var mapLights = TileLightCollector.Collect(_mapData);
         var activeTileLights = TileLightCollector.SelectNearest(
             mapLights,
-            _player.Position,
+            renderPosition,
             LightObjectEncoding.MaxShaderLights);
-        PrimitiveRenderer.SetLightingParameters(_player.Position, tileLights: activeTileLights);
+        PrimitiveRenderer.SetLightingParameters(renderPosition, tileLights: activeTileLights);
         var lightingShader = PrimitiveRenderer.GetLightingShader();
 
         BeginTextureMode(_sceneRenderTexture);
-        BeginMode3D(_player.Camera);
+        BeginMode3D(renderCamera);
         ClearBackground(Color.Black);
 
         if (lightingShader.HasValue)
@@ -657,18 +697,18 @@ public class World : IScene
         }
 
         _renderSystem.Render(
-            _player.Camera,
+            renderCamera,
             _sceneRenderTexture.Texture.Width,
             _sceneRenderTexture.Texture.Height);
-        _secretSystem.Render(_player.Camera.Position);
+        _secretSystem.Render(renderPosition);
         _doorSystem.Render();
         _animationSystem.Render();
 
         if (lightingShader.HasValue)
             EndShaderMode();
 
-        _placedObjectSystem.Render(_player.Camera.Position, _player.Camera.Target);
-        _pickupSystem.Render(_player.Camera.Position, _player.Camera.Target);
+        _placedObjectSystem.Render(renderPosition, renderTarget);
+        _pickupSystem.Render(renderPosition, renderTarget);
         Debug.Draw3DOverlays(_inputState.IsDebugEnabled);
 
         EndMode3D();

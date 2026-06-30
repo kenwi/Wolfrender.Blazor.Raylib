@@ -163,6 +163,7 @@ public static class ConsoleSelfTests
             Version = RecFile.CurrentVersion,
             LevelPath = "resources/test.json",
             MouseSensitivity = 1.25f,
+            TickHz = 60,
             PlayerSnapshot = new PlayerSnapshot
             {
                 PositionX = 1f,
@@ -182,6 +183,8 @@ public static class ConsoleSelfTests
             var loaded = RecFileSerializer.Read(path);
             if (loaded.LevelPath != file.LevelPath || loaded.MouseSensitivity != file.MouseSensitivity)
                 throw new InvalidOperationException("RecFile header round-trip mismatch.");
+            if (loaded.ResolveTickHz() != 60)
+                throw new InvalidOperationException("RecFile tickHz round-trip mismatch.");
             if (loaded.PlayerSnapshot?.PositionX != 1f || loaded.PlayerSnapshot?.ForwardZ != 1f)
                 throw new InvalidOperationException("RecFile player snapshot round-trip mismatch.");
             if (loaded.Events.Count != events.Length)

@@ -11,6 +11,7 @@ public sealed class RecFileWire
     public int Version { get; init; }
     public string LevelPath { get; init; } = string.Empty;
     public float MouseSensitivity { get; init; }
+    public int TickHz { get; init; }
     public PlayerSnapshot? Player { get; init; }
     public List<RecEventWire> Events { get; init; } = new();
 
@@ -19,17 +20,25 @@ public sealed class RecFileWire
         Version = file.Version,
         LevelPath = file.LevelPath,
         MouseSensitivity = file.MouseSensitivity,
+        TickHz = file.ResolveTickHz(),
         Player = file.PlayerSnapshot,
         Events = file.Events.Select(RecEventWire.From).ToList()
     };
 
     public RecFile ToRecFile()
     {
-        if (Version is not 1 and not RecFile.CurrentVersion)
-            throw new InvalidDataException($"Unsupported recording version {Version} (expected {RecFile.CurrentVersion}).");
+        if (Version < 1 || Version > RecFile.CurrentVersion)
+            throw new InvalidDataException($"Unsupported recording version {Version} (expected 1-{RecFile.CurrentVersion}).");
 
         if (string.IsNullOrWhiteSpace(LevelPath))
             throw new InvalidDataException("Recording is missing levelPath.");
+
+        int tickHz = Version >= 3
+            ? Math.Clamp(
+                TickHz > 0 ? TickHz : RecordingSimulationDefaults.DefaultTickHz,
+                RecordingSimulationDefaults.MinTickHz,
+                RecordingSimulationDefaults.MaxTickHz)
+            : RecordingSimulationDefaults.DefaultTickHz;
 
         var events = Events.Select(e => e.ToEvent()).OrderBy(e => e.Time).ToList();
         return new RecFile
@@ -37,6 +46,7 @@ public sealed class RecFileWire
             Version = Version,
             LevelPath = LevelPath,
             MouseSensitivity = MouseSensitivity,
+            TickHz = tickHz,
             PlayerSnapshot = Player,
             Events = events
         };
