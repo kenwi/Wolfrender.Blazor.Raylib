@@ -2,6 +2,7 @@ using System.Numerics;
 using Game.DebugConsole;
 using Game.Editor;
 using Game.Engine.Movement;
+using Game.Engine.Simulation;
 using Game.Features.Animation;
 using Game.Features.Combat;
 using Game.Features.Doors;
@@ -35,6 +36,8 @@ public class World : IScene
     private readonly List<Texture2D> _gameTextures;
     private readonly InputSystem _inputSystem;
     private readonly RecordingSystem _recordingSystem;
+    private readonly FixedSimulationClock _simulationClock = new();
+    private readonly TickDiagnostics _tickDiagnostics = new();
     private readonly CollisionSystem _collisionSystem;
     private readonly CameraSystem _cameraSystem;
     private readonly DoorSystem _doorSystem;
@@ -62,6 +65,8 @@ public class World : IScene
     private bool _hasSceneRenderTexture;
     private bool _hasHudRenderTexture;
     private InputState _inputState = new();
+    private SimulationPose _previousSimulationPose;
+    private SimulationPose _currentSimulationPose;
 
     public Player Player => _player;
     public PlayerSystem PlayerSystem => _playerSystem;
@@ -154,13 +159,20 @@ public class World : IScene
                 _inputSystem.RestoreGameplayMouse();
             },
             () => PlayerSnapshotApplication.From(_player),
-            snapshot => snapshot.ApplyTo(_player),
+            snapshot =>
+            {
+                snapshot.ApplyTo(_player);
+                ResetSimulationPoses();
+            },
+            () => _simulationClock.TickHz,
+            tickHz => _simulationClock.SetTickHz(tickHz),
             result => _runtimeConsole.WriteFeedback(result));
         _playerSystem.ConfigureLifecycle(
             () => _consoleOverlay.IsOpen,
             () => _ = RestartCurrentLevel(),
             () => _highscoreIntermission.IsBlockingRestart);
         _playerSystem.ResetForLevelLoad(_mapData);
+        ResetSimulationPoses();
         _exitSystem.Rebuild(_mapData);
         _secretSystem.Rebuild(_mapData);
 
@@ -420,6 +432,9 @@ public class World : IScene
         _highscoreIntermission.ResetForLevel();
         _highscoreIntermissionStarted = false;
         _effectSystem.Clear();
+        _simulationClock.Reset();
+        _tickDiagnostics.Reset();
+        ResetSimulationPoses();
 
         if (OperatingSystem.IsBrowser())
             _highscoreClient.PrefetchLeaderboardAccess(_currentLevelPath);
@@ -525,34 +540,17 @@ public class World : IScene
             return;
         }
 
-        var poll = _recordingSystem.ActiveProvider.Poll(deltaTime);
-        _inputState = poll.InputState;
-        var mouseDelta = poll.MouseDelta;
-
         if (!_recordingSystem.IsReplaying)
             _inputSystem.Update();
 
+        _tickDiagnostics.BeginFrame(deltaTime);
+        int ticksThisFrame = _simulationClock.Advance(deltaTime);
+        _tickDiagnostics.RecordSimulationStep(_simulationClock);
+
+        for (int i = 0; i < ticksThisFrame; i++)
+            SimulateGameplayTick(_simulationClock.FixedDeltaTime);
+
         _recordingSystem.Update(deltaTime);
-
-        if (!_exitSystem.IsBlockingGameplay)
-            _scoreSystem.Tick(deltaTime);
-
-        _effectSystem.Update(deltaTime);
-
-        int screenWidth = RenderData.InternalWidth;
-        int screenHeight = RenderData.InternalHeight;
-
-        if (_player.IsAlive)
-        {
-            _playerSystem.UpdateAlive(deltaTime, _inputState, mouseDelta, screenWidth, screenHeight);
-            if (!_exitSystem.IsBlockingGameplay)
-                _enemySystem.Update(deltaTime, _inputState);
-        }
-        else
-        {
-            _playerSystem.UpdateDead(deltaTime, _inputState, mouseDelta);
-            _enemySystem.Update(deltaTime, _inputState);
-        }
 
         if (_exitSystem.IsLevelComplete && !_highscoreIntermissionStarted)
         {
@@ -563,6 +561,80 @@ public class World : IScene
         if (_exitSystem.IsLevelComplete)
             _highscoreIntermission.Update();
     }
+
+    private void SimulateGameplayTick(float fixedDeltaTime)
+    {
+        var poll = _recordingSystem.ActiveProvider.Poll(fixedDeltaTime);
+        _recordingSystem.CaptureTick(poll, _simulationClock.TickIndex);
+        _inputState = poll.InputState;
+        var mouseDelta = poll.MouseDelta;
+
+        if (!_exitSystem.IsBlockingGameplay)
+            _scoreSystem.Tick(fixedDeltaTime);
+
+        _effectSystem.Update(fixedDeltaTime);
+
+        int screenWidth = RenderData.InternalWidth;
+        int screenHeight = RenderData.InternalHeight;
+
+        if (_player.IsAlive)
+        {
+            _playerSystem.UpdateAlive(fixedDeltaTime, _inputState, mouseDelta, screenWidth, screenHeight);
+            if (!_exitSystem.IsBlockingGameplay)
+                _enemySystem.Update(fixedDeltaTime, _inputState);
+        }
+        else
+        {
+            _playerSystem.UpdateDead(fixedDeltaTime, _inputState, mouseDelta);
+            _enemySystem.Update(fixedDeltaTime, _inputState);
+        }
+
+        AdvanceSimulationPose();
+    }
+
+    private void ResetSimulationPoses()
+    {
+        _previousSimulationPose = SimulationPose.FromPlayer(_player);
+        _currentSimulationPose = _previousSimulationPose;
+    }
+
+    private void AdvanceSimulationPose()
+    {
+        _previousSimulationPose = _currentSimulationPose;
+        _currentSimulationPose = SimulationPose.FromPlayer(_player);
+    }
+
+    private SimulationPose GetRenderPose()
+    {
+        if (!_player.IsAlive || _exitSystem.IsBlockingGameplay)
+            return SimulationPose.FromPlayer(_player);
+
+        return SimulationPose.Lerp(
+            _previousSimulationPose,
+            _currentSimulationPose,
+            _simulationClock.InterpolationAlpha);
+    }
+
+    public ConsoleCommandResult ToggleTickDiagnostics()
+    {
+        _tickDiagnostics.OverlayEnabled = !_tickDiagnostics.OverlayEnabled;
+        return ConsoleCommandResult.Ok(
+            _tickDiagnostics.OverlayEnabled
+                ? "Tick diagnostics overlay enabled."
+                : "Tick diagnostics overlay disabled.");
+    }
+
+    public ConsoleCommandResult SetTickDiagnostics(bool enabled)
+    {
+        _tickDiagnostics.OverlayEnabled = enabled;
+        return ConsoleCommandResult.Ok(
+            enabled
+                ? "Tick diagnostics overlay enabled."
+                : "Tick diagnostics overlay disabled.");
+    }
+
+    public ConsoleCommandResult GetTickDiagnosticsStatus() =>
+        ConsoleCommandResult.Ok(_tickDiagnostics.BuildStatusLine());
 
     public ConsoleCommandResult StartRecordingForConsole(string filename, float mouseSensitivity)
     {
@@ -602,16 +674,21 @@ public class World : IScene
 
     private void RenderSceneToTexture()
     {
+        var renderPose = GetRenderPose();
+        var renderCamera = renderPose.ToCamera(_player.Camera);
+        var renderPosition = renderPose.Position;
+        var renderTarget = renderCamera.Target;
+
         var mapLights = TileLightCollector.Collect(_mapData);
         var activeTileLights = TileLightCollector.SelectNearest(
             mapLights,
-            _player.Position,
+            renderPosition,
             LightObjectEncoding.MaxShaderLights);
-        PrimitiveRenderer.SetLightingParameters(_player.Position, tileLights: activeTileLights);
+        PrimitiveRenderer.SetLightingParameters(renderPosition, tileLights: activeTileLights);
         var lightingShader = PrimitiveRenderer.GetLightingShader();
 
         BeginTextureMode(_sceneRenderTexture);
-        BeginMode3D(_player.Camera);
+        BeginMode3D(renderCamera);
         ClearBackground(Color.Black);
 
         if (lightingShader.HasValue)
@@ -621,18 +698,18 @@ public class World : IScene
         }
 
         _renderSystem.Render(
-            _player.Camera,
+            renderCamera,
             _sceneRenderTexture.Texture.Width,
             _sceneRenderTexture.Texture.Height);
-        _secretSystem.Render(_player.Camera.Position);
+        _secretSystem.Render(renderPosition);
         _doorSystem.Render();
         _animationSystem.Render();
 
         if (lightingShader.HasValue)
             EndShaderMode();
 
-        _placedObjectSystem.Render(_player.Camera.Position, _player.Camera.Target);
-        _pickupSystem.Render(_player.Camera.Position, _player.Camera.Target);
+        _placedObjectSystem.Render(renderPosition, renderTarget);
+        _pickupSystem.Render(renderPosition, renderTarget);
         Debug.Draw3DOverlays(_inputState.IsDebugEnabled);
 
         EndMode3D();
@@ -692,6 +769,14 @@ public class World : IScene
 
         var healthLabel = $"HEALTH: {(int)_player.Health} / {(int)_player.MaxHealth}";
         DrawText(healthLabel, 10, 40, 20, _player.IsAlive ? Color.RayWhite : Color.Red);
+
+        if (_tickDiagnostics.OverlayEnabled)
+            TickDiagnosticsHud.Draw(_tickDiagnostics);
+
+        RecordingStatusHud.Draw(
+            _recordingSystem.IsRecording,
+            _recordingSystem.IsReplaying,
+            screenWidth);
     }
 
     private void RenderPlayHud(int screenWidth, int screenHeight)

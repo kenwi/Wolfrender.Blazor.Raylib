@@ -21,7 +21,10 @@ public sealed class RuntimeConsoleService
         Func<ConsoleCommandResult> stopRecording,
         Func<string, ConsoleCommandResult> startReplay,
         Func<ConsoleCommandResult> stopReplay,
-        Func<string, ConsoleCommandResult> sendRecording)
+        Func<string, ConsoleCommandResult> sendRecording,
+        Func<ConsoleCommandResult> toggleTickDiagnostics,
+        Func<bool, ConsoleCommandResult> setTickDiagnostics,
+        Func<ConsoleCommandResult> getTickDiagnosticsStatus)
     {
         _output = output;
 
@@ -38,9 +41,11 @@ public sealed class RuntimeConsoleService
             new RecordCommand(),
             new StopRecordCommand(),
             new ReplayCommand(),
+            new DemoCommand(),
             new StopReplayCommand(),
             new SendRecordingCommand(),
-            new ListRecordingsCommand()
+            new ListRecordingsCommand(),
+            new TickDiagnosticsCommand()
         };
 
         _dispatcher = new ConsoleCommandDispatcher(commands);
@@ -57,7 +62,10 @@ public sealed class RuntimeConsoleService
             StopRecording = stopRecording,
             StartReplay = startReplay,
             StopReplay = stopReplay,
-            SendRecording = sendRecording
+            SendRecording = sendRecording,
+            ToggleTickDiagnostics = toggleTickDiagnostics,
+            SetTickDiagnostics = setTickDiagnostics,
+            GetTickDiagnosticsStatus = getTickDiagnosticsStatus
         };
     }
 

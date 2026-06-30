@@ -1,3 +1,4 @@
+using Game.Core.Level;
 using Game.DebugConsole;
 using Game.Engine.Input;
 
@@ -20,6 +21,8 @@ public sealed class RecordingSystem
     private Action? _restoreControlSettings;
     private Func<PlayerSnapshot>? _capturePlayerSnapshot;
     private Action<PlayerSnapshot>? _applyPlayerSnapshot;
+    private Func<int>? _getSimulationTickHz;
+    private Action<int>? _setSimulationTickHz;
     private Action<ConsoleCommandResult>? _onUploadCompleted;
 
     private Task? _pendingUpload;
@@ -28,6 +31,7 @@ public sealed class RecordingSystem
     private string? _recordingPath;
     private string? _recordingLevelPath;
     private float _recordingMouseSensitivity;
+    private int _tickHzBeforeReplay;
     private PlayerSnapshot? _recordingPlayerSnapshot;
 
     public RecordingSystem(InputSystem inputSystem)
@@ -35,7 +39,6 @@ public sealed class RecordingSystem
         _inputSystem = inputSystem;
         _liveProvider = new LiveInputProvider(inputSystem);
         _activeProvider = _liveProvider;
-        _liveProvider.Polled += OnLivePolled;
     }
 
     public IInputProvider ActiveProvider => _activeProvider;
@@ -50,6 +53,8 @@ public sealed class RecordingSystem
         Action restoreControlSettings,
         Func<PlayerSnapshot> capturePlayerSnapshot,
         Action<PlayerSnapshot> applyPlayerSnapshot,
+        Func<int> getSimulationTickHz,
+        Action<int> setSimulationTickHz,
         Action<ConsoleCommandResult>? onUploadCompleted = null)
     {
         _loadLevel = loadLevel;
@@ -59,6 +64,8 @@ public sealed class RecordingSystem
         _restoreControlSettings = restoreControlSettings;
         _capturePlayerSnapshot = capturePlayerSnapshot;
         _applyPlayerSnapshot = applyPlayerSnapshot;
+        _getSimulationTickHz = getSimulationTickHz;
+        _setSimulationTickHz = setSimulationTickHz;
         _onUploadCompleted = onUploadCompleted;
     }
 
@@ -95,15 +102,21 @@ public sealed class RecordingSystem
         if (!IsRecording || _recordingPath == null || _recordingLevelPath == null)
             return ConsoleCommandResult.Fail("Not currently recording.");
 
+        if (_getSimulationTickHz == null)
+            return ConsoleCommandResult.Fail("Recording system is not configured.");
+
         try
         {
             float duration = _recorder.Duration;
             int eventCount = _recorder.Events.Count;
+            int tickHz = _getSimulationTickHz();
+            long durationTicks = _recorder.DurationTicks;
             var file = new RecFile
             {
                 Version = RecFile.CurrentVersion,
                 LevelPath = _recordingLevelPath,
                 MouseSensitivity = _recordingMouseSensitivity,
+                TickHz = tickHz,
                 PlayerSnapshot = _recordingPlayerSnapshot,
                 Events = _recorder.Events.ToList()
             };
@@ -112,7 +125,7 @@ public sealed class RecordingSystem
             RecFileSerializer.Write(path, file);
             ClearRecordingState();
             return ConsoleCommandResult.Ok(
-                $"Saved recording '{path}' ({eventCount} events, {duration:F2}s).");
+                $"Saved recording '{path}' ({eventCount} events, {durationTicks} ticks, {duration:F2}s, {tickHz} Hz).");
         }
         catch (Exception ex)
         {
@@ -125,7 +138,7 @@ public sealed class RecordingSystem
     {
         if (_loadLevel == null || _restartLevel == null || _getCurrentLevelPath == null
             || _applyMouseSensitivity == null || _restoreControlSettings == null
-            || _applyPlayerSnapshot == null)
+            || _applyPlayerSnapshot == null || _setSimulationTickHz == null || _getSimulationTickHz == null)
         {
             return ConsoleCommandResult.Fail("Recording system is not configured.");
         }
@@ -145,6 +158,9 @@ public sealed class RecordingSystem
         {
             var rec = RecFileSerializer.Read(path);
 
+            if (!RecFileValidator.TryValidateForReplay(rec, LevelExists, out string validationError))
+                return ConsoleCommandResult.Fail($"replay: {validationError}");
+
             if (!string.Equals(rec.LevelPath, _getCurrentLevelPath(), StringComparison.OrdinalIgnoreCase))
             {
                 var loadResult = _loadLevel(rec.LevelPath);
@@ -159,17 +175,34 @@ public sealed class RecordingSystem
             if (rec.PlayerSnapshot != null)
                 _applyPlayerSnapshot(rec.PlayerSnapshot);
 
+            _tickHzBeforeReplay = _getSimulationTickHz();
+            int replayTickHz = rec.ResolveTickHz();
+            _setSimulationTickHz(replayTickHz);
+
             _applyMouseSensitivity(rec.MouseSensitivity);
             _inputSystem.DisableMouse();
-            _replayProvider.Reset(rec.Events);
+            _replayProvider.Reset(rec.Events, rec.UsesTickIndexedEvents);
             _activeProvider = _replayProvider;
 
             string snapshotNote = rec.PlayerSnapshot != null
                 ? "player snapshot restored"
                 : "no player snapshot (legacy recording)";
 
+            string tickNote = rec.Version >= 3
+                ? $"{replayTickHz} Hz"
+                : $"{replayTickHz} Hz (legacy, assumed default)";
+
+            string timingNote = rec.UsesTickIndexedEvents
+                ? "tick-indexed events"
+                : "time-indexed events (legacy)";
+
             return ConsoleCommandResult.Ok(
-                $"Replaying '{path}' ({rec.Events.Count} events, level '{rec.LevelPath}', {snapshotNote}).");
+                $"Replaying '{path}' ({rec.Events.Count} events, level '{rec.LevelPath}', {tickNote}, {timingNote}, {snapshotNote}).");
+        }
+        catch (InvalidDataException ex)
+        {
+            StopReplayInternal(restoreControls: true);
+            return ConsoleCommandResult.Fail($"replay: {ex.Message}");
         }
         catch (Exception ex)
         {
@@ -243,19 +276,22 @@ public sealed class RecordingSystem
         _onUploadCompleted?.Invoke(result);
     }
 
-    private void OnLivePolled(InputPollResult poll, float deltaTime)
+    public void CaptureTick(InputPollResult poll, long tickIndex)
     {
-        if (!IsRecording)
+        if (!IsRecording || _getSimulationTickHz == null)
             return;
 
-        _recorder.CaptureFrame(poll, deltaTime);
+        _recorder.CaptureTick(poll, tickIndex, _getSimulationTickHz());
     }
 
     private void StopReplayInternal(bool restoreControls)
     {
         _activeProvider = _liveProvider;
         if (restoreControls)
+        {
+            _setSimulationTickHz?.Invoke(_tickHzBeforeReplay);
             _restoreControlSettings?.Invoke();
+        }
     }
 
     private void ClearRecordingState()
@@ -271,6 +307,9 @@ public sealed class RecordingSystem
     {
         Directory.CreateDirectory(RecordingsFolder);
     }
+
+    private static bool LevelExists(string levelPath) =>
+        LevelCatalog.TryResolve(levelPath, out _, out _);
 
     private static string ResolveRecordingPath(string filename)
     {

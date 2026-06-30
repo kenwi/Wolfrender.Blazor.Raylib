@@ -26,7 +26,7 @@ public static class RecordingSubmissionHandler
         }
 
         var recording = request.Recording;
-        if (recording.Version is not 1 and not RecFile.CurrentVersion)
+        if (recording.Version < 1 || recording.Version > RecFile.CurrentVersion)
         {
             error = $"Unsupported recording version {recording.Version}.";
             return false;
@@ -52,12 +52,13 @@ public static class RecordingSubmissionHandler
 
         logger.LogInformation(
             "Recording upload accepted: Name={Name}, Version={Version}, LevelPath={LevelPath}, " +
-            "EventCount={EventCount}, MouseSensitivity={MouseSensitivity:F2}, HasPlayerSnapshot={HasPlayerSnapshot}",
+            "EventCount={EventCount}, MouseSensitivity={MouseSensitivity:F2}, TickHz={TickHz}, HasPlayerSnapshot={HasPlayerSnapshot}",
             normalized.Name,
             normalized.Recording.Version,
             normalized.Recording.LevelPath,
             normalized.Recording.Events.Count,
             normalized.Recording.MouseSensitivity,
+            normalized.Recording.ResolveTickHz(),
             normalized.Recording.PlayerSnapshot != null);
 
         return true;
