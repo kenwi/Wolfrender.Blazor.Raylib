@@ -45,7 +45,10 @@ public static class WorldConsoleBindings
             recordingSystem.StopRecording,
             world.StartReplayForConsole,
             recordingSystem.StopReplay,
-            recordingSystem.SendRecording);
+            recordingSystem.SendRecording,
+            world.ToggleTickDiagnostics,
+            world.SetTickDiagnostics,
+            world.GetTickDiagnosticsStatus);
     }
 
     private static IReadOnlyList<RootBinding> CreateRoots(

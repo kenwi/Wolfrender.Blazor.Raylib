@@ -2,6 +2,7 @@ using System.Numerics;
 using Game.DebugConsole;
 using Game.Editor;
 using Game.Engine.Movement;
+using Game.Engine.Simulation;
 using Game.Features.Animation;
 using Game.Features.Combat;
 using Game.Features.Doors;
@@ -35,6 +36,8 @@ public class World : IScene
     private readonly List<Texture2D> _gameTextures;
     private readonly InputSystem _inputSystem;
     private readonly RecordingSystem _recordingSystem;
+    private readonly FixedSimulationClock _simulationClock = new();
+    private readonly TickDiagnostics _tickDiagnostics = new();
     private readonly CollisionSystem _collisionSystem;
     private readonly CameraSystem _cameraSystem;
     private readonly DoorSystem _doorSystem;
@@ -420,6 +423,8 @@ public class World : IScene
         _highscoreIntermission.ResetForLevel();
         _highscoreIntermissionStarted = false;
         _effectSystem.Clear();
+        _simulationClock.Reset();
+        _tickDiagnostics.Reset();
 
         if (OperatingSystem.IsBrowser())
             _highscoreClient.PrefetchLeaderboardAccess(_currentLevelPath);
@@ -525,34 +530,17 @@ public class World : IScene
             return;
         }
 
-        var poll = _recordingSystem.ActiveProvider.Poll(deltaTime);
-        _inputState = poll.InputState;
-        var mouseDelta = poll.MouseDelta;
-
         if (!_recordingSystem.IsReplaying)
             _inputSystem.Update();
 
+        _tickDiagnostics.BeginFrame(deltaTime);
+        int ticksThisFrame = _simulationClock.Advance(deltaTime);
+        _tickDiagnostics.RecordSimulationStep(_simulationClock);
+
+        for (int i = 0; i < ticksThisFrame; i++)
+            SimulateGameplayTick(_simulationClock.FixedDeltaTime);
+
         _recordingSystem.Update(deltaTime);
-
-        if (!_exitSystem.IsBlockingGameplay)
-            _scoreSystem.Tick(deltaTime);
-
-        _effectSystem.Update(deltaTime);
-
-        int screenWidth = RenderData.InternalWidth;
-        int screenHeight = RenderData.InternalHeight;
-
-        if (_player.IsAlive)
-        {
-            _playerSystem.UpdateAlive(deltaTime, _inputState, mouseDelta, screenWidth, screenHeight);
-            if (!_exitSystem.IsBlockingGameplay)
-                _enemySystem.Update(deltaTime, _inputState);
-        }
-        else
-        {
-            _playerSystem.UpdateDead(deltaTime, _inputState, mouseDelta);
-            _enemySystem.Update(deltaTime, _inputState);
-        }
 
         if (_exitSystem.IsLevelComplete && !_highscoreIntermissionStarted)
         {
@@ -563,6 +551,54 @@ public class World : IScene
         if (_exitSystem.IsLevelComplete)
             _highscoreIntermission.Update();
     }
+
+    private void SimulateGameplayTick(float fixedDeltaTime)
+    {
+        var poll = _recordingSystem.ActiveProvider.Poll(fixedDeltaTime);
+        _inputState = poll.InputState;
+        var mouseDelta = poll.MouseDelta;
+
+        if (!_exitSystem.IsBlockingGameplay)
+            _scoreSystem.Tick(fixedDeltaTime);
+
+        _effectSystem.Update(fixedDeltaTime);
+
+        int screenWidth = RenderData.InternalWidth;
+        int screenHeight = RenderData.InternalHeight;
+
+        if (_player.IsAlive)
+        {
+            _playerSystem.UpdateAlive(fixedDeltaTime, _inputState, mouseDelta, screenWidth, screenHeight);
+            if (!_exitSystem.IsBlockingGameplay)
+                _enemySystem.Update(fixedDeltaTime, _inputState);
+        }
+        else
+        {
+            _playerSystem.UpdateDead(fixedDeltaTime, _inputState, mouseDelta);
+            _enemySystem.Update(fixedDeltaTime, _inputState);
+        }
+    }
+
+    public ConsoleCommandResult ToggleTickDiagnostics()
+    {
+        _tickDiagnostics.OverlayEnabled = !_tickDiagnostics.OverlayEnabled;
+        return ConsoleCommandResult.Ok(
+            _tickDiagnostics.OverlayEnabled
+                ? "Tick diagnostics overlay enabled."
+                : "Tick diagnostics overlay disabled.");
+    }
+
+    public ConsoleCommandResult SetTickDiagnostics(bool enabled)
+    {
+        _tickDiagnostics.OverlayEnabled = enabled;
+        return ConsoleCommandResult.Ok(
+            enabled
+                ? "Tick diagnostics overlay enabled."
+                : "Tick diagnostics overlay disabled.");
+    }
+
+    public ConsoleCommandResult GetTickDiagnosticsStatus() =>
+        ConsoleCommandResult.Ok(_tickDiagnostics.BuildStatusLine());
 
     public ConsoleCommandResult StartRecordingForConsole(string filename, float mouseSensitivity)
     {
@@ -692,6 +728,9 @@ public class World : IScene
 
         var healthLabel = $"HEALTH: {(int)_player.Health} / {(int)_player.MaxHealth}";
         DrawText(healthLabel, 10, 40, 20, _player.IsAlive ? Color.RayWhite : Color.Red);
+
+        if (_tickDiagnostics.OverlayEnabled)
+            TickDiagnosticsHud.Draw(_tickDiagnostics);
     }
 
     private void RenderPlayHud(int screenWidth, int screenHeight)
