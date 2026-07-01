@@ -261,7 +261,7 @@ public class LevelEditorScene : IScene
         bool menuToggleSim = _gui.RenderMenuBar(_state.IsSimulating, _state, _state.EnemySystem, _state.DoorSystem, _state.ClearLevel, _state.RefreshLayerReferences);
         if (menuToggleSim) _state.ToggleSimulation();
         _gui.RenderFileDialogs(_state);
-        _gui.RenderLayerPanel(_state.Layers, ref _state.ActiveLayerIndex);
+        _gui.RenderLayerPanel(_state.Layers, _state);
         _gui.RenderTilePalette(_state.Layers, _state.ActiveLayerIndex, _state, ref _state.SelectedTileId, ref _state.SelectedPickupType);
         _gui.RenderPickupPalette(_state);
         _gui.RenderInfoPanel(tileX, tileY, worldPos, tileInBounds, _state.CursorInfoFollowsMouse, _state.Layers);
