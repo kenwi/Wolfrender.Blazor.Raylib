@@ -23,4 +23,5 @@ public sealed class ConsoleCommandContext
     public required Func<ConsoleCommandResult> ToggleFlying { get; init; }
     public required Func<bool, ConsoleCommandResult> SetFlying { get; init; }
     public required Func<ConsoleCommandResult> GetFlyingStatus { get; init; }
+    public required Func<ConsoleCommandResult> DumpLightingCheck { get; init; }
 }

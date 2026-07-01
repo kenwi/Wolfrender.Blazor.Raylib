@@ -30,7 +30,8 @@ public sealed class RuntimeConsoleService
         Func<ConsoleCommandResult> getStaticMeshesStatus,
         Func<ConsoleCommandResult> toggleFlying,
         Func<bool, ConsoleCommandResult> setFlying,
-        Func<ConsoleCommandResult> getFlyingStatus)
+        Func<ConsoleCommandResult> getFlyingStatus,
+        Func<ConsoleCommandResult> dumpLightingCheck)
     {
         _output = output;
 
@@ -53,7 +54,8 @@ public sealed class RuntimeConsoleService
             new ListRecordingsCommand(),
             new TickDiagnosticsCommand(),
             new StaticMeshCommand(),
-            new FlyCommand()
+            new FlyCommand(),
+            new LightCheckCommand()
         };
 
         _dispatcher = new ConsoleCommandDispatcher(commands);
@@ -79,7 +81,8 @@ public sealed class RuntimeConsoleService
             GetStaticMeshesStatus = getStaticMeshesStatus,
             ToggleFlying = toggleFlying,
             SetFlying = setFlying,
-            GetFlyingStatus = getFlyingStatus
+            GetFlyingStatus = getFlyingStatus,
+            DumpLightingCheck = dumpLightingCheck
         };
     }
 

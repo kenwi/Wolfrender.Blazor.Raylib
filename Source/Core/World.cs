@@ -683,6 +683,46 @@ public class World : IScene
     public ConsoleCommandResult GetFlyingStatus() =>
         ConsoleCommandResult.Ok(BuildFlyingStatusMessage());
 
+    public ConsoleCommandResult DumpLightingCheckForConsole()
+    {
+        var renderPose = GetRenderPose();
+        var renderPosition = renderPose.Position;
+
+        _lightOcclusionMap.Update(_mapData, _doorSystem.Doors, _renderSystem.RoomMap);
+        PrimitiveRenderer.SetLightOcclusionMap(_lightOcclusionMap, _mapData.Width, _mapData.Height);
+        PrimitiveRenderer.SetSpriteRoomMap(_renderSystem.RoomMap);
+
+        var mapLights = TileLightCollector.Collect(_mapData);
+        var visibleRooms = _renderSystem.ComputeVisibleRooms(renderPosition, _doorSystem.Doors);
+        var activeTileLights = TileLightCollector.SelectForVisibleRooms(
+            mapLights,
+            _renderSystem.RoomMap,
+            visibleRooms,
+            renderPosition,
+            LightObjectEncoding.MaxShaderLights);
+        PrimitiveRenderer.SetLightingParameters(renderPosition, tileLights: activeTileLights);
+
+        var shaderState = PrimitiveRenderer.GetLightingDebugSnapshot();
+        var rows = LightingDiagnostics.BuildReport(
+            _mapData,
+            _renderSystem.RoomMap,
+            _doorSystem.Doors,
+            renderPosition,
+            _lightOcclusionMap,
+            shaderState);
+
+        string summary = $"Lighting check for '{_currentLevelPath}':";
+        string logPath = LightingReportWriter.Publish(summary, rows);
+
+        var displayRows = new List<string>(rows.Count + 1)
+        {
+            $"Saved to: {logPath}"
+        };
+        displayRows.AddRange(rows);
+
+        return ConsoleCommandResult.Ok($"{summary} (see terminal stderr or {logPath})", displayRows);
+    }
+
     private string BuildFlyingStatusMessage()
     {
         if (!_player.IsFlying)
@@ -734,8 +774,9 @@ public class World : IScene
         var renderPosition = renderPose.Position;
         var renderTarget = renderCamera.Target;
 
-        _lightOcclusionMap.Update(_mapData, _doorSystem.Doors);
+        _lightOcclusionMap.Update(_mapData, _doorSystem.Doors, _renderSystem.RoomMap);
         PrimitiveRenderer.SetLightOcclusionMap(_lightOcclusionMap, _mapData.Width, _mapData.Height);
+        PrimitiveRenderer.SetSpriteRoomMap(_renderSystem.RoomMap);
 
         var mapLights = TileLightCollector.Collect(_mapData);
         var visibleRooms = _renderSystem.ComputeVisibleRooms(renderPosition, _doorSystem.Doors);
@@ -754,6 +795,7 @@ public class World : IScene
 
         if (lightingShader.HasValue)
         {
+            PrimitiveRenderer.SetMeshRoomId(-1);
             BeginShaderMode(lightingShader.Value);
             PrimitiveRenderer.ApplyWallLightingUniforms();
         }

@@ -92,7 +92,6 @@ public class RenderSystem : IDisposable
         var visibleRooms = _roomMap.ComputeVisibleRooms(playerTileX, playerTileY, doors);
         TrackVisibleRoomTiles(visibleRooms);
 
-        PrimitiveRenderer.ApplyWallLightingUniforms();
         _staticMeshes.Draw(_textures, lightingShader.Value, visibleRooms: visibleRooms);
         LevelData.DrawedQuads = _staticMeshes.CountQuads(visibleRooms: visibleRooms);
     }

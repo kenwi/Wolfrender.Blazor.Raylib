@@ -70,6 +70,9 @@ public sealed class StaticLevelMeshes : IDisposable
             if (batch.TextureIndex < 0 || batch.TextureIndex >= textures.Count)
                 continue;
 
+            PrimitiveRenderer.SetMeshRoomId(batch.RoomId);
+            PrimitiveRenderer.ApplyWallLightingUniforms();
+
             var texture = textures[batch.TextureIndex];
             SetMaterialTexture(ref _drawMaterial, MaterialMapIndex.Albedo, texture);
             DrawMesh(batch.Mesh, _drawMaterial, Matrix4x4.Identity);

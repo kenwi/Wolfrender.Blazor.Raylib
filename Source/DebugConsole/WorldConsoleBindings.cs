@@ -26,7 +26,8 @@ public static class WorldConsoleBindings
         var output = new ConsoleOutputMultiplexer(new IConsoleOutput[]
         {
             new OverlayConsoleOutput(overlay),
-            new DebugConsoleOutput()
+            new DebugConsoleOutput(),
+            new TerminalConsoleOutput()
         });
 
         return new RuntimeConsoleService(
@@ -54,7 +55,8 @@ public static class WorldConsoleBindings
             world.GetStaticMeshesStatus,
             world.ToggleFlying,
             world.SetFlying,
-            world.GetFlyingStatus);
+            world.GetFlyingStatus,
+            world.DumpLightingCheckForConsole);
     }
 
     private static IReadOnlyList<RootBinding> CreateRoots(

@@ -1,6 +1,7 @@
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using Game.Core.Level;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 
@@ -51,15 +52,32 @@ public static class PrimitiveRenderer
     private static float _cachedMinBrightness = DefaultMinBrightness;
     private static float _cachedTileLightRadius = DefaultTileLightRadius;
     private static Vector3[] _activeTileLights = Array.Empty<Vector3>();
+    private static Vector2[] _activeTileLightRooms = Array.Empty<Vector2>();
     private static LightOcclusionMap? _lightOcclusionMap;
     private static int _lightingShaderOcclusionMapLoc;
+    private static int _lightingShaderRoomMapLoc;
     private static int _lightingShaderMapSizeLoc;
     private static int _lightingShaderTileSizeLoc;
+    private static int _lightingShaderApplySurfaceLightingLoc;
+    private static int _lightingShaderMeshRoomIdLoc;
+    private static readonly int[] _lightingShaderTileLightRoomLocs = new int[MaxShaderLights];
     private static int _spriteLitOcclusionMapLoc;
+    private static int _spriteLitRoomMapLoc;
     private static int _spriteLitMapSizeLoc;
     private static int _spriteLitTileSizeLoc;
+    private static int _spriteLitApplySurfaceLightingLoc;
+    private static int _spriteLitMeshRoomIdLoc;
+    private static readonly int[] _spriteLitTileLightRoomLocs = new int[MaxShaderLights];
     private static float _occlusionMapWidth;
     private static float _occlusionMapHeight;
+    private static float _currentMeshRoomId = -1f;
+    private static LevelRoomMap? _spriteRoomMap;
+
+    private const int OcclusionTextureUnit = 1;
+    private const int RoomTextureUnit = 2;
+
+    internal static int OcclusionTextureUnitForDebug => OcclusionTextureUnit;
+    internal static int RoomTextureUnitForDebug => RoomTextureUnit;
 
     // rlgl texture coordinates use a different V origin than DrawTexturePro.
     // Flip V for world polygon rendering so in-game orientation matches the editor preview.
@@ -145,13 +163,17 @@ public static class PrimitiveRenderer
     private static void CacheTileLightUniformLocations(
         Shader shader,
         int[] tileLightLocs,
+        int[] tileLightRoomLocs,
         out int tileLightCountLoc,
         out int tileLightRadiusLoc)
     {
         tileLightCountLoc = GetShaderLocation(shader, "tileLightCount");
         tileLightRadiusLoc = GetShaderLocation(shader, "tileLightRadius");
         for (int i = 0; i < tileLightLocs.Length; i++)
+        {
             tileLightLocs[i] = GetShaderLocation(shader, $"tileLight{i}");
+            tileLightRoomLocs[i] = GetShaderLocation(shader, $"tileLightRoom{i}");
+        }
     }
 
     private static void EnsureLightingShader()
@@ -168,13 +190,17 @@ public static class PrimitiveRenderer
         CacheTileLightUniformLocations(
             _lightingShader.Value,
             _lightingShaderTileLightLocs,
+            _lightingShaderTileLightRoomLocs,
             out _lightingShaderTileLightCountLoc,
             out _lightingShaderTileLightRadiusLoc);
         CacheOcclusionUniformLocations(
             _lightingShader.Value,
             out _lightingShaderOcclusionMapLoc,
+            out _lightingShaderRoomMapLoc,
             out _lightingShaderMapSizeLoc,
-            out _lightingShaderTileSizeLoc);
+            out _lightingShaderTileSizeLoc,
+            out _lightingShaderApplySurfaceLightingLoc,
+            out _lightingShaderMeshRoomIdLoc);
 
         LogShaderLoad(
             "scene lighting (lighting.fs)",
@@ -201,13 +227,17 @@ public static class PrimitiveRenderer
         CacheTileLightUniformLocations(
             _spriteLitShader.Value,
             _spriteLitTileLightLocs,
+            _spriteLitTileLightRoomLocs,
             out _spriteLitTileLightCountLoc,
             out _spriteLitTileLightRadiusLoc);
         CacheOcclusionUniformLocations(
             _spriteLitShader.Value,
             out _spriteLitOcclusionMapLoc,
+            out _spriteLitRoomMapLoc,
             out _spriteLitMapSizeLoc,
-            out _spriteLitTileSizeLoc);
+            out _spriteLitTileSizeLoc,
+            out _spriteLitApplySurfaceLightingLoc,
+            out _spriteLitMeshRoomIdLoc);
 
         LogShaderLoad(
             "sprite-lit (sprite_lit.fs)",
@@ -229,12 +259,43 @@ public static class PrimitiveRenderer
     private static void CacheOcclusionUniformLocations(
         Shader shader,
         out int occlusionMapLoc,
+        out int roomMapLoc,
         out int mapSizeLoc,
-        out int tileSizeLoc)
+        out int tileSizeLoc,
+        out int applySurfaceLightingLoc,
+        out int meshRoomIdLoc)
     {
         occlusionMapLoc = GetShaderLocation(shader, "occlusionMap");
+        roomMapLoc = GetShaderLocation(shader, "roomMap");
         mapSizeLoc = GetShaderLocation(shader, "mapSize");
         tileSizeLoc = GetShaderLocation(shader, "tileSize");
+        applySurfaceLightingLoc = GetShaderLocation(shader, "applySurfaceLighting");
+        meshRoomIdLoc = GetShaderLocation(shader, "meshRoomId");
+    }
+
+    /// <summary>Room id for the current static mesh draw batch, or -1 to sample the room map.</summary>
+    public static void SetMeshRoomId(int roomId) => _currentMeshRoomId = roomId;
+
+    private static void BindLightingMapTextures(Shader shader, int occlusionMapLoc, int roomMapLoc)
+    {
+        if (_lightOcclusionMap == null)
+            return;
+
+        if (occlusionMapLoc >= 0)
+        {
+            Rlgl.ActiveTextureSlot(OcclusionTextureUnit);
+            Rlgl.EnableTexture(_lightOcclusionMap.OcclusionTexture.Id);
+            int[] unit = { OcclusionTextureUnit };
+            SetShaderValue(shader, occlusionMapLoc, unit, ShaderUniformDataType.Int);
+        }
+
+        if (roomMapLoc >= 0)
+        {
+            Rlgl.ActiveTextureSlot(RoomTextureUnit);
+            Rlgl.EnableTexture(_lightOcclusionMap.RoomTexture.Id);
+            int[] unit = { RoomTextureUnit };
+            SetShaderValue(shader, roomMapLoc, unit, ShaderUniformDataType.Int);
+        }
     }
 
     private static void ApplyLightingUniforms(
@@ -244,10 +305,15 @@ public static class PrimitiveRenderer
         int minBrightnessLoc,
         int tileLightCountLoc,
         int[] tileLightLocs,
+        int[] tileLightRoomLocs,
         int tileLightRadiusLoc,
         int occlusionMapLoc,
+        int roomMapLoc,
         int mapSizeLoc,
-        int tileSizeLoc)
+        int tileSizeLoc,
+        int applySurfaceLightingLoc,
+        int meshRoomIdLoc,
+        float applySurfaceLighting)
     {
         float[] playerPosArray = { _lightingPlayerPosition.X, _lightingPlayerPosition.Y, _lightingPlayerPosition.Z };
         SetShaderValue(shader, playerPosLoc, playerPosArray, ShaderUniformDataType.Vec3);
@@ -260,12 +326,19 @@ public static class PrimitiveRenderer
 
         for (int i = 0; i < lightCount; i++)
         {
-            if (tileLightLocs[i] < 0)
-                continue;
+            if (tileLightLocs[i] >= 0)
+            {
+                var light = _activeTileLights[i];
+                float[] lightPos = { light.X, light.Y, light.Z };
+                SetShaderValue(shader, tileLightLocs[i], lightPos, ShaderUniformDataType.Vec3);
+            }
 
-            var light = _activeTileLights[i];
-            float[] lightPos = { light.X, light.Y, light.Z };
-            SetShaderValue(shader, tileLightLocs[i], lightPos, ShaderUniformDataType.Vec3);
+            if (tileLightRoomLocs[i] >= 0)
+            {
+                var rooms = _activeTileLightRooms[i];
+                float[] roomPair = { rooms.X, rooms.Y };
+                SetShaderValue(shader, tileLightRoomLocs[i], roomPair, ShaderUniformDataType.Vec2);
+            }
         }
 
         if (tileLightRadiusLoc >= 0)
@@ -280,30 +353,13 @@ public static class PrimitiveRenderer
         if (tileSizeLoc >= 0)
             SetShaderValue(shader, tileSizeLoc, LevelData.QuadSize, ShaderUniformDataType.Float);
 
-        if (occlusionMapLoc >= 0 && _lightOcclusionMap != null)
-            SetShaderValueTexture(shader, occlusionMapLoc, _lightOcclusionMap.Texture);
-    }
+        if (applySurfaceLightingLoc >= 0)
+            SetShaderValue(shader, applySurfaceLightingLoc, applySurfaceLighting, ShaderUniformDataType.Float);
 
-    private static void ApplyLightingUniforms(
-        Shader shader,
-        int playerPosLoc,
-        int maxDistanceLoc,
-        int minBrightnessLoc,
-        int tileLightCountLoc,
-        int[] tileLightLocs,
-        int tileLightRadiusLoc)
-    {
-        ApplyLightingUniforms(
-            shader,
-            playerPosLoc,
-            maxDistanceLoc,
-            minBrightnessLoc,
-            tileLightCountLoc,
-            tileLightLocs,
-            tileLightRadiusLoc,
-            -1,
-            -1,
-            -1);
+        if (meshRoomIdLoc >= 0)
+            SetShaderValue(shader, meshRoomIdLoc, _currentMeshRoomId, ShaderUniformDataType.Float);
+
+        BindLightingMapTextures(shader, occlusionMapLoc, roomMapLoc);
     }
 
     /// <summary>Re-upload lighting uniforms to the wall/floor shader (call after <see cref="BeginShaderMode"/>).</summary>
@@ -319,10 +375,15 @@ public static class PrimitiveRenderer
             _lightingShaderMinBrightnessLoc,
             _lightingShaderTileLightCountLoc,
             _lightingShaderTileLightLocs,
+            _lightingShaderTileLightRoomLocs,
             _lightingShaderTileLightRadiusLoc,
             _lightingShaderOcclusionMapLoc,
+            _lightingShaderRoomMapLoc,
             _lightingShaderMapSizeLoc,
-            _lightingShaderTileSizeLoc);
+            _lightingShaderTileSizeLoc,
+            _lightingShaderApplySurfaceLightingLoc,
+            _lightingShaderMeshRoomIdLoc,
+            1f);
     }
 
     private static float ExponentialFalloffBrightness(float distance, float maxDistance, float minBright)
@@ -366,10 +427,21 @@ public static class PrimitiveRenderer
             color.A);
     }
 
-    private static void BeginSpriteLitDraw()
+    private static void BeginSpriteLitDraw(Vector3 anchorPosition)
     {
         EnsureSpriteLitShader();
-        if (!_spriteLitShader.HasValue) return;
+        if (!_spriteLitShader.HasValue)
+            return;
+
+        SetMeshRoomId(ResolveSpriteRoomId(anchorPosition));
+        BeginShaderMode(_spriteLitShader.Value);
+        ApplySpriteLightingUniforms();
+    }
+
+    private static void ApplySpriteLightingUniforms()
+    {
+        if (!_spriteLitShader.HasValue)
+            return;
 
         ApplyLightingUniforms(
             _spriteLitShader.Value,
@@ -378,11 +450,26 @@ public static class PrimitiveRenderer
             _spriteLitMinBrightnessLoc,
             _spriteLitTileLightCountLoc,
             _spriteLitTileLightLocs,
+            _spriteLitTileLightRoomLocs,
             _spriteLitTileLightRadiusLoc,
             _spriteLitOcclusionMapLoc,
+            _spriteLitRoomMapLoc,
             _spriteLitMapSizeLoc,
-            _spriteLitTileSizeLoc);
-        BeginShaderMode(_spriteLitShader.Value);
+            _spriteLitTileSizeLoc,
+            _spriteLitApplySurfaceLightingLoc,
+            _spriteLitMeshRoomIdLoc,
+            0f);
+    }
+
+    private static void RefreshSpriteLightingMapTextures()
+    {
+        if (!_spriteLitShader.HasValue)
+            return;
+
+        BindLightingMapTextures(
+            _spriteLitShader.Value,
+            _spriteLitOcclusionMapLoc,
+            _spriteLitRoomMapLoc);
     }
 
     private static void EndSpriteLitDraw()
@@ -398,20 +485,44 @@ public static class PrimitiveRenderer
         _occlusionMapHeight = mapHeight;
     }
 
+    public static void SetSpriteRoomMap(LevelRoomMap roomMap) => _spriteRoomMap = roomMap;
+
+    private static int ResolveSpriteRoomId(Vector3 anchorPosition)
+    {
+        if (_spriteRoomMap == null)
+            return -1;
+
+        var (tileX, tileY) = LevelData.GetEntityTileFromWorld(anchorPosition.X, anchorPosition.Z);
+        return _spriteRoomMap.GetRoomAt(tileX, tileY);
+    }
+
     public static void SetLightingParameters(
         Vector3 playerPosition,
         float maxDistance = DefaultPlayerLightDistance,
         float minBrightness = DefaultMinBrightness,
-        ReadOnlySpan<Vector3> tileLights = default,
+        ReadOnlySpan<ActiveTileLight> tileLights = default,
         float tileLightRadius = DefaultTileLightRadius)
     {
         _lightingPlayerPosition = playerPosition;
         _cachedMaxLightDistance = maxDistance;
         _cachedMinBrightness = minBrightness;
         _cachedTileLightRadius = tileLightRadius;
-        _activeTileLights = tileLights.Length == 0
-            ? Array.Empty<Vector3>()
-            : tileLights.ToArray();
+
+        if (tileLights.Length == 0)
+        {
+            _activeTileLights = Array.Empty<Vector3>();
+            _activeTileLightRooms = Array.Empty<Vector2>();
+        }
+        else
+        {
+            _activeTileLights = new Vector3[tileLights.Length];
+            _activeTileLightRooms = new Vector2[tileLights.Length];
+            for (int i = 0; i < tileLights.Length; i++)
+            {
+                _activeTileLights[i] = tileLights[i].Position;
+                _activeTileLightRooms[i] = new Vector2(tileLights[i].RoomA, tileLights[i].RoomB);
+            }
+        }
 
         EnsureLightingShader();
         if (_lightingShader.HasValue)
@@ -422,6 +533,43 @@ public static class PrimitiveRenderer
     {
         EnsureLightingShader();
         return _lightingShader;
+    }
+
+    public static LightingDebugSnapshot GetLightingDebugSnapshot()
+    {
+        EnsureLightingShader();
+        EnsureSpriteLitShader();
+
+        int occlusionTextureId = _lightOcclusionMap != null && _lightOcclusionMap.HasOcclusionTexture
+            ? (int)_lightOcclusionMap.OcclusionTexture.Id
+            : 0;
+        int roomTextureId = _lightOcclusionMap != null && _lightOcclusionMap.HasRoomTexture
+            ? (int)_lightOcclusionMap.RoomTexture.Id
+            : 0;
+
+        return new LightingDebugSnapshot(
+            _lightingShader.HasValue && IsShaderValid(_lightingShader.Value),
+            _lightingShader.HasValue ? (int)_lightingShader.Value.Id : 0,
+            _spriteLitShader.HasValue && IsShaderValid(_spriteLitShader.Value),
+            _spriteLitShader.HasValue ? (int)_spriteLitShader.Value.Id : 0,
+            _activeTileLights.Length,
+            _lightingPlayerPosition,
+            _cachedMaxLightDistance,
+            _cachedMinBrightness,
+            _cachedTileLightRadius,
+            _lightingShaderTileLightCountLoc,
+            _lightingShaderOcclusionMapLoc,
+            _lightingShaderRoomMapLoc,
+            _lightingShaderMapSizeLoc,
+            _lightingShaderTileSizeLoc,
+            _lightingShaderApplySurfaceLightingLoc,
+            _lightingShaderMeshRoomIdLoc,
+            (int[])_lightingShaderTileLightLocs.Clone(),
+            (int[])_lightingShaderTileLightRoomLocs.Clone(),
+            (Vector3[])_activeTileLights.Clone(),
+            (Vector2[])_activeTileLightRooms.Clone(),
+            occlusionTextureId,
+            roomTextureId);
     }
 
     /// <summary>Draw a screen-space sprite region with the shared magenta color-key shader.</summary>
@@ -885,10 +1033,10 @@ public static class PrimitiveRenderer
             texBottom = 1.0f;
         }
         
-        BeginSpriteLitDraw();
+        BeginSpriteLitDraw(position);
 
-        // Draw the quad
         Rlgl.SetTexture(texture.Id);
+        RefreshSpriteLightingMapTextures();
         Rlgl.Begin(DrawMode.Quads);
         Rlgl.Color4ub(color.R, color.G, color.B, color.A);
 
@@ -996,9 +1144,10 @@ public static class PrimitiveRenderer
             float texTop = frame.Y / tex.Height;
             float texBottom = (frame.Y + frame.Height) / tex.Height;
 
-            BeginSpriteLitDraw();
+            BeginSpriteLitDraw(position);
 
             Rlgl.SetTexture(tex.Id);
+            RefreshSpriteLightingMapTextures();
             Rlgl.Begin(DrawMode.Quads);
             Rlgl.Color4ub(color.R, color.G, color.B, color.A);
             Rlgl.Normal3f(directionToCamera.X, directionToCamera.Y, directionToCamera.Z);
