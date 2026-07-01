@@ -148,6 +148,17 @@ public class EditorState
     }
 
     public EditorLayer ActiveLayer => Layers[ActiveLayerIndex];
+
+    public void SetActiveLayerIndex(int index)
+    {
+        if (index < 0 || index >= Layers.Count) return;
+        ActiveLayerIndex = index;
+        EditorTilePalette.SanitizeSelectedTile(this);
+        NotifyStateChanged();
+    }
+
+    public void SanitizeSelectedTileForActiveLayer() =>
+        EditorTilePalette.SanitizeSelectedTile(this);
     public bool IsOnEnemyLayer => Layers[ActiveLayerIndex].Name == EnemiesLayerName;
     public bool IsOnPickupLayer => Layers[ActiveLayerIndex].Name == PickupsLayerName;
     public bool IsOnDoorLayer => Layers[ActiveLayerIndex].Name == DoorsLayerName;
@@ -413,6 +424,8 @@ public class EditorState
             if (SelectedTileId != 0 && !ObjectSprites.IsValidObjectId(SelectedTileId))
                 return;
         }
+        else if (IsOnTileLayer && !EditorTilePalette.IsTileIdValidForLayer(SelectedTileId, ActiveLayer.Name))
+            return;
 
         var layer = Layers[ActiveLayerIndex];
         int idx = MapData.Width * y + x;

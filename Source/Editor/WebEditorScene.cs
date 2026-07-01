@@ -61,7 +61,7 @@ public class WebEditorScene : IScene
                 if (ctrlHeld)
                     State.Layers[i].IsVisible = !State.Layers[i].IsVisible;
                 else
-                    State.ActiveLayerIndex = i;
+                    State.SetActiveLayerIndex(i);
             }
         }
 

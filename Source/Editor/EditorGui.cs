@@ -430,8 +430,9 @@ public class EditorGui
 
     // ─── Layer Panel ─────────────────────────────────────────────────────────────
 
-    public void RenderLayerPanel(List<EditorLayer> layers, ref int activeLayerIndex)
+    public void RenderLayerPanel(List<EditorLayer> layers, EditorState editorState)
     {
+        ref int activeLayerIndex = ref editorState.ActiveLayerIndex;
         if (!_showLayers) return;
 
         ImGui.SetNextWindowPos(new Vector2(GetScreenWidth() - 300, 45), ImGuiCond.FirstUseEver);
@@ -465,7 +466,7 @@ public class EditorGui
             }
             if (ImGui.Button(layer.Name, new Vector2(120, 0)))
             {
-                activeLayerIndex = i;
+                editorState.SetActiveLayerIndex(i);
             }
             if (isActive)
             {
@@ -496,6 +497,7 @@ public class EditorGui
                 activeLayerIndex = swapFrom.Value;
 
             (layers[swapFrom.Value], layers[swapTo.Value]) = (layers[swapTo.Value], layers[swapFrom.Value]);
+            editorState.SanitizeSelectedTileForActiveLayer();
         }
 
         ImGui.Separator();
@@ -589,10 +591,15 @@ public class EditorGui
         ImGui.Separator();
         ImGui.Text("Tiles:");
 
+        editorState.SanitizeSelectedTileForActiveLayer();
+
         int columns = TileSpriteSheet.PaletteColumns;
         for (int i = 0; i < TileSpriteSheet.TileCount && i < _mapData.TileTextures.Count; i++)
         {
             uint tileId = (uint)(i + 1);
+            if (!EditorTilePalette.IsArchitecturalTileId(tileId))
+                continue;
+
             var texture = _mapData.TileTextures[i];
 
             if (i % columns != 0)

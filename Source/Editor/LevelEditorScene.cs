@@ -67,7 +67,7 @@ public class LevelEditorScene : IScene
                 if (ctrlHeld)
                     _state.Layers[i].IsVisible = !_state.Layers[i].IsVisible;
                 else
-                    _state.ActiveLayerIndex = i;
+                    _state.SetActiveLayerIndex(i);
             }
         }
 
