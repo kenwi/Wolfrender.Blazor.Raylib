@@ -31,6 +31,13 @@ public class MapData
     public int Width { get; set; }
     public int Height { get; set; }
 
+    /// <summary>Incremented when wall/floor/ceiling geometry changes at runtime (secrets, exits).</summary>
+    public int GeometryVersion { get; private set; }
+
+    public void NotifyGeometryChanged() => GeometryVersion++;
+
+    public void ResetGeometryVersion() => GeometryVersion = 0;
+
     /// <summary>
     /// Get the tile ID at a given position for a specific layer array.
     /// Returns 0 if out of bounds.

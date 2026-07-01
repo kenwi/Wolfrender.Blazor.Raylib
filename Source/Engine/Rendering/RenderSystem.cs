@@ -1,15 +1,18 @@
 using System.Collections.Generic;
 using System.Numerics;
+using Game.Core.Level;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 
 namespace Game.Engine.Rendering;
 
-public class RenderSystem
+public class RenderSystem : IDisposable
 {
     private readonly LevelData _level;
+    private readonly MapData _mapData;
     private readonly List<Texture2D> _textures;
     private readonly float _drawDistance;
+    private readonly StaticLevelMeshes _staticMeshes = new();
     private const float TileSize = 4.0f;
     /// <summary>Extra half-angle beyond the view frustum (projection / pitch slack).</summary>
     private const float FrustumEdgeMarginDegrees = 5f;
@@ -19,21 +22,136 @@ public class RenderSystem
 
     public HashSet<(int x, int y)> RenderedTiles => _renderedTiles;
 
-    public RenderSystem(LevelData level, List<Texture2D> textures, float drawDistance = 15.0f)
+    /// <summary>
+    /// When true, draw baked static meshes instead of immediate-mode quads.
+    /// Toggle off to compare the legacy path on this branch.
+    /// </summary>
+    public bool UseStaticMeshes { get; set; } = true;
+
+    public int BakedQuadCount => _staticMeshes.BakedQuadCount;
+
+    public RenderSystem(LevelData level, MapData mapData, List<Texture2D> textures, float drawDistance = 15.0f)
     {
         _level = level;
+        _mapData = mapData;
         _textures = textures;
         _drawDistance = drawDistance;
+        _staticMeshes.Rebuild(mapData, textures);
     }
+
+    public void RebuildMeshes() => _staticMeshes.Rebuild(_mapData, _textures);
 
     public void Render(Camera3D camera, int viewportWidth, int viewportHeight)
     {
-        // Reset number of quads that is being drawed
         LevelData.DrawedQuads = 0;
-
-        // Clear rendered tiles tracking
         _renderedTiles.Clear();
 
+        _staticMeshes.RebuildIfNeeded(_mapData, _textures);
+
+        if (UseStaticMeshes && _staticMeshes.HasMeshes)
+        {
+            TrackVisibleTiles(camera, viewportWidth, viewportHeight);
+            DrawStaticMeshes();
+            RenderVisibleFloorsAndCeilings(camera.Position);
+            return;
+        }
+
+        RenderLegacyTiles(camera, viewportWidth, viewportHeight);
+    }
+
+    private void DrawStaticMeshes()
+    {
+        var lightingShader = PrimitiveRenderer.GetLightingShader();
+        if (!lightingShader.HasValue)
+            return;
+
+        PrimitiveRenderer.ApplyWallLightingUniforms();
+        _staticMeshes.Draw(_textures, lightingShader.Value, LevelMeshLayer.Walls);
+        LevelData.DrawedQuads = _staticMeshes.CountQuads(LevelMeshLayer.Walls);
+    }
+
+    private void RenderVisibleFloorsAndCeilings(Vector3 playerPosition)
+    {
+        foreach (var (x, y) in _renderedTiles)
+        {
+            Vector3 worldPos = new Vector3(x * TileSize, 0, y * TileSize);
+            RenderFloorAndCeiling(x, y, worldPos);
+        }
+    }
+
+    private void RenderFloorAndCeiling(int x, int y, Vector3 worldPos)
+    {
+        var floorTile = _level.GetFloorTile(x, y);
+        if (floorTile != 0 && floorTile <= _textures.Count)
+        {
+            PrimitiveRenderer.DrawFloorTexture(
+                _textures[(int)floorTile - 1],
+                new Vector3(worldPos.X, -2, worldPos.Z),
+                4.0f, 4.0f, 4.0f,
+                Color.White
+            );
+        }
+
+        var ceilingTile = _level.GetCeilingTile(x, y);
+        if (ceilingTile != 0 && ceilingTile <= _textures.Count)
+        {
+            PrimitiveRenderer.DrawCeilingTexture(
+                _textures[(int)ceilingTile - 1],
+                new Vector3(worldPos.X, 6f, worldPos.Z),
+                4.0f, 4.0f, 4.0f,
+                Color.White
+            );
+        }
+    }
+
+    private void TrackVisibleTiles(Camera3D camera, int viewportWidth, int viewportHeight)
+    {
+        float aspect = viewportHeight > 0 ? viewportWidth / (float)viewportHeight : 1f;
+        float halfHorizRad = ComputeHorizHalfFovRad(camera, aspect);
+        float baseMarginRad = FrustumEdgeMarginDegrees * (MathF.PI / 180f);
+
+        Vector3 cameraForward = Vector3.Normalize(camera.Target - camera.Position);
+        Vector3 cameraForwardXZ = new Vector3(cameraForward.X, 0f, cameraForward.Z);
+        if (cameraForwardXZ.LengthSquared() > 0.0001f)
+            cameraForwardXZ = Vector3.Normalize(cameraForwardXZ);
+        else
+            cameraForwardXZ = new Vector3(0f, 0f, 1f);
+
+        Vector3 cameraPosXZ = new Vector3(camera.Position.X, 0, camera.Position.Z);
+        float drawDistanceWorld = _drawDistance * TileSize;
+
+        int cameraTileX = (int)(camera.Position.X / TileSize + 0.5f);
+        int cameraTileY = (int)(camera.Position.Z / TileSize + 0.5f);
+        int minX = Math.Max(0, cameraTileX - (int)_drawDistance);
+        int maxX = Math.Min(_level.Width - 1, cameraTileX + (int)_drawDistance);
+        int minY = Math.Max(0, cameraTileY - (int)_drawDistance);
+        int maxY = Math.Min(_level.Height - 1, cameraTileY + (int)_drawDistance);
+
+        for (int x = minX; x <= maxX; x++)
+        {
+            for (int y = minY; y <= maxY; y++)
+            {
+                Vector3 tilePos = new Vector3(x * TileSize, 0, y * TileSize);
+                Vector3 toTile = tilePos - cameraPosXZ;
+                float distance = toTile.Length();
+
+                if (distance > drawDistanceWorld)
+                    continue;
+
+                Vector3 toTileNormalized = Vector3.Normalize(toTile);
+                float dot = Vector3.Dot(cameraForwardXZ, toTileNormalized);
+
+                float tileExtentRad = MathF.Atan(TileSize / MathF.Max(distance, TileSize));
+                float cullHalfAngle = halfHorizRad + baseMarginRad + tileExtentRad;
+
+                if (dot > MathF.Cos(cullHalfAngle) || distance < 10)
+                    _renderedTiles.Add((x, y));
+            }
+        }
+    }
+
+    private void RenderLegacyTiles(Camera3D camera, int viewportWidth, int viewportHeight)
+    {
         float aspect = viewportHeight > 0 ? viewportWidth / (float)viewportHeight : 1f;
         float halfHorizRad = ComputeHorizHalfFovRad(camera, aspect);
         float baseMarginRad = FrustumEdgeMarginDegrees * (MathF.PI / 180f);
@@ -68,14 +186,12 @@ public class RenderSystem
                 Vector3 toTileNormalized = Vector3.Normalize(toTile);
                 float dot = Vector3.Dot(cameraForwardXZ, toTileNormalized);
 
-                // Widen cull cone by tile width at this distance so full quads at the screen edge are included.
                 float tileExtentRad = MathF.Atan(TileSize / MathF.Max(distance, TileSize));
                 float cullHalfAngle = halfHorizRad + baseMarginRad + tileExtentRad;
 
                 if (dot > MathF.Cos(cullHalfAngle) || distance < 10)
                 {
                     RenderTile(x, y, tilePos, camera.Position);
-                    // Track that this tile was rendered
                     _renderedTiles.Add((x, y));
                 }
             }
@@ -93,7 +209,6 @@ public class RenderSystem
 
     private void RenderTile(int x, int y, Vector3 worldPos, Vector3 playerPosition)
     {
-        // Draw walls
         var wallTile = _level.GetWallTile(x, y);
         if (wallTile != 0 && wallTile <= _textures.Count)
         {
@@ -106,28 +221,8 @@ public class RenderSystem
             );
         }
 
-        // Draw floors
-        var floorTile = _level.GetFloorTile(x, y);
-        if (floorTile != 0 && floorTile <= _textures.Count)
-        {
-            PrimitiveRenderer.DrawFloorTexture(
-                _textures[(int)floorTile - 1],
-                new Vector3(worldPos.X, -2, worldPos.Z),
-                4.0f, 4.0f, 4.0f,
-                Color.White
-            );
-        }
-
-        // Draw ceilings
-        var ceilingTile = _level.GetCeilingTile(x, y);
-        if (ceilingTile != 0 && ceilingTile <= _textures.Count)
-        {
-            PrimitiveRenderer.DrawCeilingTexture(
-                _textures[(int)ceilingTile - 1],
-                new Vector3(worldPos.X, 6f, worldPos.Z),
-                4.0f, 4.0f, 4.0f,
-                Color.White
-            );
-        }
+        RenderFloorAndCeiling(x, y, worldPos);
     }
+
+    public void Dispose() => _staticMeshes.Dispose();
 }

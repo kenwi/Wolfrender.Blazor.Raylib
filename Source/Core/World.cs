@@ -97,7 +97,7 @@ public class World : IScene
         _collisionSystem = new CollisionSystem(_level, new CompositeMovementBlocker(_doorSystem, _secretSystem));
         _soundPropagationSystem = new SoundPropagationSystem(mapData, _doorSystem);
         _cameraSystem = new CameraSystem(_collisionSystem);
-        _renderSystem = new RenderSystem(_level, _tileTextures);
+        _renderSystem = new RenderSystem(_level, _mapData, _tileTextures);
         _minimapSystem = new MinimapSystem(_level, _renderSystem);
         _exitSystem = new ExitSystem(_scoreSystem);
         _highscoreClient = new HighscoreClient();
@@ -175,6 +175,7 @@ public class World : IScene
         ResetSimulationPoses();
         _exitSystem.Rebuild(_mapData);
         _secretSystem.Rebuild(_mapData);
+        _renderSystem.RebuildMeshes();
 
         WindowDisplayMode.SyncRenderDataFromWindow();
         GameRenderResolution.Apply(
@@ -341,6 +342,7 @@ public class World : IScene
         _scoreSystem.ResetForLevel(_mapData);
         _exitSystem.Rebuild(_mapData);
         _secretSystem.Rebuild(_mapData);
+        _renderSystem.RebuildMeshes();
 
         if (OperatingSystem.IsBrowser())
         {
@@ -428,6 +430,7 @@ public class World : IScene
         _scoreSystem.ResetForLevel(_mapData);
         _exitSystem.Rebuild(_mapData);
         _secretSystem.Rebuild(_mapData);
+        _renderSystem.RebuildMeshes();
         _soundPropagationSystem.ClearPendingEvents();
         _highscoreIntermission.ResetForLevel();
         _highscoreIntermissionStarted = false;
@@ -445,6 +448,7 @@ public class World : IScene
         BrowserPointerLockBridge.PointerLockLost = null;
         _optionsMenu.Dismiss();
         _inputSystem.EnableMouse();
+        _renderSystem.Dispose();
     }
 
     public void ToggleMouse()
@@ -635,6 +639,27 @@ public class World : IScene
 
     public ConsoleCommandResult GetTickDiagnosticsStatus() =>
         ConsoleCommandResult.Ok(_tickDiagnostics.BuildStatusLine());
+
+    public ConsoleCommandResult ToggleStaticMeshes()
+    {
+        _renderSystem.UseStaticMeshes = !_renderSystem.UseStaticMeshes;
+        return ConsoleCommandResult.Ok(BuildStaticMeshesStatusMessage());
+    }
+
+    public ConsoleCommandResult SetStaticMeshes(bool enabled)
+    {
+        _renderSystem.UseStaticMeshes = enabled;
+        return ConsoleCommandResult.Ok(BuildStaticMeshesStatusMessage());
+    }
+
+    public ConsoleCommandResult GetStaticMeshesStatus() =>
+        ConsoleCommandResult.Ok(BuildStaticMeshesStatusMessage());
+
+    private string BuildStaticMeshesStatusMessage()
+    {
+        string mode = _renderSystem.UseStaticMeshes ? "on (baked wall meshes)" : "off (legacy quads)";
+        return $"Static meshes: {mode}. Baked wall quads: {_renderSystem.BakedQuadCount}.";
+    }
 
     public ConsoleCommandResult StartRecordingForConsole(string filename, float mouseSensitivity)
     {

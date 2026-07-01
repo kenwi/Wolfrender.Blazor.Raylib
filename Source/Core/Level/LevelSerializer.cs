@@ -121,6 +121,7 @@ public static class LevelSerializer
             .Select(s => s.ToPlacement())
             .ToList();
         fileData.PlayerSpawn?.ApplyTo(mapData.Spawn);
+        mapData.ResetGeometryVersion();
     }
 
     /// <summary>Returns the layer array when length matches the map, otherwise a zero-filled array.</summary>
@@ -155,6 +156,7 @@ public static class LevelSerializer
         mapData.Objects = new uint[mapData.Width * mapData.Height];
         mapData.Pickups = new List<PickupPlacement>();
         mapData.SecretWalls = new List<SecretWallPlacement>();
+        mapData.ResetGeometryVersion();
     }
 
     public static void LoadFromBmp(MapData mapData, string path)
@@ -208,6 +210,7 @@ public static class LevelSerializer
         }
 
         UnloadImage(image);
+        mapData.ResetGeometryVersion();
     }
 
     public static Dictionary<string, int> DiscoverBmpTileHashes(string path)

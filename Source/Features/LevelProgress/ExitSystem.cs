@@ -104,6 +104,7 @@ public sealed class ExitSystem
     {
         int index = LevelData.GetIndex(exit.TileX, exit.TileY, _mapData.Width);
         _mapData.Walls[index] = ExitTileIds.Activated;
+        _mapData.NotifyGeometryChanged();
         exit.IsActivated = true;
         _exitCountdownRemaining = ExitTileIds.ExitDelaySeconds;
 

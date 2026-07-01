@@ -48,7 +48,10 @@ public static class WorldConsoleBindings
             recordingSystem.SendRecording,
             world.ToggleTickDiagnostics,
             world.SetTickDiagnostics,
-            world.GetTickDiagnosticsStatus);
+            world.GetTickDiagnosticsStatus,
+            world.ToggleStaticMeshes,
+            world.SetStaticMeshes,
+            world.GetStaticMeshesStatus);
     }
 
     private static IReadOnlyList<RootBinding> CreateRoots(
