@@ -51,6 +51,15 @@ public static class PrimitiveRenderer
     private static float _cachedMinBrightness = DefaultMinBrightness;
     private static float _cachedTileLightRadius = DefaultTileLightRadius;
     private static Vector3[] _activeTileLights = Array.Empty<Vector3>();
+    private static LightOcclusionMap? _lightOcclusionMap;
+    private static int _lightingShaderOcclusionMapLoc;
+    private static int _lightingShaderMapSizeLoc;
+    private static int _lightingShaderTileSizeLoc;
+    private static int _spriteLitOcclusionMapLoc;
+    private static int _spriteLitMapSizeLoc;
+    private static int _spriteLitTileSizeLoc;
+    private static float _occlusionMapWidth;
+    private static float _occlusionMapHeight;
 
     // rlgl texture coordinates use a different V origin than DrawTexturePro.
     // Flip V for world polygon rendering so in-game orientation matches the editor preview.
@@ -161,6 +170,11 @@ public static class PrimitiveRenderer
             _lightingShaderTileLightLocs,
             out _lightingShaderTileLightCountLoc,
             out _lightingShaderTileLightRadiusLoc);
+        CacheOcclusionUniformLocations(
+            _lightingShader.Value,
+            out _lightingShaderOcclusionMapLoc,
+            out _lightingShaderMapSizeLoc,
+            out _lightingShaderTileSizeLoc);
 
         LogShaderLoad(
             "scene lighting (lighting.fs)",
@@ -189,6 +203,11 @@ public static class PrimitiveRenderer
             _spriteLitTileLightLocs,
             out _spriteLitTileLightCountLoc,
             out _spriteLitTileLightRadiusLoc);
+        CacheOcclusionUniformLocations(
+            _spriteLitShader.Value,
+            out _spriteLitOcclusionMapLoc,
+            out _spriteLitMapSizeLoc,
+            out _spriteLitTileSizeLoc);
 
         LogShaderLoad(
             "sprite-lit (sprite_lit.fs)",
@@ -207,6 +226,17 @@ public static class PrimitiveRenderer
         }
     }
 
+    private static void CacheOcclusionUniformLocations(
+        Shader shader,
+        out int occlusionMapLoc,
+        out int mapSizeLoc,
+        out int tileSizeLoc)
+    {
+        occlusionMapLoc = GetShaderLocation(shader, "occlusionMap");
+        mapSizeLoc = GetShaderLocation(shader, "mapSize");
+        tileSizeLoc = GetShaderLocation(shader, "tileSize");
+    }
+
     private static void ApplyLightingUniforms(
         Shader shader,
         int playerPosLoc,
@@ -214,7 +244,10 @@ public static class PrimitiveRenderer
         int minBrightnessLoc,
         int tileLightCountLoc,
         int[] tileLightLocs,
-        int tileLightRadiusLoc)
+        int tileLightRadiusLoc,
+        int occlusionMapLoc,
+        int mapSizeLoc,
+        int tileSizeLoc)
     {
         float[] playerPosArray = { _lightingPlayerPosition.X, _lightingPlayerPosition.Y, _lightingPlayerPosition.Z };
         SetShaderValue(shader, playerPosLoc, playerPosArray, ShaderUniformDataType.Vec3);
@@ -237,6 +270,40 @@ public static class PrimitiveRenderer
 
         if (tileLightRadiusLoc >= 0)
             SetShaderValue(shader, tileLightRadiusLoc, _cachedTileLightRadius, ShaderUniformDataType.Float);
+
+        if (mapSizeLoc >= 0)
+        {
+            float[] mapSize = { _occlusionMapWidth, _occlusionMapHeight };
+            SetShaderValue(shader, mapSizeLoc, mapSize, ShaderUniformDataType.Vec2);
+        }
+
+        if (tileSizeLoc >= 0)
+            SetShaderValue(shader, tileSizeLoc, LevelData.QuadSize, ShaderUniformDataType.Float);
+
+        if (occlusionMapLoc >= 0 && _lightOcclusionMap != null)
+            SetShaderValueTexture(shader, occlusionMapLoc, _lightOcclusionMap.Texture);
+    }
+
+    private static void ApplyLightingUniforms(
+        Shader shader,
+        int playerPosLoc,
+        int maxDistanceLoc,
+        int minBrightnessLoc,
+        int tileLightCountLoc,
+        int[] tileLightLocs,
+        int tileLightRadiusLoc)
+    {
+        ApplyLightingUniforms(
+            shader,
+            playerPosLoc,
+            maxDistanceLoc,
+            minBrightnessLoc,
+            tileLightCountLoc,
+            tileLightLocs,
+            tileLightRadiusLoc,
+            -1,
+            -1,
+            -1);
     }
 
     /// <summary>Re-upload lighting uniforms to the wall/floor shader (call after <see cref="BeginShaderMode"/>).</summary>
@@ -252,7 +319,10 @@ public static class PrimitiveRenderer
             _lightingShaderMinBrightnessLoc,
             _lightingShaderTileLightCountLoc,
             _lightingShaderTileLightLocs,
-            _lightingShaderTileLightRadiusLoc);
+            _lightingShaderTileLightRadiusLoc,
+            _lightingShaderOcclusionMapLoc,
+            _lightingShaderMapSizeLoc,
+            _lightingShaderTileSizeLoc);
     }
 
     private static float ExponentialFalloffBrightness(float distance, float maxDistance, float minBright)
@@ -308,7 +378,10 @@ public static class PrimitiveRenderer
             _spriteLitMinBrightnessLoc,
             _spriteLitTileLightCountLoc,
             _spriteLitTileLightLocs,
-            _spriteLitTileLightRadiusLoc);
+            _spriteLitTileLightRadiusLoc,
+            _spriteLitOcclusionMapLoc,
+            _spriteLitMapSizeLoc,
+            _spriteLitTileSizeLoc);
         BeginShaderMode(_spriteLitShader.Value);
     }
 
@@ -316,6 +389,13 @@ public static class PrimitiveRenderer
     {
         if (_spriteLitShader.HasValue)
             EndShaderMode();
+    }
+
+    public static void SetLightOcclusionMap(LightOcclusionMap occlusionMap, int mapWidth, int mapHeight)
+    {
+        _lightOcclusionMap = occlusionMap;
+        _occlusionMapWidth = mapWidth;
+        _occlusionMapHeight = mapHeight;
     }
 
     public static void SetLightingParameters(

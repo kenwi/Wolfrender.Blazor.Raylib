@@ -33,6 +33,14 @@ public class RenderSystem : IDisposable
 
     public int BakedQuadCount => _staticMeshes.BakedQuadCount;
 
+    public HashSet<int> ComputeVisibleRooms(Vector3 playerPosition, IReadOnlyList<Door> doors)
+    {
+        var (playerTileX, playerTileY) = LevelData.GetEntityTileFromWorld(playerPosition.X, playerPosition.Z);
+        return _roomMap.ComputeVisibleRooms(playerTileX, playerTileY, doors);
+    }
+
+    public LevelRoomMap RoomMap => _roomMap;
+
     public RenderSystem(LevelData level, MapData mapData, List<Texture2D> textures, float drawDistance = 15.0f)
     {
         _level = level;

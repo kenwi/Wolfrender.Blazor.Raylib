@@ -16,6 +16,7 @@ using Game.Features.Players;
 using Game.Features.Recording;
 using Game.Features.WorldObjects;
 using Game.Features.SoundPropagation;
+using Game.Engine.Rendering;
 using ImGuiNET;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
@@ -42,6 +43,7 @@ public class World : IScene
     private readonly CameraSystem _cameraSystem;
     private readonly DoorSystem _doorSystem;
     private readonly RenderSystem _renderSystem;
+    private readonly LightOcclusionMap _lightOcclusionMap = new();
     private readonly AnimationSystem _animationSystem;
     private readonly MinimapSystem _minimapSystem;
     private readonly ConsoleOverlay _consoleOverlay;
@@ -449,6 +451,7 @@ public class World : IScene
         _optionsMenu.Dismiss();
         _inputSystem.EnableMouse();
         _renderSystem.Dispose();
+        _lightOcclusionMap.Dispose();
     }
 
     public void ToggleMouse()
@@ -731,9 +734,15 @@ public class World : IScene
         var renderPosition = renderPose.Position;
         var renderTarget = renderCamera.Target;
 
+        _lightOcclusionMap.Update(_mapData, _doorSystem.Doors);
+        PrimitiveRenderer.SetLightOcclusionMap(_lightOcclusionMap, _mapData.Width, _mapData.Height);
+
         var mapLights = TileLightCollector.Collect(_mapData);
-        var activeTileLights = TileLightCollector.SelectNearest(
+        var visibleRooms = _renderSystem.ComputeVisibleRooms(renderPosition, _doorSystem.Doors);
+        var activeTileLights = TileLightCollector.SelectForVisibleRooms(
             mapLights,
+            _renderSystem.RoomMap,
+            visibleRooms,
             renderPosition,
             LightObjectEncoding.MaxShaderLights);
         PrimitiveRenderer.SetLightingParameters(renderPosition, tileLights: activeTileLights);
