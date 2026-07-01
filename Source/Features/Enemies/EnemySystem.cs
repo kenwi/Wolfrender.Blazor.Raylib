@@ -42,6 +42,8 @@ public class EnemySystem
     /// <summary>How long a fully-blocked slide must persist before the AI picks a different target.</summary>
     private const float StuckRecoverSeconds = 0.5f;
 
+    private bool IsPlayerTargetable => _player.IsAlive && !_player.IsFlying;
+
     public List<Enemy> Enemies => _enemies;
 
     public EnemySystem(
@@ -125,6 +127,9 @@ public class EnemySystem
 
         foreach (var enemy in _enemies)
         {
+            if (_player.IsFlying)
+                AbandonPlayerTarget(enemy);
+
             TryAwardKillPoints(enemy);
             TrySpawnAmmoDrop(enemy);
             UpdateBehavior(enemy, deltaTime);
@@ -219,7 +224,7 @@ public class EnemySystem
 
     private void OnIdle(Enemy enemy, float deltaTime)
     {
-        if (enemy.CanSeePlayer)
+        if (enemy.CanSeePlayer && IsPlayerTargetable)
         {
             enemy.TransitionTo(EnemyState.NOTICING);
             return;
@@ -232,7 +237,7 @@ public class EnemySystem
 
     private void OnWalking(Enemy enemy, float deltaTime)
     {
-        if (enemy.CanSeePlayer && _player.IsAlive)
+        if (enemy.CanSeePlayer && IsPlayerTargetable)
         {
             enemy.IsPatrolReturnPath = false;
             enemy.TransitionTo(EnemyState.NOTICING);
@@ -261,7 +266,14 @@ public class EnemySystem
 
         if (!enemy.CanSeePlayer)
         {
-            enemy.LastSeenPlayerPosition ??= _player.Position;
+            if (IsPlayerTargetable)
+                enemy.LastSeenPlayerPosition ??= _player.Position;
+            TryStartChaseToLastKnown(enemy);
+            return;
+        }
+
+        if (!IsPlayerTargetable)
+        {
             TryStartChaseToLastKnown(enemy);
             return;
         }
@@ -276,7 +288,7 @@ public class EnemySystem
 
     private void OnAttacking(Enemy enemy, float deltaTime)
     {
-        if (enemy.CanSeePlayer)
+        if (enemy.CanSeePlayer && IsPlayerTargetable)
         {
             if (!_player.IsAlive)
             {
@@ -310,7 +322,7 @@ public class EnemySystem
 
     private void OnSearching(Enemy enemy, float deltaTime)
     {
-        if (enemy.CanSeePlayer && _player.IsAlive)
+        if (enemy.CanSeePlayer && IsPlayerTargetable)
         {
             enemy.TransitionTo(EnemyState.NOTICING);
             return;
@@ -453,7 +465,7 @@ public class EnemySystem
 
     private void TryEnemyHitPlayer(Enemy enemy)
     {
-        if (_mapData == null || !_player.IsAlive)
+        if (_mapData == null || !IsPlayerTargetable)
             return;
 
         float quadSize = LevelData.QuadSize;
@@ -641,11 +653,28 @@ public class EnemySystem
     /// </summary>
     private void OrientTowardPlayerAfterHit(Enemy enemy)
     {
-        if (!_player.IsAlive)
+        if (!IsPlayerTargetable)
             return;
 
         enemy.LastSeenPlayerPosition = _player.Position;
         enemy.Rotation = GetFacingAngleToward(enemy.Position, _player.Position);
+    }
+
+    private void AbandonPlayerTarget(Enemy enemy)
+    {
+        if (enemy.EnemyState is EnemyState.DYING or EnemyState.CORPSE or EnemyState.HIT)
+            return;
+
+        enemy.CanSeePlayer = false;
+        enemy.ResetShootingState();
+
+        bool pursuingPlayer = enemy.LastSeenPlayerPosition.HasValue
+            || enemy.EnemyState is EnemyState.NOTICING or EnemyState.ATTACKING or EnemyState.SEARCHING;
+
+        if (!pursuingPlayer)
+            return;
+
+        ReturnToPatrol(enemy);
     }
 
     private static float GetFacingAngleToward(Vector3 from, Vector3 to)
@@ -840,7 +869,7 @@ public class EnemySystem
     /// </summary>
     private void UpdateHearing()
     {
-        if (_soundPropagationSystem is null || _mapData is null || !_player.IsAlive)
+        if (_soundPropagationSystem is null || _mapData is null || !IsPlayerTargetable)
         {
             _soundPropagationSystem?.ClearPendingEvents();
             return;
@@ -880,6 +909,9 @@ public class EnemySystem
 
     private void ReactToHeardGunshot(Enemy enemy)
     {
+        if (!IsPlayerTargetable)
+            return;
+
         if (enemy.EnemyState is EnemyState.ATTACKING && enemy.CanSeePlayer)
             return;
 
@@ -933,7 +965,7 @@ public class EnemySystem
 
             // Distance check
             float distTiles = Vector2.Distance(enemyTile, playerTile);
-            if (distTiles > enemy.SightRange)
+            if (!IsPlayerTargetable || distTiles > enemy.SightRange)
             {
                 enemy.CanSeePlayer = false;
                 continue;
