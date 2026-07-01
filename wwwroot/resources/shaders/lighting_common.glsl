@@ -4,6 +4,8 @@ uniform sampler2D occlusionMap;
 uniform vec2 mapSize;
 uniform float tileSize;
 
+varying vec3 fragNormal;
+
 float exponentialFalloffBrightness(float distance, float maxDistance, float minBright)
 {
     if (distance <= 0.0 || maxDistance <= 0.0)
@@ -93,6 +95,10 @@ bool lightPathBlocked(vec3 fromWorld, vec3 toWorld)
 
 float lightContributionAt(vec3 worldPos, vec3 lightPos, float radius)
 {
+    vec3 toLight = lightPos - worldPos;
+    if (dot(normalize(toLight), normalize(fragNormal)) <= 0.0)
+        return 0.0;
+
     if (lightPathBlocked(lightPos, worldPos))
         return 0.0;
 
