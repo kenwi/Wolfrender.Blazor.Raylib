@@ -47,7 +47,7 @@
     {
         if (int.TryParse(e.Value?.ToString(), out var val))
         {
-            pickup.TileX = Math.Clamp(val, 0, State.MapData.Width - 1);
+            State.SetPickupTilePosition(State.SelectedPickupIndex, val, pickup.TileY);
             OnChanged.InvokeAsync();
         }
     }
@@ -56,7 +56,7 @@
     {
         if (int.TryParse(e.Value?.ToString(), out var val))
         {
-            pickup.TileY = Math.Clamp(val, 0, State.MapData.Height - 1);
+            State.SetPickupTilePosition(State.SelectedPickupIndex, pickup.TileX, val);
             OnChanged.InvokeAsync();
         }
     }
@@ -65,15 +65,14 @@
     {
         if (int.TryParse(e.Value?.ToString(), out var val))
         {
-            pickup.Amount = Math.Max(0, val);
+            State.SetPickupAmount(State.SelectedPickupIndex, val);
             OnChanged.InvokeAsync();
         }
     }
 
     private void SetType(PickupPlacement pickup, PickupType type)
     {
-        pickup.Type = type;
-        State.SelectedPickupType = type;
+        State.SetPickupType(State.SelectedPickupIndex, type);
         OnChanged.InvokeAsync();
     }
 

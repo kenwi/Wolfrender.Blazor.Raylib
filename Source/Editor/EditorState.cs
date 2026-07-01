@@ -1,4 +1,6 @@
 using System.Numerics;
+using Game.Core.Level;
+using Game.Editor.Undo;
 using Game.Features.Doors;
 using Game.Features.Enemies;
 using Game.Features.LevelProgress;
@@ -26,6 +28,7 @@ public class EditorState
     public readonly Player Player;
     public readonly EditorCamera Camera;
     public readonly List<EditorLayer> Layers;
+    public readonly EditorUndoStack UndoStack = new();
 
     public enum EditorToolMode { Paint, Select }
 
@@ -99,6 +102,20 @@ public class EditorState
     private int _entityPropsDragStartTop;
     private int _entityPropsDragStartRight;
 
+    // Undo batching for paint strokes and entity drags
+    private List<TileChange>? _paintStroke;
+    private int _enemyDragIndex = -1;
+    private int _enemyDragStartX;
+    private int _enemyDragStartY;
+    private int _pickupDragIndex = -1;
+    private int _pickupDragStartX;
+    private int _pickupDragStartY;
+    private int? _pickupDragRemovedIndex;
+    private PickupPlacementData? _pickupDragRemovedPlacement;
+    private int _playerDragStartX;
+    private int _playerDragStartY;
+    private float _playerDragStartRotation;
+
     // Status message
     public string StatusMessage = "";
     public float StatusTimer;
@@ -143,6 +160,82 @@ public class EditorState
     public const string DoorsLayerName = "Doors";
 
     public void NotifyStateChanged() => StateChanged?.Invoke();
+
+    public bool CanUndo => UndoStack.CanUndo;
+    public bool CanRedo => UndoStack.CanRedo;
+
+    public bool Undo()
+    {
+        if (!UndoStack.CanUndo)
+            return false;
+
+        string description = UndoStack.UndoDescription!;
+        UndoStack.Undo(this);
+        SetStatus($"Undo: {description}");
+        NotifyStateChanged();
+        return true;
+    }
+
+    public bool Redo()
+    {
+        if (!UndoStack.CanRedo)
+            return false;
+
+        string description = UndoStack.RedoDescription!;
+        UndoStack.Redo(this);
+        SetStatus($"Redo: {description}");
+        NotifyStateChanged();
+        return true;
+    }
+
+    public void ApplyAfterMapMutation()
+    {
+        RefreshLayerReferences();
+        if (IsSimulating)
+        {
+            EnemySystem.Rebuild(MapData.Enemies, MapData);
+            DoorSystem.Rebuild(MapData.Doors, MapData.Width);
+            SecretSystem.Rebuild(MapData);
+        }
+    }
+
+    internal void RestoreMapFromJson(string json)
+    {
+        LevelSerializer.DeserializeFromJson(MapData, json);
+        RefreshLayerReferences();
+    }
+
+    public void ExecuteMapMutation(Action mutate, string description)
+    {
+        string before = LevelSerializer.SerializeToJson(MapData);
+        mutate();
+        string after = LevelSerializer.SerializeToJson(MapData);
+        UndoStack.Push(new ReplaceMapDataCommand(before, after, description));
+        ApplyAfterMapMutation();
+    }
+
+    public void LoadLevelFromJson(string path)
+    {
+        ExecuteMapMutation(() => LevelSerializer.LoadFromJson(MapData, path), $"Load {Path.GetFileName(path)}");
+        SetStatus($"Loaded from {path}");
+    }
+
+    public void LoadLevelFromTmx(string path)
+    {
+        ExecuteMapMutation(() => LevelSerializer.LoadFromTmx(MapData, path), $"Load {Path.GetFileName(path)}");
+        SetStatus($"Loaded TMX from {path}");
+    }
+
+    public void LoadLevelFromBmp(string path)
+    {
+        ExecuteMapMutation(() => LevelSerializer.LoadFromBmp(MapData, path), $"Load {Path.GetFileName(path)}");
+        SetStatus($"Loaded BMP from {path}");
+    }
+
+    public void LoadLevelFromJsonString(string json, string description)
+    {
+        ExecuteMapMutation(() => LevelSerializer.DeserializeFromJson(MapData, json), description);
+    }
 
     public void OnEnemyPlacementEdited()
     {
@@ -239,17 +332,23 @@ public class EditorState
     {
         if (!HasSelectedWall) return;
 
+        var before = CloneSecretPlacement(FindSecretWallAt(SelectedWallTileX, SelectedWallTileY));
         RemoveSecretWallAt(SelectedWallTileX, SelectedWallTileY);
+        SecretWallPlacement? after = null;
         if (isSecret)
         {
-            MapData.SecretWalls.Add(new SecretWallPlacement
+            after = new SecretWallPlacement
             {
                 TileX = SelectedWallTileX,
                 TileY = SelectedWallTileY,
                 Direction = direction,
                 TravelTiles = ClampSecretTravelTiles(SelectedWallTileX, SelectedWallTileY, direction, travelTiles)
-            });
+            };
+            MapData.SecretWalls.Add(after);
         }
+
+        if (!SecretPlacementsEqual(before, after))
+            UndoStack.Push(new SetSecretWallCommand(SelectedWallTileX, SelectedWallTileY, before, after));
 
         NotifyStateChanged();
     }
@@ -280,6 +379,24 @@ public class EditorState
     public int ClampSecretTravelTiles(int tileX, int tileY, SecretWallDirection direction, int travelTiles) =>
         Math.Clamp(travelTiles, 1, GetMaxSecretTravelTiles(tileX, tileY, direction));
 
+    public void BeginPaintStroke()
+    {
+        _paintStroke ??= new List<TileChange>();
+    }
+
+    public void EndPaintStroke()
+    {
+        if (_paintStroke == null || _paintStroke.Count == 0)
+        {
+            _paintStroke = null;
+            return;
+        }
+
+        UndoStack.Push(new PaintTilesCommand(_paintStroke));
+        _paintStroke = null;
+        NotifyStateChanged();
+    }
+
     public void PaintTile(int x, int y)
     {
         if (IsOnEnemyLayer || IsOnPickupLayer) return;
@@ -298,7 +415,26 @@ public class EditorState
         }
 
         var layer = Layers[ActiveLayerIndex];
-        layer.Tiles[MapData.Width * y + x] = SelectedTileId;
+        int idx = MapData.Width * y + x;
+        uint oldTile = layer.Tiles[idx];
+        if (oldTile == SelectedTileId)
+            return;
+
+        if (_paintStroke != null
+            && !_paintStroke.Exists(c => c.LayerIndex == ActiveLayerIndex && c.X == x && c.Y == y))
+        {
+            SecretWallPlacement? removedSecret = null;
+            if (IsOnWallsLayer && SelectedTileId == 0)
+            {
+                var secret = FindSecretWallAt(x, y);
+                if (secret != null)
+                    removedSecret = CloneSecretPlacement(secret);
+            }
+
+            _paintStroke.Add(new TileChange(ActiveLayerIndex, x, y, oldTile, SelectedTileId, removedSecret));
+        }
+
+        layer.Tiles[idx] = SelectedTileId;
 
         if (IsOnWallsLayer && SelectedTileId == 0)
             RemoveSecretWallAt(x, y);
@@ -307,14 +443,18 @@ public class EditorState
     public void PlaceEnemy(int x, int y)
     {
         if (x < 0 || x >= MapData.Width || y < 0 || y >= MapData.Height) return;
-        MapData.Enemies.Add(new EnemyPlacement
+        var placement = new EnemyPlacement
         {
             TileX = x, TileY = y, Rotation = 0, EnemyType = "Guard"
-        });
+        };
+        MapData.Enemies.Add(placement);
+        int index = MapData.Enemies.Count - 1;
+        UndoStack.Push(new AddEnemyCommand(index, EnemyPlacementData.FromPlacement(placement)));
         DeselectPickup();
         DeselectPlayer();
-        SelectedEnemyIndex = MapData.Enemies.Count - 1;
+        SelectedEnemyIndex = index;
         IsDraggingEnemy = true;
+        BeginEnemyDrag();
         NotifyStateChanged();
     }
 
@@ -342,7 +482,25 @@ public class EditorState
         DeselectPickup();
         IsPlayerSelected = true;
         IsDraggingPlayer = true;
+        _playerDragStartX = MapData.Spawn.TileX;
+        _playerDragStartY = MapData.Spawn.TileY;
+        _playerDragStartRotation = MapData.Spawn.Rotation;
         NotifyStateChanged();
+    }
+
+    public void EndPlayerDrag()
+    {
+        if (!IsPlayerSelected) return;
+
+        if (MapData.Spawn.TileX != _playerDragStartX
+            || MapData.Spawn.TileY != _playerDragStartY
+            || MapData.Spawn.Rotation != _playerDragStartRotation)
+        {
+            UndoStack.Push(new SetPlayerSpawnCommand(
+                _playerDragStartX, _playerDragStartY, _playerDragStartRotation,
+                MapData.Spawn.TileX, MapData.Spawn.TileY, MapData.Spawn.Rotation));
+            NotifyStateChanged();
+        }
     }
 
     /// <summary>Hide the yellow tile-under-cursor highlight when pointing at or dragging an entity.</summary>
@@ -356,7 +514,36 @@ public class EditorState
         DeselectPlayer();
         SelectedEnemyIndex = index;
         IsDraggingEnemy = true;
+        BeginEnemyDrag();
         NotifyStateChanged();
+    }
+
+    public void BeginEnemyDrag()
+    {
+        if (SelectedEnemyIndex < 0 || SelectedEnemyIndex >= MapData.Enemies.Count) return;
+        var enemy = MapData.Enemies[SelectedEnemyIndex];
+        _enemyDragIndex = SelectedEnemyIndex;
+        _enemyDragStartX = enemy.TileX;
+        _enemyDragStartY = enemy.TileY;
+    }
+
+    public void EndEnemyDrag()
+    {
+        if (_enemyDragIndex < 0 || _enemyDragIndex >= MapData.Enemies.Count)
+        {
+            _enemyDragIndex = -1;
+            return;
+        }
+
+        var enemy = MapData.Enemies[_enemyDragIndex];
+        if (enemy.TileX != _enemyDragStartX || enemy.TileY != _enemyDragStartY)
+        {
+            UndoStack.Push(new MoveEnemyCommand(
+                _enemyDragIndex, _enemyDragStartX, _enemyDragStartY, enemy.TileX, enemy.TileY));
+            NotifyStateChanged();
+        }
+
+        _enemyDragIndex = -1;
     }
 
     public void MoveEnemy(int x, int y)
@@ -370,9 +557,77 @@ public class EditorState
     public void DeleteSelectedEnemy()
     {
         if (SelectedEnemyIndex < 0 || SelectedEnemyIndex >= MapData.Enemies.Count) return;
-        MapData.Enemies.RemoveAt(SelectedEnemyIndex);
+        int index = SelectedEnemyIndex;
+        var data = EnemyPlacementData.FromPlacement(MapData.Enemies[index]);
+        MapData.Enemies.RemoveAt(index);
+        UndoStack.Push(new RemoveEnemyCommand(index, data));
         SelectedEnemyIndex = -1;
         NotifyStateChanged();
+    }
+
+    public void DeleteEnemyAt(int index)
+    {
+        if (index < 0 || index >= MapData.Enemies.Count) return;
+        var data = EnemyPlacementData.FromPlacement(MapData.Enemies[index]);
+        MapData.Enemies.RemoveAt(index);
+        UndoStack.Push(new RemoveEnemyCommand(index, data));
+        if (SelectedEnemyIndex == index)
+            SelectedEnemyIndex = -1;
+        else if (SelectedEnemyIndex > index)
+            SelectedEnemyIndex--;
+        NotifyStateChanged();
+    }
+
+    public void SetEnemyTilePosition(int index, int tileX, int tileY)
+    {
+        if (index < 0 || index >= MapData.Enemies.Count) return;
+        tileX = Math.Clamp(tileX, 0, MapData.Width - 1);
+        tileY = Math.Clamp(tileY, 0, MapData.Height - 1);
+        RecordEnemyChange(index, enemy =>
+        {
+            enemy.TileX = tileX;
+            enemy.TileY = tileY;
+        });
+    }
+
+    public void SetEnemyRotation(int index, float rotation)
+    {
+        if (index < 0 || index >= MapData.Enemies.Count) return;
+        RecordEnemyChange(index, enemy => enemy.Rotation = rotation);
+    }
+
+    public void SetEnemyType(int index, string enemyType)
+    {
+        if (index < 0 || index >= MapData.Enemies.Count) return;
+        RecordEnemyChange(index, enemy => enemy.EnemyType = enemyType);
+    }
+
+    public void SetEnemyStartsAsCorpse(int index, bool value)
+    {
+        if (index < 0 || index >= MapData.Enemies.Count) return;
+        RecordEnemyChange(index, enemy => enemy.StartsAsCorpse = value);
+    }
+
+    public void SetEnemyDropsAmmo(int index, bool value)
+    {
+        if (index < 0 || index >= MapData.Enemies.Count) return;
+        RecordEnemyChange(index, enemy => enemy.DropsAmmo = value);
+    }
+
+    public void ClearEnemyPatrolPath(int index)
+    {
+        if (index < 0 || index >= MapData.Enemies.Count) return;
+        if (MapData.Enemies[index].PatrolPath.Count == 0) return;
+        RecordEnemyChange(index, enemy => enemy.PatrolPath.Clear());
+    }
+
+    private void RecordEnemyChange(int index, Action<EnemyPlacement> apply)
+    {
+        var before = EnemyPlacementData.FromPlacement(MapData.Enemies[index]);
+        apply(MapData.Enemies[index]);
+        var after = EnemyPlacementData.FromPlacement(MapData.Enemies[index]);
+        UndoStack.Push(new ModifyEnemyCommand(index, before, after));
+        OnEnemyPlacementEdited();
     }
 
     public int FindPickupIndexAt(int tileX, int tileY) =>
@@ -387,20 +642,34 @@ public class EditorState
             return;
         }
 
+        int? replacedIndex = null;
+        PickupPlacementData? replacedPlacement = null;
         int existing = FindPickupIndexAt(x, y);
         if (existing >= 0)
+        {
+            replacedIndex = existing;
+            replacedPlacement = PickupPlacementData.FromPlacement(MapData.Pickups[existing]);
             MapData.Pickups.RemoveAt(existing);
+        }
 
-        MapData.Pickups.Add(new PickupPlacement
+        var placement = new PickupPlacement
         {
             TileX = x,
             TileY = y,
             Type = SelectedPickupType
-        });
+        };
+        MapData.Pickups.Add(placement);
+        int index = MapData.Pickups.Count - 1;
+        UndoStack.Push(new PlacePickupCommand(
+            index,
+            PickupPlacementData.FromPlacement(placement),
+            replacedIndex,
+            replacedPlacement));
         DeselectEnemy();
         DeselectPlayer();
-        SelectedPickupIndex = MapData.Pickups.Count - 1;
+        SelectedPickupIndex = index;
         IsDraggingPickup = true;
+        BeginPickupDrag();
         SetStatus($"Placed {SelectedPickupType} pickup");
         NotifyStateChanged();
     }
@@ -413,7 +682,49 @@ public class EditorState
         IsDraggingPickup = true;
         if (index >= 0 && index < MapData.Pickups.Count)
             SelectedPickupType = MapData.Pickups[index].Type;
+        BeginPickupDrag();
         NotifyStateChanged();
+    }
+
+    public void BeginPickupDrag()
+    {
+        if (SelectedPickupIndex < 0 || SelectedPickupIndex >= MapData.Pickups.Count) return;
+        var pickup = MapData.Pickups[SelectedPickupIndex];
+        _pickupDragIndex = SelectedPickupIndex;
+        _pickupDragStartX = pickup.TileX;
+        _pickupDragStartY = pickup.TileY;
+        _pickupDragRemovedIndex = null;
+        _pickupDragRemovedPlacement = null;
+    }
+
+    public void EndPickupDrag()
+    {
+        if (_pickupDragIndex < 0 || _pickupDragIndex >= MapData.Pickups.Count)
+        {
+            _pickupDragIndex = -1;
+            _pickupDragRemovedIndex = null;
+            _pickupDragRemovedPlacement = null;
+            return;
+        }
+
+        var pickup = MapData.Pickups[_pickupDragIndex];
+        if (pickup.TileX != _pickupDragStartX || pickup.TileY != _pickupDragStartY
+            || _pickupDragRemovedIndex.HasValue)
+        {
+            UndoStack.Push(new MovePickupCommand(
+                _pickupDragIndex,
+                _pickupDragStartX,
+                _pickupDragStartY,
+                pickup.TileX,
+                pickup.TileY,
+                _pickupDragRemovedIndex,
+                _pickupDragRemovedPlacement));
+            NotifyStateChanged();
+        }
+
+        _pickupDragIndex = -1;
+        _pickupDragRemovedIndex = null;
+        _pickupDragRemovedPlacement = null;
     }
 
     public void MovePickup(int x, int y)
@@ -428,7 +739,18 @@ public class EditorState
 
         int occupant = FindPickupIndexAt(x, y);
         if (occupant >= 0 && occupant != SelectedPickupIndex)
+        {
+            if (!_pickupDragRemovedIndex.HasValue)
+            {
+                _pickupDragRemovedIndex = occupant;
+                _pickupDragRemovedPlacement = PickupPlacementData.FromPlacement(MapData.Pickups[occupant]);
+            }
             MapData.Pickups.RemoveAt(occupant);
+            if (SelectedPickupIndex > occupant)
+                SelectedPickupIndex--;
+            if (_pickupDragIndex > occupant)
+                _pickupDragIndex--;
+        }
 
         pickup.TileX = x;
         pickup.TileY = y;
@@ -439,8 +761,58 @@ public class EditorState
     public void DeleteSelectedPickup()
     {
         if (SelectedPickupIndex < 0 || SelectedPickupIndex >= MapData.Pickups.Count) return;
-        MapData.Pickups.RemoveAt(SelectedPickupIndex);
+        int index = SelectedPickupIndex;
+        var data = PickupPlacementData.FromPlacement(MapData.Pickups[index]);
+        MapData.Pickups.RemoveAt(index);
+        UndoStack.Push(new RemovePickupCommand(index, data));
         SelectedPickupIndex = -1;
+        NotifyStateChanged();
+    }
+
+    public void DeletePickupAt(int index)
+    {
+        if (index < 0 || index >= MapData.Pickups.Count) return;
+        var data = PickupPlacementData.FromPlacement(MapData.Pickups[index]);
+        MapData.Pickups.RemoveAt(index);
+        UndoStack.Push(new RemovePickupCommand(index, data));
+        if (SelectedPickupIndex == index)
+            SelectedPickupIndex = -1;
+        else if (SelectedPickupIndex > index)
+            SelectedPickupIndex--;
+        NotifyStateChanged();
+    }
+
+    public void SetPickupTilePosition(int index, int tileX, int tileY)
+    {
+        if (index < 0 || index >= MapData.Pickups.Count) return;
+        tileX = Math.Clamp(tileX, 0, MapData.Width - 1);
+        tileY = Math.Clamp(tileY, 0, MapData.Height - 1);
+        RecordPickupChange(index, pickup =>
+        {
+            pickup.TileX = tileX;
+            pickup.TileY = tileY;
+        });
+    }
+
+    public void SetPickupAmount(int index, int amount)
+    {
+        if (index < 0 || index >= MapData.Pickups.Count) return;
+        RecordPickupChange(index, pickup => pickup.Amount = Math.Max(0, amount));
+    }
+
+    public void SetPickupType(int index, PickupType type)
+    {
+        if (index < 0 || index >= MapData.Pickups.Count) return;
+        RecordPickupChange(index, pickup => pickup.Type = type);
+        SelectedPickupType = type;
+    }
+
+    private void RecordPickupChange(int index, Action<PickupPlacement> apply)
+    {
+        var before = PickupPlacementData.FromPlacement(MapData.Pickups[index]);
+        apply(MapData.Pickups[index]);
+        var after = PickupPlacementData.FromPlacement(MapData.Pickups[index]);
+        UndoStack.Push(new ModifyPickupCommand(index, before, after));
         NotifyStateChanged();
     }
 
@@ -454,7 +826,11 @@ public class EditorState
     {
         if (PatrolEditEnemyIndex >= 0 && PatrolEditEnemyIndex < MapData.Enemies.Count)
         {
-            MapData.Enemies[PatrolEditEnemyIndex].PatrolPath = new List<PatrolWaypoint>(PatrolPathInProgress);
+            var enemy = MapData.Enemies[PatrolEditEnemyIndex];
+            var before = enemy.PatrolPath.Select(w => new PatrolWaypoint { TileX = w.TileX, TileY = w.TileY }).ToList();
+            var after = PatrolPathInProgress.Select(w => new PatrolWaypoint { TileX = w.TileX, TileY = w.TileY }).ToList();
+            enemy.PatrolPath = new List<PatrolWaypoint>(after);
+            UndoStack.Push(new SetPatrolPathCommand(PatrolEditEnemyIndex, before, after));
         }
         IsEditingPatrolPath = false;
         PatrolPathInProgress.Clear();
@@ -520,6 +896,12 @@ public class EditorState
 
     public void ClearLevel()
     {
+        ExecuteMapMutation(ClearLevelCore, "New level");
+        SetStatus("New empty level created");
+    }
+
+    private void ClearLevelCore()
+    {
         int tileCount = MapData.Width * MapData.Height;
         MapData.Floor = new uint[tileCount];
         MapData.Walls = new uint[tileCount];
@@ -536,8 +918,6 @@ public class EditorState
         SelectedPickupIndex = -1;
         HoveredPickupIndex = -1;
         ClearWallSelection();
-        RefreshLayerReferences();
-        SetStatus("New empty level created");
     }
 
     public void RefreshLayerReferences()
@@ -689,17 +1069,39 @@ public class EditorState
         if (tileX < 0 || tileX >= MapData.Width || tileY < 0 || tileY >= MapData.Height)
             return;
 
+        int oldX = MapData.Spawn.TileX;
+        int oldY = MapData.Spawn.TileY;
+        float oldRotation = MapData.Spawn.Rotation;
+        if (oldX == tileX && oldY == tileY)
+            return;
+
         MapData.Spawn.TileX = tileX;
         MapData.Spawn.TileY = tileY;
         PlayerSpawn.ApplyFromMap(Player, MapData, PlayerSpawnApplyMode.PositionAndCameraOnly);
+
+        if (!IsDraggingPlayer)
+        {
+            UndoStack.Push(new SetPlayerSpawnCommand(
+                oldX, oldY, oldRotation, tileX, tileY, MapData.Spawn.Rotation));
+        }
+
         NotifyStateChanged();
     }
 
     public void SetPlayerSpawnRotationIndex(int rotIndex)
     {
         const float step = MathF.PI / 4f;
-        MapData.Spawn.Rotation = Math.Clamp(rotIndex, 0, 7) * step;
+        int oldX = MapData.Spawn.TileX;
+        int oldY = MapData.Spawn.TileY;
+        float oldRotation = MapData.Spawn.Rotation;
+        float newRotation = Math.Clamp(rotIndex, 0, 7) * step;
+        if (MathF.Abs(oldRotation - newRotation) < 0.0001f)
+            return;
+
+        MapData.Spawn.Rotation = newRotation;
         PlayerSpawn.ApplyCameraFromMap(Player, MapData);
+        UndoStack.Push(new SetPlayerSpawnCommand(
+            oldX, oldY, oldRotation, oldX, oldY, newRotation));
         NotifyStateChanged();
     }
 
@@ -895,5 +1297,24 @@ public class EditorState
 
         (Layers[from], Layers[to]) = (Layers[to], Layers[from]);
         NotifyStateChanged();
+    }
+
+    private static SecretWallPlacement? CloneSecretPlacement(SecretWallPlacement? secret) =>
+        secret == null ? null : new SecretWallPlacement
+        {
+            TileX = secret.TileX,
+            TileY = secret.TileY,
+            Direction = secret.Direction,
+            TravelTiles = secret.TravelTiles
+        };
+
+    private static bool SecretPlacementsEqual(SecretWallPlacement? a, SecretWallPlacement? b)
+    {
+        if (a == null && b == null) return true;
+        if (a == null || b == null) return false;
+        return a.TileX == b.TileX
+            && a.TileY == b.TileY
+            && a.Direction == b.Direction
+            && a.TravelTiles == b.TravelTiles;
     }
 }
