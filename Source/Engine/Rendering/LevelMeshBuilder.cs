@@ -96,13 +96,28 @@ internal static class LevelMeshBuilder
         }
     }
 
+    /// <summary>
+    /// True when no wall face should be emitted toward neighbor (x, y):
+    /// solid wall, map out-of-bounds, or unused padding tiles (map void).
+    /// </summary>
     private static bool BlocksWallFace(MapData mapData, int x, int y)
     {
         if (x < 0 || x >= mapData.Width || y < 0 || y >= mapData.Height)
             return true;
 
         int index = LevelData.GetIndex(x, y, mapData.Width);
-        return mapData.Walls[index] != 0;
+        if (mapData.Walls[index] != 0)
+            return true;
+
+        // Playable open tiles (and doorways) still need the adjacent wall face.
+        if (mapData.Floor[index] != 0 || mapData.Ceiling[index] != 0)
+            return false;
+
+        if (mapData.Doors[index] != 0 && DoorTileEncoding.IsDoorTile(mapData.Doors[index]))
+            return false;
+
+        // In-bounds map void (no layers) - exterior shell not visible in play.
+        return true;
     }
 
     private static void AddWallTile(
