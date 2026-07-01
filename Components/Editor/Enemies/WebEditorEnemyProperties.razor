@@ -87,7 +87,7 @@
         if (int.TryParse(e.Value?.ToString(), out var idx))
         {
             const float step = MathF.PI / 4f;
-            enemy.Rotation = Math.Clamp(idx, 0, 7) * step;
+            State.SetEnemyRotation(State.SelectedEnemyIndex, Math.Clamp(idx, 0, 7) * step);
             OnChanged.InvokeAsync();
         }
     }
@@ -96,7 +96,7 @@
     {
         if (int.TryParse(e.Value?.ToString(), out var val))
         {
-            enemy.TileX = Math.Clamp(val, 0, State.MapData.Width - 1);
+            State.SetEnemyTilePosition(State.SelectedEnemyIndex, val, enemy.TileY);
             OnChanged.InvokeAsync();
         }
     }
@@ -105,14 +105,14 @@
     {
         if (int.TryParse(e.Value?.ToString(), out var val))
         {
-            enemy.TileY = Math.Clamp(val, 0, State.MapData.Height - 1);
+            State.SetEnemyTilePosition(State.SelectedEnemyIndex, enemy.TileX, val);
             OnChanged.InvokeAsync();
         }
     }
 
     private void ClearPath(EnemyPlacement enemy)
     {
-        enemy.PatrolPath.Clear();
+        State.ClearEnemyPatrolPath(State.SelectedEnemyIndex);
         OnChanged.InvokeAsync();
     }
 
@@ -124,21 +124,19 @@
 
     private void SetGuardType(EnemyPlacement enemy)
     {
-        enemy.EnemyType = "Guard";
+        State.SetEnemyType(State.SelectedEnemyIndex, "Guard");
         OnChanged.InvokeAsync();
     }
 
     private void ToggleCorpse(EnemyPlacement enemy, ChangeEventArgs e)
     {
-        enemy.StartsAsCorpse = e.Value is bool b && b;
-        State.OnEnemyPlacementEdited();
+        State.SetEnemyStartsAsCorpse(State.SelectedEnemyIndex, e.Value is bool b && b);
         OnChanged.InvokeAsync();
     }
 
     private void ToggleDropsAmmo(EnemyPlacement enemy, ChangeEventArgs e)
     {
-        enemy.DropsAmmo = e.Value is bool b && b;
-        State.OnEnemyPlacementEdited();
+        State.SetEnemyDropsAmmo(State.SelectedEnemyIndex, e.Value is bool b && b);
         OnChanged.InvokeAsync();
     }
 

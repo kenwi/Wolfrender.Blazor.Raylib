@@ -67,7 +67,7 @@ public class LevelEditorScene : IScene
                 if (ctrlHeld)
                     _state.Layers[i].IsVisible = !_state.Layers[i].IsVisible;
                 else
-                    _state.ActiveLayerIndex = i;
+                    _state.SetActiveLayerIndex(i);
             }
         }
 
@@ -88,6 +88,11 @@ public class LevelEditorScene : IScene
 
         if (!imGuiWantsKeyboard)
         {
+            if (IsKeyPressed(KeyboardKey.Z) && ctrlHeld)
+                _state.Undo();
+            else if (IsKeyPressed(KeyboardKey.Y) && ctrlHeld)
+                _state.Redo();
+
             if (IsKeyPressed(KeyboardKey.B))
                 _state.SetToolMode(EditorState.EditorToolMode.Paint);
             if (IsKeyPressed(KeyboardKey.V))
@@ -109,7 +114,14 @@ public class LevelEditorScene : IScene
 
         // Drop the click-suppression latch as soon as the user lets go.
         if (IsMouseButtonReleased(MouseButton.Left))
+        {
+            _state.EndPaintStroke();
+            _state.EndEnemyDrag();
+            _state.EndPickupDrag();
+            _state.EndPlayerDrag();
+            _state.IsDraggingPlayer = false;
             _suppressMapClickUntilRelease = false;
+        }
 
         // Patrol path editing mode
         if (_state.IsEditingPatrolPath)
@@ -251,13 +263,13 @@ public class LevelEditorScene : IScene
         rlImGui.Begin();
         bool menuToggleSim = _gui.RenderMenuBar(_state.IsSimulating, _state, _state.EnemySystem, _state.DoorSystem, _state.ClearLevel, _state.RefreshLayerReferences);
         if (menuToggleSim) _state.ToggleSimulation();
-        _gui.RenderFileDialogs(_state.RefreshLayerReferences);
-        _gui.RenderLayerPanel(_state.Layers, ref _state.ActiveLayerIndex);
+        _gui.RenderFileDialogs(_state);
+        _gui.RenderLayerPanel(_state.Layers, _state);
         _gui.RenderTilePalette(_state.Layers, _state.ActiveLayerIndex, _state, ref _state.SelectedTileId, ref _state.SelectedPickupType);
         _gui.RenderPickupPalette(_state);
         _gui.RenderInfoPanel(tileX, tileY, worldPos, tileInBounds, _state.CursorInfoFollowsMouse, _state.Layers);
         _gui.RenderEntityPropertiesPanel(_state, ref _state.SelectedEnemyIndex, ref _state.IsEditingPatrolPath, ref _state.PatrolEditEnemyIndex, _state.PatrolPathInProgress);
-        _gui.RenderPickupPropertiesPanel(ref _state.SelectedPickupIndex);
+        _gui.RenderPickupPropertiesPanel(_state, ref _state.SelectedPickupIndex);
         _gui.RenderWallPropertiesPanel(_state);
         _gui.RenderDebugLogPanel();
         _gui.RenderPathfindingPanel(_state);
@@ -406,6 +418,14 @@ public class LevelEditorScene : IScene
         {
             if (_state.IsWallSelectMode)
                 HandleWallSelectInput(mouseOverUI);
+            else if (IsMouseButtonPressed(MouseButton.Left))
+            {
+                _state.BeginPaintStroke();
+                var paintPos = _state.Camera.ScreenToWorld(GetMousePosition());
+                int px = (int)MathF.Floor(paintPos.X);
+                int py = (int)MathF.Floor(paintPos.Y);
+                _state.PaintTile(px, py);
+            }
             else if (IsMouseButtonDown(MouseButton.Left))
             {
                 var paintPos = _state.Camera.ScreenToWorld(GetMousePosition());

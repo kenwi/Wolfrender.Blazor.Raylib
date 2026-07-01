@@ -76,11 +76,20 @@ public class EditorMapRenderer
                 float drawX = x * tileSize + camera.Offset.X;
                 float drawY = y * tileSize + camera.Offset.Y;
 
-                bool isDoorTile = DoorTileEncoding.TryParse(tileId, out var doorInfo);
-                bool isVerticalDoor = isDoorTile && doorInfo.Rotation == DoorRotation.VERTICAL;
-                int textureIndex = isDoorTile
-                    ? doorInfo.TextureIndex
-                    : (int)tileId - 1;
+                bool isDoorsLayer = layer.Name == EditorState.DoorsLayerName;
+                DoorTileEncoding.DoorTileInfo doorInfo = default;
+                bool isDoorTile = isDoorsLayer && DoorTileEncoding.TryParse(tileId, out doorInfo);
+                int textureIndex;
+                bool isVerticalDoor = false;
+                if (isDoorTile)
+                {
+                    textureIndex = doorInfo.TextureIndex;
+                    isVerticalDoor = doorInfo.Rotation == DoorRotation.VERTICAL;
+                }
+                else
+                {
+                    textureIndex = (int)tileId - 1;
+                }
 
                 if (textureIndex >= 0 && textureIndex < _mapData.TileTextures.Count)
                 {

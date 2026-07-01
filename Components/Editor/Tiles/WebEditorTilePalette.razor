@@ -1,5 +1,6 @@
 @namespace Wolfrender.Blazor.Raylib.Components.Editor
 @using Game.Editor
+@using Game.Engine.Rendering
 
 <div class="editor-panel editor-tile-palette" @onpointerenter="OnPointerEnter" @onpointerleave="OnPointerLeave">
     <h3>Tile Palette</h3>
@@ -16,6 +17,10 @@
         {
             var index = i;
             uint tileId = (uint)(index + 1);
+            if (!EditorTilePalette.IsArchitecturalTileId(tileId))
+            {
+                continue;
+            }
             <button class="tile-btn @(State.SelectedTileId == tileId ? "selected" : "")"
                     title="Tile ID: @tileId"
                     @onclick="() => SelectTile(tileId)">
@@ -35,8 +40,16 @@
 
     private void SelectTile(uint tileId)
     {
+        if (!EditorTilePalette.IsTileIdValidForLayer(tileId, State.ActiveLayer.Name))
+            return;
+
         State.SelectedTileId = tileId;
         OnChanged.InvokeAsync();
+    }
+
+    protected override void OnParametersSet()
+    {
+        State.SanitizeSelectedTileForActiveLayer();
     }
 
     private void OnPointerEnter() => State.IsMouseOverUI = true;
