@@ -48,7 +48,11 @@ public sealed class StaticLevelMeshes : IDisposable
         _trackedGeometryVersion = mapData.GeometryVersion;
     }
 
-    public void Draw(IReadOnlyList<Texture2D> textures, Shader lightingShader, LevelMeshLayer? layerFilter = null)
+    public void Draw(
+        IReadOnlyList<Texture2D> textures,
+        Shader lightingShader,
+        LevelMeshLayer? layerFilter = null,
+        IReadOnlySet<int>? visibleRooms = null)
     {
         if (_batches.Count == 0)
             return;
@@ -60,6 +64,9 @@ public sealed class StaticLevelMeshes : IDisposable
             if (layerFilter.HasValue && batch.Layer != layerFilter.Value)
                 continue;
 
+            if (!ShouldDrawBatch(batch, visibleRooms))
+                continue;
+
             if (batch.TextureIndex < 0 || batch.TextureIndex >= textures.Count)
                 continue;
 
@@ -69,16 +76,31 @@ public sealed class StaticLevelMeshes : IDisposable
         }
     }
 
-    public int CountQuads(LevelMeshLayer? layerFilter = null)
+    public int CountQuads(LevelMeshLayer? layerFilter = null, IReadOnlySet<int>? visibleRooms = null)
     {
         int count = 0;
         foreach (var batch in _batches)
         {
             if (layerFilter.HasValue && batch.Layer != layerFilter.Value)
                 continue;
+
+            if (!ShouldDrawBatch(batch, visibleRooms))
+                continue;
+
             count += batch.QuadCount;
         }
         return count;
+    }
+
+    private static bool ShouldDrawBatch(LevelMeshBuilder.MeshBatch batch, IReadOnlySet<int>? visibleRooms)
+    {
+        if (visibleRooms == null)
+            return true;
+
+        if (batch.RoomId < 0)
+            return true;
+
+        return visibleRooms.Contains(batch.RoomId);
     }
 
     public void Dispose()

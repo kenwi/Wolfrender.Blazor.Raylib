@@ -14,6 +14,7 @@ public class RenderSystem : IDisposable
     private readonly List<Texture2D> _textures;
     private readonly float _drawDistance;
     private readonly StaticLevelMeshes _staticMeshes = new();
+    private LevelRoomMap _roomMap;
     private HashSet<(int x, int y)> _secretTiles = new();
     private const float TileSize = 4.0f;
     /// <summary>Extra half-angle beyond the view frustum (projection / pitch slack).</summary>
@@ -38,12 +39,14 @@ public class RenderSystem : IDisposable
         _mapData = mapData;
         _textures = textures;
         _drawDistance = drawDistance;
+        _roomMap = LevelRoomMap.Build(mapData);
         _staticMeshes.Rebuild(mapData, textures);
         RebuildSecretTileSet();
     }
 
     public void RebuildMeshes()
     {
+        _roomMap = LevelRoomMap.Build(_mapData);
         _staticMeshes.Rebuild(_mapData, _textures);
         RebuildSecretTileSet();
     }
@@ -55,7 +58,7 @@ public class RenderSystem : IDisposable
             _secretTiles.Add((secret.TileX, secret.TileY));
     }
 
-    public void Render(Camera3D camera, int viewportWidth, int viewportHeight)
+    public void Render(Camera3D camera, int viewportWidth, int viewportHeight, IReadOnlyList<Door> doors)
     {
         LevelData.DrawedQuads = 0;
         _renderedTiles.Clear();
@@ -64,32 +67,40 @@ public class RenderSystem : IDisposable
 
         if (UseStaticMeshes && _staticMeshes.HasMeshes)
         {
-            TrackVisibleTiles(camera, viewportWidth, viewportHeight);
-            DrawStaticMeshes();
-            RenderVisibleFloorsAndCeilings(camera.Position);
+            DrawStaticMeshes(camera, doors);
             return;
         }
 
         RenderLegacyTiles(camera, viewportWidth, viewportHeight);
     }
 
-    private void DrawStaticMeshes()
+    private void DrawStaticMeshes(Camera3D camera, IReadOnlyList<Door> doors)
     {
         var lightingShader = PrimitiveRenderer.GetLightingShader();
         if (!lightingShader.HasValue)
             return;
 
+        var (playerTileX, playerTileY) = LevelData.GetEntityTileFromWorld(camera.Position.X, camera.Position.Z);
+        var visibleRooms = _roomMap.ComputeVisibleRooms(playerTileX, playerTileY, doors);
+        TrackVisibleRoomTiles(visibleRooms);
+
         PrimitiveRenderer.ApplyWallLightingUniforms();
-        _staticMeshes.Draw(_textures, lightingShader.Value, LevelMeshLayer.Walls);
-        LevelData.DrawedQuads = _staticMeshes.CountQuads(LevelMeshLayer.Walls);
+        _staticMeshes.Draw(_textures, lightingShader.Value, visibleRooms: visibleRooms);
+        LevelData.DrawedQuads = _staticMeshes.CountQuads(visibleRooms: visibleRooms);
     }
 
-    private void RenderVisibleFloorsAndCeilings(Vector3 playerPosition)
+    private void TrackVisibleRoomTiles(HashSet<int> visibleRooms)
     {
-        foreach (var (x, y) in _renderedTiles)
+        foreach (var (x, y, roomId) in _roomMap.EnumerateRoomTiles())
         {
-            Vector3 worldPos = new Vector3(x * TileSize, 0, y * TileSize);
-            RenderFloorAndCeiling(x, y, worldPos);
+            if (visibleRooms.Contains(roomId))
+                _renderedTiles.Add((x, y));
+        }
+
+        foreach (var link in _roomMap.DoorLinks)
+        {
+            if (visibleRooms.Contains(link.RoomA) || visibleRooms.Contains(link.RoomB))
+                _renderedTiles.Add((link.DoorTileX, link.DoorTileY));
         }
     }
 

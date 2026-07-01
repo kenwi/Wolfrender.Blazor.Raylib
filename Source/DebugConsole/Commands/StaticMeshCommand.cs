@@ -3,7 +3,7 @@ namespace Game.DebugConsole.Commands;
 public sealed class StaticMeshCommand : IConsoleCommand
 {
     public string Name => "staticmesh";
-    public string Description => "Toggles baked static wall meshes vs legacy immediate-mode quads.";
+    public string Description => "Toggles room-scoped baked meshes vs legacy immediate-mode quads.";
     public string Usage => "staticmesh [on|off|status]";
 
     public ConsoleCommandResult Execute(ConsoleCommandContext context, IReadOnlyList<string> args)

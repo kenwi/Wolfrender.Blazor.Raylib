@@ -8,6 +8,7 @@ namespace Game.Engine.Rendering;
 
 /// <summary>
 /// Bakes static wall/floor/ceiling geometry from <see cref="MapData"/> with neighbor face culling.
+/// Walls, floors, and ceilings are grouped per room for visibility filtering at draw time.
 /// </summary>
 internal static class LevelMeshBuilder
 {
@@ -25,6 +26,8 @@ internal static class LevelMeshBuilder
         public required int TextureIndex { get; init; }
         public required LevelMeshLayer Layer { get; init; }
         public required int QuadCount { get; init; }
+        /// <summary>Room id for baked batches; -1 for unassigned geometry.</summary>
+        public int RoomId { get; init; } = -1;
     }
 
     public static List<MeshBatch> Build(MapData mapData)
@@ -32,10 +35,11 @@ internal static class LevelMeshBuilder
         int width = mapData.Width;
         int height = mapData.Height;
         int maxTextureIndex = mapData.TileTextures.Count;
+        var roomMap = LevelRoomMap.Build(mapData);
 
-        var wallBuilders = CreateBuilders(maxTextureIndex);
-        var floorBuilders = CreateBuilders(maxTextureIndex);
-        var ceilingBuilders = CreateBuilders(maxTextureIndex);
+        var wallBuilders = new Dictionary<int, MeshGeometryBuilder[]>();
+        var floorBuilders = new Dictionary<int, MeshGeometryBuilder[]>();
+        var ceilingBuilders = new Dictionary<int, MeshGeometryBuilder[]>();
         var secretTiles = BuildSecretTileSet(mapData);
 
         for (int y = 0; y < height; y++)
@@ -47,26 +51,47 @@ internal static class LevelMeshBuilder
 
                 uint wallTile = mapData.Walls[index];
                 if (wallTile != 0 && !hasDoor)
-                    AddWallTile(wallBuilders, mapData, x, y, (int)wallTile - 1);
+                    AddWallTile(wallBuilders, roomMap, mapData, x, y, (int)wallTile - 1, maxTextureIndex);
 
                 if (!ShouldEmitFloorOrCeiling(mapData, x, y, hasDoor, secretTiles))
                     continue;
 
+                var roomIds = roomMap.GetTileRoomIds(x, y);
                 uint floorTile = mapData.Floor[index];
                 if (floorTile != 0)
-                    AddFloorTile(floorBuilders, (int)floorTile - 1, x, y);
+                {
+                    foreach (int roomId in roomIds)
+                        AddFloorTile(GetRoomBuilders(floorBuilders, roomId, maxTextureIndex), (int)floorTile - 1, x, y);
+                }
 
                 uint ceilingTile = mapData.Ceiling[index];
                 if (ceilingTile != 0)
-                    AddCeilingTile(ceilingBuilders, (int)ceilingTile - 1, x, y);
+                {
+                    foreach (int roomId in roomIds)
+                        AddCeilingTile(GetRoomBuilders(ceilingBuilders, roomId, maxTextureIndex), (int)ceilingTile - 1, x, y);
+                }
             }
         }
 
         var batches = new List<MeshBatch>();
-        AppendBatches(batches, wallBuilders, LevelMeshLayer.Walls);
-        AppendBatches(batches, floorBuilders, LevelMeshLayer.Floors);
-        AppendBatches(batches, ceilingBuilders, LevelMeshLayer.Ceilings);
+        AppendRoomBatches(batches, wallBuilders, LevelMeshLayer.Walls);
+        AppendRoomBatches(batches, floorBuilders, LevelMeshLayer.Floors);
+        AppendRoomBatches(batches, ceilingBuilders, LevelMeshLayer.Ceilings);
         return batches;
+    }
+
+    private static MeshGeometryBuilder[] GetRoomBuilders(
+        Dictionary<int, MeshGeometryBuilder[]> buildersByRoom,
+        int roomId,
+        int textureCount)
+    {
+        if (!buildersByRoom.TryGetValue(roomId, out var builders))
+        {
+            builders = CreateBuilders(textureCount);
+            buildersByRoom[roomId] = builders;
+        }
+
+        return builders;
     }
 
     /// <summary>
@@ -105,24 +130,28 @@ internal static class LevelMeshBuilder
         return builders;
     }
 
-    private static void AppendBatches(
+    private static void AppendRoomBatches(
         List<MeshBatch> batches,
-        MeshGeometryBuilder[] builders,
+        Dictionary<int, MeshGeometryBuilder[]> buildersByRoom,
         LevelMeshLayer layer)
     {
-        for (int textureIndex = 0; textureIndex < builders.Length; textureIndex++)
+        foreach (var (roomId, builders) in buildersByRoom.OrderBy(pair => pair.Key))
         {
-            foreach (var (mesh, quadCount) in builders[textureIndex].BuildMeshes())
+            for (int textureIndex = 0; textureIndex < builders.Length; textureIndex++)
             {
-                if (mesh.VertexCount > 0)
+                foreach (var (mesh, quadCount) in builders[textureIndex].BuildMeshes())
                 {
-                    batches.Add(new MeshBatch
+                    if (mesh.VertexCount > 0)
                     {
-                        Mesh = mesh,
-                        TextureIndex = textureIndex,
-                        Layer = layer,
-                        QuadCount = quadCount
-                    });
+                        batches.Add(new MeshBatch
+                        {
+                            Mesh = mesh,
+                            TextureIndex = textureIndex,
+                            Layer = layer,
+                            QuadCount = quadCount,
+                            RoomId = roomId
+                        });
+                    }
                 }
             }
         }
@@ -153,13 +182,15 @@ internal static class LevelMeshBuilder
     }
 
     private static void AddWallTile(
-        MeshGeometryBuilder[] builders,
+        Dictionary<int, MeshGeometryBuilder[]> buildersByRoom,
+        LevelRoomMap roomMap,
         MapData mapData,
         int x,
         int y,
-        int textureIndex)
+        int textureIndex,
+        int maxTextureIndex)
     {
-        if (textureIndex < 0 || textureIndex >= builders.Length)
+        if (textureIndex < 0)
             return;
 
         float cx = x * TileSize;
@@ -167,50 +198,75 @@ internal static class LevelMeshBuilder
         float cz = y * TileSize;
         float half = TileSize * 0.5f;
 
-        var builder = builders[textureIndex];
+        TryAddWallFace(buildersByRoom, roomMap, mapData, x, y, textureIndex, maxTextureIndex, x, y + 1,
+            new Vector3(cx - half, cy - half, cz + half),
+            new Vector3(cx + half, cy - half, cz + half),
+            new Vector3(cx + half, cy + half, cz + half),
+            new Vector3(cx - half, cy + half, cz + half),
+            new Vector3(0f, 0f, 1f),
+            T(0f, 0f), T(1f, 0f), T(1f, 1f), T(0f, 1f));
 
-        if (!BlocksWallFace(mapData, x, y + 1))
-        {
-            builder.AddQuad(
-                new Vector3(cx - half, cy - half, cz + half),
-                new Vector3(cx + half, cy - half, cz + half),
-                new Vector3(cx + half, cy + half, cz + half),
-                new Vector3(cx - half, cy + half, cz + half),
-                new Vector3(0f, 0f, 1f),
-                T(0f, 0f), T(1f, 0f), T(1f, 1f), T(0f, 1f));
-        }
+        TryAddWallFace(buildersByRoom, roomMap, mapData, x, y, textureIndex, maxTextureIndex, x, y - 1,
+            new Vector3(cx - half, cy - half, cz - half),
+            new Vector3(cx - half, cy + half, cz - half),
+            new Vector3(cx + half, cy + half, cz - half),
+            new Vector3(cx + half, cy - half, cz - half),
+            new Vector3(0f, 0f, -1f),
+            T(1f, 0f), T(1f, 1f), T(0f, 1f), T(0f, 0f));
 
-        if (!BlocksWallFace(mapData, x, y - 1))
-        {
-            builder.AddQuad(
-                new Vector3(cx - half, cy - half, cz - half),
-                new Vector3(cx - half, cy + half, cz - half),
-                new Vector3(cx + half, cy + half, cz - half),
-                new Vector3(cx + half, cy - half, cz - half),
-                new Vector3(0f, 0f, -1f),
-                T(1f, 0f), T(1f, 1f), T(0f, 1f), T(0f, 0f));
-        }
+        TryAddWallFace(buildersByRoom, roomMap, mapData, x, y, textureIndex, maxTextureIndex, x + 1, y,
+            new Vector3(cx + half, cy - half, cz - half),
+            new Vector3(cx + half, cy + half, cz - half),
+            new Vector3(cx + half, cy + half, cz + half),
+            new Vector3(cx + half, cy - half, cz + half),
+            new Vector3(1f, 0f, 0f),
+            T(1f, 0f), T(1f, 1f), T(0f, 1f), T(0f, 0f));
 
-        if (!BlocksWallFace(mapData, x + 1, y))
-        {
-            builder.AddQuad(
-                new Vector3(cx + half, cy - half, cz - half),
-                new Vector3(cx + half, cy + half, cz - half),
-                new Vector3(cx + half, cy + half, cz + half),
-                new Vector3(cx + half, cy - half, cz + half),
-                new Vector3(1f, 0f, 0f),
-                T(1f, 0f), T(1f, 1f), T(0f, 1f), T(0f, 0f));
-        }
+        TryAddWallFace(buildersByRoom, roomMap, mapData, x, y, textureIndex, maxTextureIndex, x - 1, y,
+            new Vector3(cx - half, cy - half, cz - half),
+            new Vector3(cx - half, cy - half, cz + half),
+            new Vector3(cx - half, cy + half, cz + half),
+            new Vector3(cx - half, cy + half, cz - half),
+            new Vector3(-1f, 0f, 0f),
+            T(0f, 0f), T(1f, 0f), T(1f, 1f), T(0f, 1f));
+    }
 
-        if (!BlocksWallFace(mapData, x - 1, y))
+    /// <summary>
+    /// Emit a wall face toward walkable neighbor (nx, ny) into the room(s) on that side of the wall.
+    /// </summary>
+    private static void TryAddWallFace(
+        Dictionary<int, MeshGeometryBuilder[]> buildersByRoom,
+        LevelRoomMap roomMap,
+        MapData mapData,
+        int x,
+        int y,
+        int textureIndex,
+        int maxTextureIndex,
+        int neighborX,
+        int neighborY,
+        Vector3 v0,
+        Vector3 v1,
+        Vector3 v2,
+        Vector3 v3,
+        Vector3 normal,
+        Vector2 t0,
+        Vector2 t1,
+        Vector2 t2,
+        Vector2 t3)
+    {
+        if (BlocksWallFace(mapData, neighborX, neighborY))
+            return;
+
+        foreach (int roomId in roomMap.GetTileRoomIds(neighborX, neighborY))
         {
-            builder.AddQuad(
-                new Vector3(cx - half, cy - half, cz - half),
-                new Vector3(cx - half, cy - half, cz + half),
-                new Vector3(cx - half, cy + half, cz + half),
-                new Vector3(cx - half, cy + half, cz - half),
-                new Vector3(-1f, 0f, 0f),
-                T(0f, 0f), T(1f, 0f), T(1f, 1f), T(0f, 1f));
+            if (roomId < 0)
+                continue;
+
+            var builders = GetRoomBuilders(buildersByRoom, roomId, maxTextureIndex);
+            if (textureIndex >= builders.Length)
+                continue;
+
+            builders[textureIndex].AddQuad(v0, v1, v2, v3, normal, t0, t1, t2, t3);
         }
     }
 

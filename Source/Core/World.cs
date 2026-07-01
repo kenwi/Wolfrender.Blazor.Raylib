@@ -657,7 +657,7 @@ public class World : IScene
 
     private string BuildStaticMeshesStatusMessage()
     {
-        string mode = _renderSystem.UseStaticMeshes ? "on (baked wall meshes)" : "off (legacy quads)";
+        string mode = _renderSystem.UseStaticMeshes ? "on (room-scoped baked meshes)" : "off (legacy quads)";
         return $"Static meshes: {mode}. Baked wall quads: {_renderSystem.BakedQuadCount}.";
     }
 
@@ -752,7 +752,8 @@ public class World : IScene
         _renderSystem.Render(
             renderCamera,
             _sceneRenderTexture.Texture.Width,
-            _sceneRenderTexture.Texture.Height);
+            _sceneRenderTexture.Texture.Height,
+            _doorSystem.Doors);
         _secretSystem.Render(renderPosition);
         _doorSystem.Render();
         _animationSystem.Render();
