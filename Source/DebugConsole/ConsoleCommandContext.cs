@@ -17,4 +17,14 @@ public sealed class ConsoleCommandContext
     public required Func<ConsoleCommandResult> ToggleTickDiagnostics { get; init; }
     public required Func<bool, ConsoleCommandResult> SetTickDiagnostics { get; init; }
     public required Func<ConsoleCommandResult> GetTickDiagnosticsStatus { get; init; }
+    public required Func<ConsoleCommandResult> ToggleStaticMeshes { get; init; }
+    public required Func<bool, ConsoleCommandResult> SetStaticMeshes { get; init; }
+    public required Func<ConsoleCommandResult> GetStaticMeshesStatus { get; init; }
+    public required Func<ConsoleCommandResult> ToggleFlying { get; init; }
+    public required Func<bool, ConsoleCommandResult> SetFlying { get; init; }
+    public required Func<ConsoleCommandResult> GetFlyingStatus { get; init; }
+    public required Func<ConsoleCommandResult> DumpLightingCheck { get; init; }
+    public required Func<ConsoleCommandResult> ToggleFullBright { get; init; }
+    public required Func<bool, ConsoleCommandResult> SetFullBright { get; init; }
+    public required Func<ConsoleCommandResult> GetFullBrightStatus { get; init; }
 }

@@ -1,4 +1,5 @@
 using System.Numerics;
+using Game.Engine.Rendering;
 using Game.Features.Doors;
 using Game.Features.Enemies;
 using Game.Features.LevelProgress;
@@ -617,6 +618,23 @@ public class EditorMapRenderer
 
         foreach (var tile in tiles)
             FillTile(tile, tileSize, camera.Offset, fill, border);
+    }
+
+    /// <summary>
+    /// Draw translucent colored regions for each precomputed render room.
+    /// </summary>
+    public void DrawRoomOverlay(LevelRoomMap? roomMap, EditorCamera camera)
+    {
+        if (roomMap == null || roomMap.RoomCount == 0)
+            return;
+
+        float tileSize = camera.TileSize;
+        foreach (var (x, y, roomId) in roomMap.EnumerateRoomTiles())
+        {
+            var fill = RoomOverlayColors.ForRoom(roomId);
+            var border = fill with { A = (byte)Math.Min(255, fill.A + 70) };
+            FillTile(new Vector2(x, y), tileSize, camera.Offset, fill, border);
+        }
     }
 
     private static void FillTile(Vector2 tile, float tileSize, Vector2 offset, Color fill, Color border)

@@ -10,6 +10,7 @@ attribute vec4 vertexColor;
 varying vec2 fragTexCoord;
 varying vec4 fragColor;
 varying vec3 fragWorldPos;
+varying vec3 fragNormal;
 
 // Uniforms
 uniform mat4 mvp;
@@ -21,6 +22,7 @@ void main()
     
     // Vertex position is already in world space (we pass world coords directly)
     fragWorldPos = vertexPosition;
+    fragNormal = normalize(vertexNormal);
     
     gl_Position = mvp * vec4(vertexPosition, 1.0);
 }

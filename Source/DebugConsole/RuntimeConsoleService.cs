@@ -24,7 +24,17 @@ public sealed class RuntimeConsoleService
         Func<string, ConsoleCommandResult> sendRecording,
         Func<ConsoleCommandResult> toggleTickDiagnostics,
         Func<bool, ConsoleCommandResult> setTickDiagnostics,
-        Func<ConsoleCommandResult> getTickDiagnosticsStatus)
+        Func<ConsoleCommandResult> getTickDiagnosticsStatus,
+        Func<ConsoleCommandResult> toggleStaticMeshes,
+        Func<bool, ConsoleCommandResult> setStaticMeshes,
+        Func<ConsoleCommandResult> getStaticMeshesStatus,
+        Func<ConsoleCommandResult> toggleFlying,
+        Func<bool, ConsoleCommandResult> setFlying,
+        Func<ConsoleCommandResult> getFlyingStatus,
+        Func<ConsoleCommandResult> dumpLightingCheck,
+        Func<ConsoleCommandResult> toggleFullBright,
+        Func<bool, ConsoleCommandResult> setFullBright,
+        Func<ConsoleCommandResult> getFullBrightStatus)
     {
         _output = output;
 
@@ -45,7 +55,11 @@ public sealed class RuntimeConsoleService
             new StopReplayCommand(),
             new SendRecordingCommand(),
             new ListRecordingsCommand(),
-            new TickDiagnosticsCommand()
+            new TickDiagnosticsCommand(),
+            new StaticMeshCommand(),
+            new FlyCommand(),
+            new LightCheckCommand(),
+            new FullBrightCommand()
         };
 
         _dispatcher = new ConsoleCommandDispatcher(commands);
@@ -65,7 +79,17 @@ public sealed class RuntimeConsoleService
             SendRecording = sendRecording,
             ToggleTickDiagnostics = toggleTickDiagnostics,
             SetTickDiagnostics = setTickDiagnostics,
-            GetTickDiagnosticsStatus = getTickDiagnosticsStatus
+            GetTickDiagnosticsStatus = getTickDiagnosticsStatus,
+            ToggleStaticMeshes = toggleStaticMeshes,
+            SetStaticMeshes = setStaticMeshes,
+            GetStaticMeshesStatus = getStaticMeshesStatus,
+            ToggleFlying = toggleFlying,
+            SetFlying = setFlying,
+            GetFlyingStatus = getFlyingStatus,
+            DumpLightingCheck = dumpLightingCheck,
+            ToggleFullBright = toggleFullBright,
+            SetFullBright = setFullBright,
+            GetFullBrightStatus = getFullBrightStatus
         };
     }
 

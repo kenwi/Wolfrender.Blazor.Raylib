@@ -225,6 +225,13 @@ public class EditorGui
                 if (ImGui.MenuItem("Sound Propagation", null, _showSoundPropagation))
                     _showSoundPropagation = !_showSoundPropagation;
 
+                if (editorState != null)
+                {
+                    bool showRooms = editorState.ShowRoomOverlay;
+                    if (ImGui.MenuItem("Room Overlay", null, showRooms))
+                        editorState.ShowRoomOverlay = !showRooms;
+                }
+
                 ImGui.EndMenu();
             }
 

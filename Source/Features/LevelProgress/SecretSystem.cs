@@ -199,6 +199,7 @@ public sealed class SecretSystem : IMovementBlocker
 
         int startIndex = LevelData.GetIndex(secret.TileX, secret.TileY, _mapData.Width);
         _mapData.Walls[startIndex] = 0;
+        _mapData.NotifyGeometryChanged();
 
         if (!secret.HasScored)
         {
@@ -223,6 +224,8 @@ public sealed class SecretSystem : IMovementBlocker
             int endIndex = LevelData.GetIndex(occupied.x, occupied.y, _mapData.Width);
             _mapData.Walls[endIndex] = secret.WallTileId;
         }
+
+        _mapData.NotifyGeometryChanged();
 
         Debug.Log(
             $"Secret wall opened at tile ({occupied.x}, {occupied.y}).");

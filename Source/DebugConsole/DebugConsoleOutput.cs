@@ -1,4 +1,3 @@
-
 namespace Game.DebugConsole;
 
 public sealed class DebugConsoleOutput : IConsoleOutput

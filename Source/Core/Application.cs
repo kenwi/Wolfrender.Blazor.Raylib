@@ -1,4 +1,5 @@
 using System.Numerics;
+using Game.DebugConsole;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 using static Game.Core.Level.Res;
@@ -15,6 +16,8 @@ public class Application
 
     public Application()
     {
+        NativeConsole.EnsureAttached();
+
         InitWindow(0, 0, "");
         SetWindowState(ConfigFlags.FullscreenMode);
         SetExitKey(KeyboardKey.Null);

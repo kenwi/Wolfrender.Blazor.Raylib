@@ -26,7 +26,8 @@ public static class WorldConsoleBindings
         var output = new ConsoleOutputMultiplexer(new IConsoleOutput[]
         {
             new OverlayConsoleOutput(overlay),
-            new DebugConsoleOutput()
+            new DebugConsoleOutput(),
+            new TerminalConsoleOutput()
         });
 
         return new RuntimeConsoleService(
@@ -48,7 +49,17 @@ public static class WorldConsoleBindings
             recordingSystem.SendRecording,
             world.ToggleTickDiagnostics,
             world.SetTickDiagnostics,
-            world.GetTickDiagnosticsStatus);
+            world.GetTickDiagnosticsStatus,
+            world.ToggleStaticMeshes,
+            world.SetStaticMeshes,
+            world.GetStaticMeshesStatus,
+            world.ToggleFlying,
+            world.SetFlying,
+            world.GetFlyingStatus,
+            world.DumpLightingCheckForConsole,
+            world.ToggleFullBright,
+            world.SetFullBright,
+            world.GetFullBrightStatus);
     }
 
     private static IReadOnlyList<RootBinding> CreateRoots(

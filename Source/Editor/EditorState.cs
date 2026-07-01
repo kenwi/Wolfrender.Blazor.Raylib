@@ -1,6 +1,7 @@
 using System.Numerics;
 using Game.Core.Level;
 using Game.Editor.Undo;
+using Game.Engine.Rendering;
 using Game.Features.Doors;
 using Game.Features.Enemies;
 using Game.Features.LevelProgress;
@@ -79,6 +80,11 @@ public class EditorState
     public float SoundPropagationShowUntil;
     public const float SoundPropagationDurationSeconds = 2f;
 
+    /// <summary>When true, draw translucent room regions over the map.</summary>
+    public bool ShowRoomOverlay;
+
+    public LevelRoomMap? RoomMap { get; private set; }
+
     /// <summary>When true, the editor draws each live enemy's current A* chase path during simulation.</summary>
     public bool DrawEnemyPaths;
 
@@ -145,6 +151,7 @@ public class EditorState
         };
 
         ApplyPlayerSpawnFromMap();
+        RebuildRoomMap();
     }
 
     public EditorLayer ActiveLayer => Layers[ActiveLayerIndex];
@@ -361,6 +368,7 @@ public class EditorState
         if (!SecretPlacementsEqual(before, after))
             UndoStack.Push(new SetSecretWallCommand(SelectedWallTileX, SelectedWallTileY, before, after));
 
+        RebuildRoomMap();
         NotifyStateChanged();
     }
 
@@ -451,6 +459,9 @@ public class EditorState
 
         if (IsOnWallsLayer && SelectedTileId == 0)
             RemoveSecretWallAt(x, y);
+
+        if (!IsOnEnemyLayer && !IsOnPickupLayer && !IsOnObjectLayer)
+            RebuildRoomMap();
     }
 
     public void PlaceEnemy(int x, int y)
@@ -955,7 +966,13 @@ public class EditorState
             };
         }
         ApplyPlayerSpawnFromMap();
+        RebuildRoomMap();
         NotifyStateChanged();
+    }
+
+    public void RebuildRoomMap()
+    {
+        RoomMap = LevelRoomMap.Build(MapData);
     }
 
     public void SetStatus(string message, float duration = 4f)

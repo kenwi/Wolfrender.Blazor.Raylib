@@ -75,6 +75,7 @@ public sealed class PlayerSystem
     public void ResetForLevelLoad(MapData mapData)
     {
         PlayerSpawn.ApplyFromMap(_player, mapData, PlayerSpawnApplyMode.FullReset);
+        _player.IsFlying = false;
         _deathHandled = false;
         _levelCompleteHandled = false;
         _cameraSystem.ResetDeathFall();
@@ -140,6 +141,19 @@ public sealed class PlayerSystem
     private void UpdateVelocity(float deltaTime, InputState input)
     {
         Vector3 moveDirection = _inputSystem.GetMoveDirection(_player.Camera, input);
+
+        if (_player.IsFlying)
+        {
+            float vertical = 0f;
+            if (IsKeyDown(KeyboardKey.LeftShift) || IsKeyDown(KeyboardKey.RightShift))
+                vertical += 1f;
+            if (IsKeyDown(KeyboardKey.LeftControl) || IsKeyDown(KeyboardKey.RightControl))
+                vertical -= 1f;
+
+            if (MathF.Abs(vertical) > 0f)
+                moveDirection += new Vector3(0f, vertical, 0f);
+        }
+
         Vector3 targetVelocity = moveDirection * _player.MoveSpeed;
         float rate = targetVelocity.LengthSquared() > 0f ? _player.MoveAcceleration : _player.MoveDeceleration;
         _player.Velocity = MoveToward(_player.Velocity, targetVelocity, rate * deltaTime);
@@ -163,6 +177,12 @@ public sealed class PlayerSystem
             return;
 
         Vector3 desired = _player.Position + _player.Velocity * deltaTime;
+        if (_player.IsFlying)
+        {
+            _player.Position = desired;
+            return;
+        }
+
         _player.Position = _collisionSystem.ResolveMovement(_player.OldPosition, desired, _player.CollisionRadius);
     }
 

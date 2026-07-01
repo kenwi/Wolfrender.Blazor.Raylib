@@ -233,6 +233,9 @@ public class LevelEditorScene : IScene
 
         _mapRenderer.DrawSoundPropagationOverlay(_state.SoundPropagationTiles, _state.Camera);
 
+        if (_state.ShowRoomOverlay)
+            _mapRenderer.DrawRoomOverlay(_state.RoomMap, _state.Camera);
+
         if (_state.IsSimulating && _state.DrawEnemyPaths)
             _mapRenderer.DrawEnemyChasePaths(_state.EnemySystem, _state.Camera);
 
