@@ -60,6 +60,7 @@ public static class PrimitiveRenderer
     private static int _lightingShaderTileSizeLoc;
     private static int _lightingShaderApplySurfaceLightingLoc;
     private static int _lightingShaderMeshRoomIdLoc;
+    private static int _lightingShaderFullBrightLoc;
     private static readonly int[] _lightingShaderTileLightRoomLocs = new int[MaxShaderLights];
     private static int _spriteLitOcclusionMapLoc;
     private static int _spriteLitRoomMapLoc;
@@ -67,11 +68,17 @@ public static class PrimitiveRenderer
     private static int _spriteLitTileSizeLoc;
     private static int _spriteLitApplySurfaceLightingLoc;
     private static int _spriteLitMeshRoomIdLoc;
+    private static int _spriteLitFullBrightLoc;
     private static readonly int[] _spriteLitTileLightRoomLocs = new int[MaxShaderLights];
     private static float _occlusionMapWidth;
     private static float _occlusionMapHeight;
     private static float _currentMeshRoomId = -1f;
     private static LevelRoomMap? _spriteRoomMap;
+    private static bool _fullBright;
+
+    public static bool FullBright => _fullBright;
+
+    public static void SetFullBright(bool enabled) => _fullBright = enabled;
 
     private const int OcclusionTextureUnit = 1;
     private const int RoomTextureUnit = 2;
@@ -200,7 +207,8 @@ public static class PrimitiveRenderer
             out _lightingShaderMapSizeLoc,
             out _lightingShaderTileSizeLoc,
             out _lightingShaderApplySurfaceLightingLoc,
-            out _lightingShaderMeshRoomIdLoc);
+            out _lightingShaderMeshRoomIdLoc,
+            out _lightingShaderFullBrightLoc);
 
         LogShaderLoad(
             "scene lighting (lighting.fs)",
@@ -237,7 +245,8 @@ public static class PrimitiveRenderer
             out _spriteLitMapSizeLoc,
             out _spriteLitTileSizeLoc,
             out _spriteLitApplySurfaceLightingLoc,
-            out _spriteLitMeshRoomIdLoc);
+            out _spriteLitMeshRoomIdLoc,
+            out _spriteLitFullBrightLoc);
 
         LogShaderLoad(
             "sprite-lit (sprite_lit.fs)",
@@ -263,7 +272,8 @@ public static class PrimitiveRenderer
         out int mapSizeLoc,
         out int tileSizeLoc,
         out int applySurfaceLightingLoc,
-        out int meshRoomIdLoc)
+        out int meshRoomIdLoc,
+        out int fullBrightLoc)
     {
         occlusionMapLoc = GetShaderLocation(shader, "occlusionMap");
         roomMapLoc = GetShaderLocation(shader, "roomMap");
@@ -271,6 +281,7 @@ public static class PrimitiveRenderer
         tileSizeLoc = GetShaderLocation(shader, "tileSize");
         applySurfaceLightingLoc = GetShaderLocation(shader, "applySurfaceLighting");
         meshRoomIdLoc = GetShaderLocation(shader, "meshRoomId");
+        fullBrightLoc = GetShaderLocation(shader, "fullBright");
     }
 
     /// <summary>Room id for the current static mesh draw batch, or -1 to sample the room map.</summary>
@@ -313,6 +324,7 @@ public static class PrimitiveRenderer
         int tileSizeLoc,
         int applySurfaceLightingLoc,
         int meshRoomIdLoc,
+        int fullBrightLoc,
         float applySurfaceLighting)
     {
         float[] playerPosArray = { _lightingPlayerPosition.X, _lightingPlayerPosition.Y, _lightingPlayerPosition.Z };
@@ -359,6 +371,9 @@ public static class PrimitiveRenderer
         if (meshRoomIdLoc >= 0)
             SetShaderValue(shader, meshRoomIdLoc, _currentMeshRoomId, ShaderUniformDataType.Float);
 
+        if (fullBrightLoc >= 0)
+            SetShaderValue(shader, fullBrightLoc, _fullBright ? 1f : 0f, ShaderUniformDataType.Float);
+
         BindLightingMapTextures(shader, occlusionMapLoc, roomMapLoc);
     }
 
@@ -383,6 +398,7 @@ public static class PrimitiveRenderer
             _lightingShaderTileSizeLoc,
             _lightingShaderApplySurfaceLightingLoc,
             _lightingShaderMeshRoomIdLoc,
+            _lightingShaderFullBrightLoc,
             1f);
     }
 
@@ -419,6 +435,9 @@ public static class PrimitiveRenderer
 
     private static Color ApplyDistanceLighting(Color color, Vector3 worldPos)
     {
+        if (_fullBright)
+            return color;
+
         float brightness = ComputeDistanceBrightness(worldPos);
         return new Color(
             (byte)Math.Clamp(color.R * brightness, 0, 255),
@@ -458,6 +477,7 @@ public static class PrimitiveRenderer
             _spriteLitTileSizeLoc,
             _spriteLitApplySurfaceLightingLoc,
             _spriteLitMeshRoomIdLoc,
+            _spriteLitFullBrightLoc,
             0f);
     }
 

@@ -6,6 +6,7 @@ uniform vec2 mapSize;
 uniform float tileSize;
 uniform float applySurfaceLighting;
 uniform float meshRoomId;
+uniform float fullBright;
 
 uniform vec2 tileLightRoom0;
 uniform vec2 tileLightRoom1;
@@ -212,5 +213,8 @@ float tileLightBrightness(vec3 worldPos)
 
 float combinedSceneBrightness(vec3 worldPos)
 {
+    if (fullBright > 0.5)
+        return 1.0;
+
     return clamp(max(playerLightBrightness(worldPos), tileLightBrightness(worldPos)), minBrightness, 1.0);
 }

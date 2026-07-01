@@ -31,7 +31,10 @@ public sealed class RuntimeConsoleService
         Func<ConsoleCommandResult> toggleFlying,
         Func<bool, ConsoleCommandResult> setFlying,
         Func<ConsoleCommandResult> getFlyingStatus,
-        Func<ConsoleCommandResult> dumpLightingCheck)
+        Func<ConsoleCommandResult> dumpLightingCheck,
+        Func<ConsoleCommandResult> toggleFullBright,
+        Func<bool, ConsoleCommandResult> setFullBright,
+        Func<ConsoleCommandResult> getFullBrightStatus)
     {
         _output = output;
 
@@ -55,7 +58,8 @@ public sealed class RuntimeConsoleService
             new TickDiagnosticsCommand(),
             new StaticMeshCommand(),
             new FlyCommand(),
-            new LightCheckCommand()
+            new LightCheckCommand(),
+            new FullBrightCommand()
         };
 
         _dispatcher = new ConsoleCommandDispatcher(commands);
@@ -82,7 +86,10 @@ public sealed class RuntimeConsoleService
             ToggleFlying = toggleFlying,
             SetFlying = setFlying,
             GetFlyingStatus = getFlyingStatus,
-            DumpLightingCheck = dumpLightingCheck
+            DumpLightingCheck = dumpLightingCheck,
+            ToggleFullBright = toggleFullBright,
+            SetFullBright = setFullBright,
+            GetFullBrightStatus = getFullBrightStatus
         };
     }
 

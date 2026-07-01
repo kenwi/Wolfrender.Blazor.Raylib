@@ -56,7 +56,10 @@ public static class WorldConsoleBindings
             world.ToggleFlying,
             world.SetFlying,
             world.GetFlyingStatus,
-            world.DumpLightingCheckForConsole);
+            world.DumpLightingCheckForConsole,
+            world.ToggleFullBright,
+            world.SetFullBright,
+            world.GetFullBrightStatus);
     }
 
     private static IReadOnlyList<RootBinding> CreateRoots(

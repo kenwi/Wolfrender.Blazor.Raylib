@@ -683,6 +683,26 @@ public class World : IScene
     public ConsoleCommandResult GetFlyingStatus() =>
         ConsoleCommandResult.Ok(BuildFlyingStatusMessage());
 
+    public ConsoleCommandResult ToggleFullBright()
+    {
+        PrimitiveRenderer.SetFullBright(!PrimitiveRenderer.FullBright);
+        return ConsoleCommandResult.Ok(BuildFullBrightStatusMessage());
+    }
+
+    public ConsoleCommandResult SetFullBright(bool enabled)
+    {
+        PrimitiveRenderer.SetFullBright(enabled);
+        return ConsoleCommandResult.Ok(BuildFullBrightStatusMessage());
+    }
+
+    public ConsoleCommandResult GetFullBrightStatus() =>
+        ConsoleCommandResult.Ok(BuildFullBrightStatusMessage());
+
+    private static string BuildFullBrightStatusMessage() =>
+        PrimitiveRenderer.FullBright
+            ? "Fullbright: on (scene drawn at 100% brightness, torch and placed lights disabled)."
+            : "Fullbright: off (normal distance and fixture lighting).";
+
     public ConsoleCommandResult DumpLightingCheckForConsole()
     {
         var renderPose = GetRenderPose();
