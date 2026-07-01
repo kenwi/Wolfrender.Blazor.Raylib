@@ -65,6 +65,20 @@ public class WebEditorScene : IScene
             }
         }
 
+        if (IsMouseButtonReleased(MouseButton.Left))
+        {
+            State.EndPaintStroke();
+            State.EndEnemyDrag();
+            State.EndPickupDrag();
+            State.EndPlayerDrag();
+            State.IsDraggingPlayer = false;
+        }
+
+        if (IsKeyPressed(KeyboardKey.Z) && ctrlHeld)
+            State.Undo();
+        else if (IsKeyPressed(KeyboardKey.Y) && ctrlHeld)
+            State.Redo();
+
         State.UpdateStatusTimer(deltaTime);
 
         if (IsKeyPressed(KeyboardKey.P))
@@ -266,13 +280,23 @@ public class WebEditorScene : IScene
         {
             HandlePickupInput();
         }
-        else if (!State.IsMouseOverUI && IsMouseButtonDown(MouseButton.Left) && !isEnemyLayer && !isPickupLayer
-                 && !State.IsDraggingPlayer)
+        else if (!State.IsMouseOverUI && !State.IsDraggingPlayer && !isEnemyLayer && !isPickupLayer)
         {
-            var paintPos = State.Camera.ScreenToWorld(GetMousePosition());
-            int px = (int)MathF.Floor(paintPos.X);
-            int py = (int)MathF.Floor(paintPos.Y);
-            State.PaintTile(px, py);
+            if (IsMouseButtonPressed(MouseButton.Left))
+            {
+                State.BeginPaintStroke();
+                var paintPos = State.Camera.ScreenToWorld(GetMousePosition());
+                int px = (int)MathF.Floor(paintPos.X);
+                int py = (int)MathF.Floor(paintPos.Y);
+                State.PaintTile(px, py);
+            }
+            else if (IsMouseButtonDown(MouseButton.Left))
+            {
+                var paintPos = State.Camera.ScreenToWorld(GetMousePosition());
+                int px = (int)MathF.Floor(paintPos.X);
+                int py = (int)MathF.Floor(paintPos.Y);
+                State.PaintTile(px, py);
+            }
         }
 
         if (isEnemyLayer && State.SelectedEnemyIndex >= 0 && State.SelectedEnemyIndex < State.MapData.Enemies.Count
