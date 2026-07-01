@@ -16,6 +16,9 @@ public class Player
     public float MoveAcceleration { get; set; } = 60f;
     public float MoveDeceleration { get; set; } = 60f;
 
+    /// <summary>Free-flight debug mode: no collision, Shift/Ctrl for vertical movement.</summary>
+    public bool IsFlying { get; set; }
+
     public float MaxHealth { get; set; } = 100f;
     public float Health { get; set; } = 100f;
     public bool IsAlive => Health > 0f;

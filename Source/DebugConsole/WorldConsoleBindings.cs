@@ -51,7 +51,10 @@ public static class WorldConsoleBindings
             world.GetTickDiagnosticsStatus,
             world.ToggleStaticMeshes,
             world.SetStaticMeshes,
-            world.GetStaticMeshesStatus);
+            world.GetStaticMeshesStatus,
+            world.ToggleFlying,
+            world.SetFlying,
+            world.GetFlyingStatus);
     }
 
     private static IReadOnlyList<RootBinding> CreateRoots(

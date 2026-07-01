@@ -661,6 +661,33 @@ public class World : IScene
         return $"Static meshes: {mode}. Baked wall quads: {_renderSystem.BakedQuadCount}.";
     }
 
+    public ConsoleCommandResult ToggleFlying()
+    {
+        _player.IsFlying = !_player.IsFlying;
+        if (_player.IsFlying)
+            _player.Velocity = Vector3.Zero;
+        return ConsoleCommandResult.Ok(BuildFlyingStatusMessage());
+    }
+
+    public ConsoleCommandResult SetFlying(bool enabled)
+    {
+        _player.IsFlying = enabled;
+        if (!_player.IsFlying)
+            _player.Velocity = Vector3.Zero;
+        return ConsoleCommandResult.Ok(BuildFlyingStatusMessage());
+    }
+
+    public ConsoleCommandResult GetFlyingStatus() =>
+        ConsoleCommandResult.Ok(BuildFlyingStatusMessage());
+
+    private string BuildFlyingStatusMessage()
+    {
+        if (!_player.IsFlying)
+            return "Flying: off. Use Shift/Ctrl for vertical movement when enabled.";
+
+        return $"Flying: on. Position Y={_player.Position.Y:F1}. Shift=up, Ctrl=down.";
+    }
+
     public ConsoleCommandResult StartRecordingForConsole(string filename, float mouseSensitivity)
     {
         var result = _recordingSystem.StartRecording(filename, mouseSensitivity);

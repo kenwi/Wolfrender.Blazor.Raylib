@@ -102,11 +102,7 @@ internal static class LevelMeshBuilder
             return true;
 
         int index = LevelData.GetIndex(x, y, mapData.Width);
-        if (mapData.Walls[index] != 0)
-            return true;
-
-        uint door = mapData.Doors[index];
-        return door != 0 && DoorTileEncoding.IsDoorTile(door);
+        return mapData.Walls[index] != 0;
     }
 
     private static void AddWallTile(
