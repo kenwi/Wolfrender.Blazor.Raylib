@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Numerics;
 using Game.Core.Level;
+using Game.Features.Doors;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 
@@ -13,6 +14,7 @@ public class RenderSystem : IDisposable
     private readonly List<Texture2D> _textures;
     private readonly float _drawDistance;
     private readonly StaticLevelMeshes _staticMeshes = new();
+    private HashSet<(int x, int y)> _secretTiles = new();
     private const float TileSize = 4.0f;
     /// <summary>Extra half-angle beyond the view frustum (projection / pitch slack).</summary>
     private const float FrustumEdgeMarginDegrees = 5f;
@@ -37,9 +39,21 @@ public class RenderSystem : IDisposable
         _textures = textures;
         _drawDistance = drawDistance;
         _staticMeshes.Rebuild(mapData, textures);
+        RebuildSecretTileSet();
     }
 
-    public void RebuildMeshes() => _staticMeshes.Rebuild(_mapData, _textures);
+    public void RebuildMeshes()
+    {
+        _staticMeshes.Rebuild(_mapData, _textures);
+        RebuildSecretTileSet();
+    }
+
+    private void RebuildSecretTileSet()
+    {
+        _secretTiles.Clear();
+        foreach (var secret in _mapData.SecretWalls)
+            _secretTiles.Add((secret.TileX, secret.TileY));
+    }
 
     public void Render(Camera3D camera, int viewportWidth, int viewportHeight)
     {
@@ -81,6 +95,11 @@ public class RenderSystem : IDisposable
 
     private void RenderFloorAndCeiling(int x, int y, Vector3 worldPos)
     {
+        int index = LevelData.GetIndex(x, y, _mapData.Width);
+        bool hasDoor = _mapData.Doors[index] != 0 && DoorTileEncoding.IsDoorTile(_mapData.Doors[index]);
+        if (!LevelMeshBuilder.ShouldEmitFloorOrCeiling(_mapData, x, y, hasDoor, _secretTiles))
+            return;
+
         var floorTile = _level.GetFloorTile(x, y);
         if (floorTile != 0 && floorTile <= _textures.Count)
         {

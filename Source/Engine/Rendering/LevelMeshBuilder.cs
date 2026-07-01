@@ -36,6 +36,7 @@ internal static class LevelMeshBuilder
         var wallBuilders = CreateBuilders(maxTextureIndex);
         var floorBuilders = CreateBuilders(maxTextureIndex);
         var ceilingBuilders = CreateBuilders(maxTextureIndex);
+        var secretTiles = BuildSecretTileSet(mapData);
 
         for (int y = 0; y < height; y++)
         {
@@ -47,6 +48,9 @@ internal static class LevelMeshBuilder
                 uint wallTile = mapData.Walls[index];
                 if (wallTile != 0 && !hasDoor)
                     AddWallTile(wallBuilders, mapData, x, y, (int)wallTile - 1);
+
+                if (!ShouldEmitFloorOrCeiling(mapData, x, y, hasDoor, secretTiles))
+                    continue;
 
                 uint floorTile = mapData.Floor[index];
                 if (floorTile != 0)
@@ -63,6 +67,34 @@ internal static class LevelMeshBuilder
         AppendBatches(batches, floorBuilders, LevelMeshLayer.Floors);
         AppendBatches(batches, ceilingBuilders, LevelMeshLayer.Ceilings);
         return batches;
+    }
+
+    /// <summary>
+    /// Floor/ceiling quads are omitted on wall tiles unless the tile is a door or secret wall.
+    /// </summary>
+    internal static bool ShouldEmitFloorOrCeiling(
+        MapData mapData,
+        int x,
+        int y,
+        bool hasDoor,
+        IReadOnlySet<(int x, int y)> secretTiles)
+    {
+        int index = LevelData.GetIndex(x, y, mapData.Width);
+        if (mapData.Walls[index] == 0)
+            return true;
+
+        if (hasDoor || secretTiles.Contains((x, y)))
+            return true;
+
+        return false;
+    }
+
+    private static HashSet<(int x, int y)> BuildSecretTileSet(MapData mapData)
+    {
+        var secretTiles = new HashSet<(int x, int y)>();
+        foreach (var secret in mapData.SecretWalls)
+            secretTiles.Add((secret.TileX, secret.TileY));
+        return secretTiles;
     }
 
     private static MeshGeometryBuilder[] CreateBuilders(int textureCount)
