@@ -173,6 +173,14 @@ public class EditorGui
 
             if (editorState != null && ImGui.BeginMenu("Edit"))
             {
+                if (ImGui.MenuItem("Undo", "Ctrl+Z", false, editorState.CanUndo))
+                    editorState.Undo();
+
+                if (ImGui.MenuItem("Redo", "Ctrl+Y", false, editorState.CanRedo))
+                    editorState.Redo();
+
+                ImGui.Separator();
+
                 if (ImGui.MenuItem("Paint Mode", "B", editorState.ToolMode == EditorState.EditorToolMode.Paint))
                     editorState.SetToolMode(EditorState.EditorToolMode.Paint);
 
@@ -271,7 +279,7 @@ public class EditorGui
 
     // ─── File Dialogs ────────────────────────────────────────────────────────────
 
-    public void RenderFileDialogs(Action refreshLayers)
+    public void RenderFileDialogs(EditorState state)
     {
         if (_showSaveDialog)
         {
@@ -338,9 +346,8 @@ public class EditorGui
             {
                 try
                 {
-                    LevelSerializer.LoadFromJson(_mapData, _loadJsonPath);
-                    refreshLayers();
-                    _statusMessage = $"Loaded from {_loadJsonPath}";
+                    state.LoadLevelFromJson(_loadJsonPath);
+                    _statusMessage = state.StatusMessage;
                 }
                 catch (Exception ex)
                 {
@@ -370,9 +377,8 @@ public class EditorGui
             {
                 try
                 {
-                    LevelSerializer.LoadFromTmx(_mapData, _loadTmxPath);
-                    refreshLayers();
-                    _statusMessage = $"Loaded TMX from {_loadTmxPath}";
+                    state.LoadLevelFromTmx(_loadTmxPath);
+                    _statusMessage = state.StatusMessage;
                 }
                 catch (Exception ex)
                 {
@@ -403,9 +409,8 @@ public class EditorGui
             {
                 try
                 {
-                    LevelSerializer.LoadFromBmp(_mapData, _loadBmpPath);
-                    refreshLayers();
-                    _statusMessage = $"Loaded BMP from {_loadBmpPath}";
+                    state.LoadLevelFromBmp(_loadBmpPath);
+                    _statusMessage = state.StatusMessage;
                 }
                 catch (Exception ex)
                 {
@@ -501,6 +506,7 @@ public class EditorGui
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "1-9: Activate layer");
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Ctrl+1-9: Toggle visibility");
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "C: Toggle cursor follow");
+        ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Ctrl+Z / Ctrl+Y: Undo / Redo");
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Del: Delete selected enemy");
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "P: Toggle simulation");
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "E: Open door (while simulating)");
@@ -1029,7 +1035,7 @@ public class EditorGui
 
     // ─── Pickup Properties Panel ───────────────────────────────────────────────────
 
-    public void RenderPickupPropertiesPanel(ref int selectedPickupIndex)
+    public void RenderPickupPropertiesPanel(EditorState state, ref int selectedPickupIndex)
     {
         if (!_showPickupProperties) return;
         if (selectedPickupIndex < 0 || selectedPickupIndex >= _mapData.Pickups.Count)
@@ -1047,25 +1053,25 @@ public class EditorGui
         int tileX = pickup.TileX;
         int tileY = pickup.TileY;
         if (ImGui.InputInt("Tile X", ref tileX))
-            pickup.TileX = Math.Clamp(tileX, 0, _mapData.Width - 1);
+            state.SetPickupTilePosition(selectedPickupIndex, tileX, pickup.TileY);
         if (ImGui.InputInt("Tile Y", ref tileY))
-            pickup.TileY = Math.Clamp(tileY, 0, _mapData.Height - 1);
+            state.SetPickupTilePosition(selectedPickupIndex, pickup.TileX, tileY);
 
         int amount = pickup.Amount;
         if (ImGui.InputInt("Amount (0=default)", ref amount))
-            pickup.Amount = Math.Max(0, amount);
+            state.SetPickupAmount(selectedPickupIndex, amount);
 
         ImGui.Spacing();
         ImGui.Text("Type:");
         foreach (PickupType type in Enum.GetValues<PickupType>())
         {
             if (ImGui.RadioButton(type.ToString(), pickup.Type == type))
-                pickup.Type = type;
+                state.SetPickupType(selectedPickupIndex, type);
         }
 
         if (ImGui.Button("Delete Pickup"))
         {
-            _mapData.Pickups.RemoveAt(selectedPickupIndex);
+            state.DeletePickupAt(selectedPickupIndex);
             selectedPickupIndex = -1;
         }
 
@@ -1228,11 +1234,11 @@ public class EditorGui
         int tileY = enemy.TileY;
         if (ImGui.InputInt("Tile X", ref tileX))
         {
-            enemy.TileX = Math.Clamp(tileX, 0, _mapData.Width - 1);
+            state.SetEnemyTilePosition(selectedEnemyIndex, tileX, enemy.TileY);
         }
         if (ImGui.InputInt("Tile Y", ref tileY))
         {
-            enemy.TileY = Math.Clamp(tileY, 0, _mapData.Height - 1);
+            state.SetEnemyTilePosition(selectedEnemyIndex, enemy.TileX, tileY);
         }
 
         ImGui.Spacing();
@@ -1250,31 +1256,23 @@ public class EditorGui
         string[] labels = { "0°", "45°", "90°", "135°", "180°", "225°", "270°", "315°" };
         if (ImGui.SliderInt("Rotation", ref rotIndex, 0, 7, labels[rotIndex]))
         {
-            enemy.Rotation = rotIndex * step;
+            state.SetEnemyRotation(selectedEnemyIndex, rotIndex * step);
         }
 
         ImGui.Spacing();
 
         ImGui.Text($"Type: {enemy.EnemyType}");
-        if (ImGui.Button("Guard")) enemy.EnemyType = "Guard";
+        if (ImGui.Button("Guard")) state.SetEnemyType(selectedEnemyIndex, "Guard");
 
         ImGui.Spacing();
 
         bool startsAsCorpse = enemy.StartsAsCorpse;
         if (ImGui.Checkbox("Corpse (dead on spawn)", ref startsAsCorpse))
-        {
-            enemy.StartsAsCorpse = startsAsCorpse;
-            if (state.IsSimulating)
-                state.EnemySystem.Rebuild(state.MapData.Enemies, state.MapData);
-        }
+            state.SetEnemyStartsAsCorpse(selectedEnemyIndex, startsAsCorpse);
 
         bool dropsAmmo = enemy.DropsAmmo;
         if (ImGui.Checkbox("Drops ammo on death", ref dropsAmmo))
-        {
-            enemy.DropsAmmo = dropsAmmo;
-            if (state.IsSimulating)
-                state.EnemySystem.Rebuild(state.MapData.Enemies, state.MapData);
-        }
+            state.SetEnemyDropsAmmo(selectedEnemyIndex, dropsAmmo);
 
         ImGui.Spacing();
         ImGui.Separator();
@@ -1317,7 +1315,7 @@ public class EditorGui
 
                 if (ImGui.Button("Clear Path"))
                 {
-                    enemy.PatrolPath.Clear();
+                    state.ClearEnemyPatrolPath(selectedEnemyIndex);
                 }
                 ImGui.SameLine();
             }
@@ -1337,7 +1335,7 @@ public class EditorGui
         ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.9f, 0.3f, 0.3f, 1f));
         if (ImGui.Button("Delete Enemy", new Vector2(-1, 0)))
         {
-            _mapData.Enemies.RemoveAt(selectedEnemyIndex);
+            state.DeleteEnemyAt(selectedEnemyIndex);
             selectedEnemyIndex = -1;
         }
         ImGui.PopStyleColor(2);

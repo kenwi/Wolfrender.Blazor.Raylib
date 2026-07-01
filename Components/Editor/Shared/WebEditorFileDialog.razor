@@ -76,8 +76,7 @@
             using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
             using var reader = new StreamReader(stream);
             var json = await reader.ReadToEndAsync();
-            LevelSerializer.DeserializeFromJson(State.MapData, json);
-            State.RefreshLayerReferences();
+            State.LoadLevelFromJsonString(json, $"Load {file.Name}");
             State.SetStatus($"Loaded {file.Name}");
         }
         catch (Exception ex)

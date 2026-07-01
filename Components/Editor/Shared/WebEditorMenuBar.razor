@@ -16,6 +16,21 @@
         }
     </div>
 
+    <div class="menu-item @EditMenuClass" @onclick="ToggleEditMenu">
+        Edit
+        @if (OpenMenu == MenuEdit)
+        {
+            <div class="menu-dropdown" @onclick:stopPropagation="true">
+                <div class="menu-option @(State.CanUndo ? "" : "disabled")" @onclick="OnUndo">
+                    Undo <span class="shortcut">Ctrl+Z</span>
+                </div>
+                <div class="menu-option @(State.CanRedo ? "" : "disabled")" @onclick="OnRedo">
+                    Redo <span class="shortcut">Ctrl+Y</span>
+                </div>
+            </div>
+        }
+    </div>
+
     <div class="menu-item @WindowMenuClass" @onclick="ToggleWindowMenu">
         Window
         @if (OpenMenu == MenuWindow)
@@ -86,17 +101,20 @@
     [Parameter] public EventCallback<bool> ShowDebugLogChanged { get; set; }
 
     private const string MenuFile = "file";
+    private const string MenuEdit = "edit";
     private const string MenuWindow = "window";
     private const string MenuOptions = "options";
     private const string MenuSim = "sim";
     private string? OpenMenu;
 
     private string FileMenuClass => OpenMenu == MenuFile ? "active" : "";
+    private string EditMenuClass => OpenMenu == MenuEdit ? "active" : "";
     private string WindowMenuClass => OpenMenu == MenuWindow ? "active" : "";
     private string OptionsMenuClass => OpenMenu == MenuOptions ? "active" : "";
     private string SimMenuClass => OpenMenu == MenuSim ? "active" : "";
 
     private void ToggleFileMenu() => OpenMenu = OpenMenu == MenuFile ? null : MenuFile;
+    private void ToggleEditMenu() => OpenMenu = OpenMenu == MenuEdit ? null : MenuEdit;
     private void ToggleWindowMenu() => OpenMenu = OpenMenu == MenuWindow ? null : MenuWindow;
     private void ToggleOptionsMenu() => OpenMenu = OpenMenu == MenuOptions ? null : MenuOptions;
     private void ToggleSimMenu() => OpenMenu = OpenMenu == MenuSim ? null : MenuSim;
@@ -104,6 +122,20 @@
     private async Task OnNew() { OpenMenu = null; await OnNewLevel.InvokeAsync(); }
     private async Task OnSave() { OpenMenu = null; await OnSaveLevel.InvokeAsync(); }
     private async Task OnLoad() { OpenMenu = null; await OnLoadLevel.InvokeAsync(); }
+
+    private void OnUndo()
+    {
+        if (!State.CanUndo) return;
+        OpenMenu = null;
+        State.Undo();
+    }
+
+    private void OnRedo()
+    {
+        if (!State.CanRedo) return;
+        OpenMenu = null;
+        State.Redo();
+    }
 
     private void OnToggleSimulation() { OpenMenu = null; State.ToggleSimulation(); }
 
