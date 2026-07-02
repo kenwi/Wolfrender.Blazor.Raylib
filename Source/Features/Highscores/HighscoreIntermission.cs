@@ -41,6 +41,9 @@ public sealed class HighscoreIntermission
     /// <summary>When true, ESC is reserved for the intermission flow (name skip / leaderboard dismiss).</summary>
     public bool CapturesEscapeKey => _phase is Phase.NameEntry or Phase.Leaderboard;
 
+    /// <summary>When true, console toggle keys are ignored so name entry is not interrupted.</summary>
+    public bool BlocksConsoleToggle => _phase is Phase.NameEntry;
+
     public void ResetForLevel()
     {
         _phase = Phase.Hidden;

@@ -524,8 +524,9 @@ public class World : IScene
             return;
         }
 
-        if (IsKeyPressed(KeyboardKey.Grave) ||
-            (OperatingSystem.IsBrowser() && IsKeyPressed(KeyboardKey.Period)))
+        if (!_highscoreIntermission.BlocksConsoleToggle &&
+            (IsKeyPressed(KeyboardKey.Grave) ||
+            (OperatingSystem.IsBrowser() && IsKeyPressed(KeyboardKey.Period))))
         {
             _consoleOverlay.Toggle();
             toggledConsoleThisFrame = true;
