@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Runtime.Versioning;
 using System.Text;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
@@ -11,6 +12,7 @@ using Wolfrender.Blazor.Raylib.Components;
 
 namespace Wolfrender.Blazor.Raylib.Pages;
 
+[SupportedOSPlatform("browser")]
 public partial class ThreeDFirstPerson : IDisposable
 {
     [Inject] private IJSRuntime JS { get; set; } = default!;
