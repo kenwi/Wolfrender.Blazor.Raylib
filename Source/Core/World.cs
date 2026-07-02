@@ -450,8 +450,6 @@ public class World : IScene
         BrowserPointerLockBridge.PointerLockLost = null;
         _optionsMenu.Dismiss();
         _inputSystem.EnableMouse();
-        _renderSystem.Dispose();
-        _lightOcclusionMap.Dispose();
     }
 
     public void ToggleMouse()

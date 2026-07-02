@@ -109,7 +109,11 @@ public sealed class StaticLevelMeshes : IDisposable
     public void Dispose()
     {
         UnloadMeshes();
-        _hasDrawMaterial = false;
+        if (_hasDrawMaterial)
+        {
+            UnloadMaterial(_drawMaterial);
+            _hasDrawMaterial = false;
+        }
     }
 
     private void EnsureDrawMaterial(Shader lightingShader)
@@ -130,5 +134,9 @@ public sealed class StaticLevelMeshes : IDisposable
     {
         foreach (var batch in _batches)
             UnloadMesh(batch.Mesh);
+
+        _batches.Clear();
+        _bakedQuadCount = 0;
+        _trackedGeometryVersion = -1;
     }
 }
