@@ -8,6 +8,7 @@ using static Raylib_cs.Raylib;
 using Raylib_cs;
 using Game.Core;
 using Game.Editor;
+using Wolfrender.Blazor.Raylib.Components.Editor;
 
 namespace Wolfrender.Blazor.Raylib.Pages;
 
@@ -15,6 +16,7 @@ namespace Wolfrender.Blazor.Raylib.Pages;
 public partial class WebEditor : IDisposable
 {
     [Inject] private IJSRuntime JS { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
 
     private int ScreenWidth = 1920;
     private int ScreenHeight = 1080;
@@ -98,16 +100,22 @@ public partial class WebEditor : IDisposable
             _loggedFirstFrame = true;
         }
 
-        // Detect any key press for debugging
-        int keyPressed = GetKeyPressed();
-        if (keyPressed != 0)
+        bool ctrlHeld = IsKeyDown(KeyboardKey.LeftControl) || IsKeyDown(KeyboardKey.RightControl);
+
+        if (_activeScene == _editorScene && ctrlHeld)
         {
-            Console.WriteLine($"[WebEditor] Key pressed: {keyPressed} (Q={((int)KeyboardKey.Q)})");
+            if (IsKeyPressed(KeyboardKey.S) && !_showSaveDialog)
+            {
+                await OnQuickSave();
+            }
+            else if (IsKeyPressed(KeyboardKey.Q))
+            {
+                OnQuit();
+            }
         }
 
-        if (IsKeyPressed(KeyboardKey.Q))
+        if (IsKeyPressed(KeyboardKey.Q) && !ctrlHeld)
         {
-            Console.WriteLine("[WebEditor] Q detected via IsKeyPressed - toggling scene");
             ToggleScene();
             await InvokeAsync(StateHasChanged);
         }
@@ -166,6 +174,28 @@ public partial class WebEditor : IDisposable
     {
         _editorScene?.State.ClearLevel();
         await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnQuickSave()
+    {
+        if (_editorScene == null)
+            return;
+
+        try
+        {
+            await WebEditorLevelSave.QuickSaveAsync(JS, _editorScene.State);
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            _editorScene.State.SetStatus($"Error saving: {ex.Message}");
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void OnQuit()
+    {
+        Navigation.NavigateTo("/");
     }
 
     private async Task Refresh()

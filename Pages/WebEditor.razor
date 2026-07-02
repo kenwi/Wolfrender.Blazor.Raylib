@@ -9,8 +9,10 @@
          @onpointercancel="OnOverlayPointerUp">
         <WebEditorMenuBar State="_editorScene.State"
                           OnNewLevel="OnNewLevel"
+                          OnQuickSave="OnQuickSave"
                           OnSaveLevel="() => _showSaveDialog = true"
                           OnLoadLevel="() => _showLoadDialog = true"
+                          OnQuit="OnQuit"
                           @bind-ShowLayers="_showLayers"
                           @bind-ShowTilePalette="_showTilePalette"
                           @bind-ShowCursorInfo="_showCursorInfo"

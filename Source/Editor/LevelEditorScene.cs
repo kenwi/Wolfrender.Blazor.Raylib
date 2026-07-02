@@ -92,6 +92,10 @@ public class LevelEditorScene : IScene
                 _state.Undo();
             else if (IsKeyPressed(KeyboardKey.Y) && ctrlHeld)
                 _state.Redo();
+            else if (IsKeyPressed(KeyboardKey.S) && ctrlHeld)
+                _gui.QuickSave(_state);
+            else if (IsKeyPressed(KeyboardKey.Q) && ctrlHeld)
+                CloseWindow();
 
             if (IsKeyPressed(KeyboardKey.B))
                 _state.SetToolMode(EditorState.EditorToolMode.Paint);
@@ -261,7 +265,7 @@ public class LevelEditorScene : IScene
 
         // ImGui panels
         rlImGui.Begin();
-        bool menuToggleSim = _gui.RenderMenuBar(_state.IsSimulating, _state, _state.EnemySystem, _state.DoorSystem, _state.ClearLevel, _state.RefreshLayerReferences);
+        bool menuToggleSim = _gui.RenderMenuBar(_state.IsSimulating, _state, _state.EnemySystem, _state.DoorSystem, _state.ClearLevel, _state.RefreshLayerReferences, CloseWindow);
         if (menuToggleSim) _state.ToggleSimulation();
         _gui.RenderFileDialogs(_state);
         _gui.RenderLayerPanel(_state.Layers, _state);

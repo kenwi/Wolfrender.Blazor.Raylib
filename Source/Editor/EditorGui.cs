@@ -1,4 +1,5 @@
 using System.Numerics;
+using Game.Core.Level;
 using Game.Features.Doors;
 using Game.Features.Enemies;
 using Game.Features.LevelProgress;
@@ -104,7 +105,7 @@ public class EditorGui
     /// </summary>
     public bool RenderMenuBar(
         bool isSimulating, EditorState? editorState, EnemySystem enemySystem, DoorSystem doorSystem,
-        Action clearLevel, Action refreshLayers)
+        Action clearLevel, Action refreshLayers, Action quit)
     {
         bool toggleSimulation = false;
 
@@ -123,8 +124,15 @@ public class EditorGui
 
                 ImGui.Separator();
 
+                if (editorState != null && ImGui.MenuItem("Save", "Ctrl+S"))
+                {
+                    QuickSave(editorState);
+                }
+
                 if (ImGui.MenuItem("Save JSON..."))
                 {
+                    if (editorState != null)
+                        _savePath = GetQuickSavePath(editorState);
                     _showSaveDialog = true;
                 }
 
@@ -143,6 +151,13 @@ public class EditorGui
                 if (ImGui.MenuItem("Load BMP..."))
                 {
                     _showLoadBmpDialog = true;
+                }
+
+                ImGui.Separator();
+
+                if (ImGui.MenuItem("Quit", "Ctrl+Q"))
+                {
+                    quit();
                 }
 
                 ImGui.EndMenu();
@@ -286,6 +301,28 @@ public class EditorGui
 
     // ─── File Dialogs ────────────────────────────────────────────────────────────
 
+    public bool QuickSave(EditorState state)
+    {
+        try
+        {
+            _savePath = GetQuickSavePath(state);
+            LevelSerializer.SaveToJson(_mapData, _savePath);
+            state.SetLevelFilename(Path.GetFileName(_savePath));
+            _statusMessage = $"Saved {_savePath}";
+            _statusTimer = 4f;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _statusMessage = $"Error saving: {ex.Message}";
+            _statusTimer = 4f;
+            return false;
+        }
+    }
+
+    private static string GetQuickSavePath(EditorState state) =>
+        Res.Path(LevelCatalog.NormalizePath(state.LevelFilename));
+
     public void RenderFileDialogs(EditorState state)
     {
         if (_showSaveDialog)
@@ -323,6 +360,7 @@ public class EditorGui
                 try
                 {
                     LevelSerializer.SaveToJson(_mapData, _savePath);
+                    state.SetLevelFilename(Path.GetFileName(_savePath));
                     _statusMessage = $"Saved to {_savePath}";
                 }
                 catch (Exception ex)
@@ -354,6 +392,7 @@ public class EditorGui
                 try
                 {
                     state.LoadLevelFromJson(_loadJsonPath);
+                    _savePath = _loadJsonPath;
                     _statusMessage = state.StatusMessage;
                 }
                 catch (Exception ex)
@@ -516,6 +555,8 @@ public class EditorGui
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Ctrl+1-9: Toggle visibility");
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "C: Toggle cursor follow");
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Ctrl+Z / Ctrl+Y: Undo / Redo");
+        ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Ctrl+S: Quick save");
+        ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Ctrl+Q: Quit");
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Del: Delete selected enemy");
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "P: Toggle simulation");
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "E: Open door (while simulating)");

@@ -9,9 +9,16 @@
             <div class="menu-dropdown" @onclick:stopPropagation="true">
                 <div class="menu-option" @onclick="OnNew">New</div>
                 <div class="menu-separator"></div>
-                <div class="menu-option" @onclick="OnSave">Save JSON</div>
+                <div class="menu-option" @onclick="HandleQuickSave">
+                    Save <span class="shortcut">Ctrl+S</span>
+                </div>
+                <div class="menu-option" @onclick="OnSave">Save JSON...</div>
                 <div class="menu-separator"></div>
                 <div class="menu-option" @onclick="OnLoad">Load JSON</div>
+                <div class="menu-separator"></div>
+                <div class="menu-option" @onclick="HandleQuit">
+                    Quit <span class="shortcut">Ctrl+Q</span>
+                </div>
             </div>
         }
     </div>
@@ -80,8 +87,10 @@
 @code {
     [Parameter] public EditorState State { get; set; } = default!;
     [Parameter] public EventCallback OnNewLevel { get; set; }
+    [Parameter] public EventCallback OnQuickSave { get; set; }
     [Parameter] public EventCallback OnSaveLevel { get; set; }
     [Parameter] public EventCallback OnLoadLevel { get; set; }
+    [Parameter] public EventCallback OnQuit { get; set; }
 
     [Parameter] public bool ShowLayers { get; set; }
     [Parameter] public EventCallback<bool> ShowLayersChanged { get; set; }
@@ -120,8 +129,10 @@
     private void ToggleSimMenu() => OpenMenu = OpenMenu == MenuSim ? null : MenuSim;
 
     private async Task OnNew() { OpenMenu = null; await OnNewLevel.InvokeAsync(); }
+    private async Task HandleQuickSave() { OpenMenu = null; await OnQuickSave.InvokeAsync(); }
     private async Task OnSave() { OpenMenu = null; await OnSaveLevel.InvokeAsync(); }
     private async Task OnLoad() { OpenMenu = null; await OnLoadLevel.InvokeAsync(); }
+    private async Task HandleQuit() { OpenMenu = null; await OnQuit.InvokeAsync(); }
 
     private void OnUndo()
     {

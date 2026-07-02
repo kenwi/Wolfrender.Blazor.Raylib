@@ -126,6 +126,9 @@ public class EditorState
     public string StatusMessage = "";
     public float StatusTimer;
 
+    /// <summary>Current level JSON filename used for quick save (e.g. level.json).</summary>
+    public string LevelFilename { get; private set; } = Path.GetFileName(LevelCatalog.DefaultLevelPath);
+
     // Fires when state changes that the Blazor UI should reflect
     public event Action? StateChanged;
 
@@ -235,6 +238,7 @@ public class EditorState
     public void LoadLevelFromJson(string path)
     {
         ExecuteMapMutation(() => LevelSerializer.LoadFromJson(MapData, path), $"Load {Path.GetFileName(path)}");
+        LevelFilename = Path.GetFileName(path);
         SetStatus($"Loaded from {path}");
     }
 
@@ -921,6 +925,7 @@ public class EditorState
     public void ClearLevel()
     {
         ExecuteMapMutation(ClearLevelCore, "New level");
+        LevelFilename = Path.GetFileName(LevelCatalog.DefaultLevelPath);
         SetStatus("New empty level created");
     }
 
@@ -979,6 +984,14 @@ public class EditorState
     {
         StatusMessage = message;
         StatusTimer = duration;
+    }
+
+    public void SetLevelFilename(string filename)
+    {
+        if (string.IsNullOrWhiteSpace(filename))
+            return;
+
+        LevelFilename = filename;
     }
 
     public void UpdateStatusTimer(float deltaTime)

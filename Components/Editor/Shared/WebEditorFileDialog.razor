@@ -42,6 +42,11 @@
 
     private string SaveFilename = "level.json";
 
+    protected override void OnParametersSet()
+    {
+        SaveFilename = State.LevelFilename;
+    }
+
     private async Task CloseSave()
     {
         await ShowSaveDialogChanged.InvokeAsync(false);
@@ -56,9 +61,7 @@
     {
         try
         {
-            var json = LevelSerializer.SerializeToJson(State.MapData);
-            await DownloadFile(SaveFilename, json);
-            State.SetStatus($"Saved {SaveFilename}");
+            await WebEditorLevelSave.SaveAsync(JS, State, SaveFilename);
         }
         catch (Exception ex)
         {
@@ -77,6 +80,7 @@
             using var reader = new StreamReader(stream);
             var json = await reader.ReadToEndAsync();
             State.LoadLevelFromJsonString(json, $"Load {file.Name}");
+            State.SetLevelFilename(file.Name);
             State.SetStatus($"Loaded {file.Name}");
         }
         catch (Exception ex)
@@ -86,24 +90,6 @@
         await ShowLoadDialogChanged.InvokeAsync(false);
         await OnChanged.InvokeAsync();
     }
-
-    private async Task DownloadFile(string filename, string content)
-    {
-        await JS.InvokeVoidAsync("eval", $@"
-            (function() {{
-                var blob = new Blob([{System.Text.Json.JsonSerializer.Serialize(content)}], {{ type: 'application/json' }});
-                var url = URL.createObjectURL(blob);
-                var a = document.createElement('a');
-                a.href = url;
-                a.download = '{filename}';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            }})();
-        ");
-    }
-
     private void OnPointerEnter() => State.IsMouseOverUI = true;
     private void OnPointerLeave() => State.IsMouseOverUI = false;
 }
