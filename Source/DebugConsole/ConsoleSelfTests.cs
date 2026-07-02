@@ -1,5 +1,7 @@
 using System.Numerics;
 using Game.Core.Level;
+using Game.Engine.Rendering;
+using Game.Features.Doors;
 using Game.Features.LevelProgress;
 using Game.Features.Recording;
 
@@ -23,6 +25,7 @@ public static class ConsoleSelfTests
         TestSecretWallJsonRoundTrip();
         TestRecFileRoundTrip();
         TestRecFileValidator();
+        TestLevelRoomMapDoorVisibility();
     }
 
     private static void TestParserQuotedArgs()
@@ -237,6 +240,83 @@ public static class ConsoleSelfTests
         };
         if (RecFileValidator.TryValidateForReplay(badTick, _ => true, out _))
             throw new InvalidOperationException("Invalid tick index should fail validation.");
+    }
+
+    private static void TestLevelRoomMapDoorVisibility()
+    {
+        const int doorX = 2;
+        const int doorY = 3;
+        var map = CreateTwoRoomDoorMap(doorX, doorY);
+        var roomMap = LevelRoomMap.Build(map);
+
+        if (roomMap.RoomCount != 2)
+            throw new InvalidOperationException($"Two-room test map should flood-fill into 2 rooms, got {roomMap.RoomCount}.");
+
+        var closedDoors = new List<Door>
+        {
+            new()
+            {
+                StartPosition = new Vector2(doorX, doorY),
+                DoorState = DoorState.CLOSED
+            }
+        };
+
+        var visible = roomMap.ComputeVisibleRooms(doorX, doorY, closedDoors);
+        if (visible.Count < 2)
+            throw new InvalidOperationException("Closed door tile should seed visibility for both adjacent rooms.");
+
+        foreach (var link in roomMap.DoorLinks)
+        {
+            if (link.DoorTileX != doorX || link.DoorTileY != doorY)
+                continue;
+
+            if (!visible.Contains(link.RoomA) || !visible.Contains(link.RoomB))
+                throw new InvalidOperationException("Both rooms linked by the door should be visible from the door tile.");
+        }
+    }
+
+    /// <summary>
+    /// 5-wide, 7-tall map split by a horizontal wall row at y=3 with a single door gap at (doorX, doorY).
+    /// The door is the only connection between the north room and the south room.
+    /// </summary>
+    private static MapData CreateTwoRoomDoorMap(int doorX, int doorY)
+    {
+        const int width = 5;
+        const int height = 7;
+        const int dividerRow = 3;
+        int tileCount = width * height;
+        var map = new MapData
+        {
+            Width = width,
+            Height = height,
+            Floor = new uint[tileCount],
+            Ceiling = new uint[tileCount],
+            Walls = new uint[tileCount],
+            Doors = new uint[tileCount]
+        };
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int index = LevelData.GetIndex(x, y, width);
+                bool border = x == 0 || x == width - 1 || y == 0 || y == height - 1;
+                bool divider = y == dividerRow;
+                if (border || divider)
+                {
+                    map.Walls[index] = 1;
+                    continue;
+                }
+
+                map.Floor[index] = 1;
+                map.Ceiling[index] = 1;
+            }
+        }
+
+        int doorIndex = LevelData.GetIndex(doorX, doorY, width);
+        map.Walls[doorIndex] = 0;
+        map.Doors[doorIndex] = DoorTileEncoding.LightHorizontal;
+        return map;
     }
 
     private sealed class TestTarget

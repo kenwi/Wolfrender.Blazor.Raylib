@@ -513,7 +513,12 @@ public static class PrimitiveRenderer
             return -1;
 
         var (tileX, tileY) = LevelData.GetEntityTileFromWorld(anchorPosition.X, anchorPosition.Z);
-        return _spriteRoomMap.GetRoomAt(tileX, tileY);
+        var roomIds = _spriteRoomMap.GetTileRoomIds(tileX, tileY);
+        if (roomIds.Count == 1)
+            return roomIds[0];
+
+        // Door threshold or ambiguous tile - let the shader sample the room map.
+        return -1;
     }
 
     public static void SetLightingParameters(

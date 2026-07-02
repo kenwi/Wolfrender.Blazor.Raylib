@@ -107,17 +107,29 @@ public sealed class LevelRoomMap
 
     /// <summary>
     /// Rooms visible from the player tile: current room plus rooms reachable through non-closed doors.
+    /// On door tiles (no single room id), seeds visibility with every adjacent room so orientation
+    /// does not hide the interior when the door is closed.
     /// </summary>
     public HashSet<int> ComputeVisibleRooms(int playerTileX, int playerTileY, IReadOnlyList<Door> doors)
     {
         var visible = new HashSet<int>();
-        int startRoom = GetRoomAt(playerTileX, playerTileY);
-        if (startRoom < 0)
+        if (playerTileX < 0 || playerTileX >= Width || playerTileY < 0 || playerTileY >= Height)
             return visible;
 
+        int index = LevelData.GetIndex(playerTileX, playerTileY, Width);
+        IEnumerable<int> seedRooms = TileRoomId[index] >= 0
+            ? new[] { TileRoomId[index] }
+            : GetTileRoomIds(playerTileX, playerTileY).Where(id => id >= 0);
+
         var queue = new Queue<int>();
-        visible.Add(startRoom);
-        queue.Enqueue(startRoom);
+        foreach (int roomId in seedRooms)
+        {
+            if (visible.Add(roomId))
+                queue.Enqueue(roomId);
+        }
+
+        if (visible.Count == 0)
+            return visible;
 
         while (queue.Count > 0)
         {
