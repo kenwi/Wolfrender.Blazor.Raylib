@@ -19,6 +19,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 
 builder.Services.AddSingleton<JsonFileScoreStore>();
 builder.Services.AddSingleton<FileRecordingStore>();
+builder.Services.AddHttpClient<DiscordScoreAnnouncer>();
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -57,6 +58,7 @@ app.UseCors();
 app.MapPost("/api/scores", async (
     ScoreSubmission submission,
     JsonFileScoreStore store,
+    DiscordScoreAnnouncer announcer,
     HttpContext httpContext,
     ILogger<Program> logger,
     CancellationToken cancellationToken) =>
@@ -84,7 +86,8 @@ app.MapPost("/api/scores", async (
         return Results.BadRequest(new { error });
     }
 
-    if (!await store.TryAddScoreAsync(normalized, cancellationToken))
+    var addResult = await store.TryAddScoreAsync(normalized, cancellationToken);
+    if (!addResult.Accepted)
     {
         logger.LogWarning(
             "POST /api/scores rejected (duplicate): ClientIp={ClientIp}, LevelId={LevelId}, PlayerName={PlayerName}, FinalScore={FinalScore}",
@@ -95,13 +98,16 @@ app.MapPost("/api/scores", async (
         return Results.Conflict(new { error = "This score has already been submitted." });
     }
 
+    announcer.AnnounceInBackground(normalized, addResult);
+
     logger.LogInformation(
-        "POST /api/scores succeeded: ClientIp={ClientIp}, LevelId={LevelId}, PlayerName={PlayerName}, FinalScore={FinalScore}",
+        "POST /api/scores succeeded: ClientIp={ClientIp}, LevelId={LevelId}, PlayerName={PlayerName}, FinalScore={FinalScore}, Rank={Rank}",
         clientIp,
         normalized.LevelId,
         normalized.PlayerName,
-        normalized.FinalScore);
-    return Results.Ok(new { message = "Score accepted." });
+        normalized.FinalScore,
+        addResult.Rank);
+    return Results.Ok(new { message = "Score accepted.", rank = addResult.Rank });
 });
 
 app.MapGet("/api/scores/{levelId}", async (

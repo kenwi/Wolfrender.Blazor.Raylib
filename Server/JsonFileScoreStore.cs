@@ -4,6 +4,12 @@ using Microsoft.Extensions.Logging;
 
 namespace Wolfrender.Highscores.Server;
 
+/// <summary>Outcome of a score submission. Rank is 1-based within the level's leaderboard.</summary>
+public sealed record ScoreAddResult(bool Accepted, int Rank, int TotalEntriesForLevel)
+{
+    public static readonly ScoreAddResult Duplicate = new(false, 0, 0);
+}
+
 public sealed class JsonFileScoreStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -22,7 +28,7 @@ public sealed class JsonFileScoreStore
         _logger.LogInformation("JsonFileScoreStore initialized. FilePath={FilePath}", Path.GetFullPath(_filePath));
     }
 
-    public async Task<bool> TryAddScoreAsync(ScoreSubmission submission, CancellationToken cancellationToken = default)
+    public async Task<ScoreAddResult> TryAddScoreAsync(ScoreSubmission submission, CancellationToken cancellationToken = default)
     {
         await _lock.WaitAsync(cancellationToken);
         try
@@ -40,7 +46,7 @@ public sealed class JsonFileScoreStore
                     submission.FinalScore,
                     checksum,
                     _filePath);
-                return false;
+                return ScoreAddResult.Duplicate;
             }
 
             if (!data.Levels.TryGetValue(submission.LevelId, out var entries))
@@ -82,7 +88,7 @@ public sealed class JsonFileScoreStore
                 _filePath);
 
             await WriteAsync(data, cancellationToken);
-            return true;
+            return new ScoreAddResult(true, rank, entries.Count);
         }
         finally
         {

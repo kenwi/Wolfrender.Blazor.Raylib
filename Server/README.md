@@ -30,6 +30,31 @@ API: `http://localhost:5080/api/scores/{levelId}`
 
 Recordings: `POST http://localhost:5080/api/recordings` (JSON body with `name` and `recording` payload). Files are stored under `data/recordings/` when using Docker.
 
+## Discord score announcements
+
+When a score is accepted, the server can post an embed to a Discord channel via webhook: player name, points, time, kills/treasures/secrets, and a gold "New #1" callout when someone takes the top spot.
+
+Configure in `.env` (or `Discord:*` keys in `data/appsettings.json`):
+
+```bash
+# Server Settings > Integrations > Webhooks > Copy Webhook URL
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+
+# Optional: appended as a "Play now" link on every announcement
+DISCORD_GAME_URL=https://wolf3d.m0b.tech
+
+# Optional: only announce top-N placements per level (0 = announce everything)
+DISCORD_ANNOUNCE_TOP_RANKS=0
+```
+
+Restart after changing `.env`:
+
+```bash
+docker compose up -d
+```
+
+Announcements are fire-and-forget: a failing or unset webhook never blocks score submission. Leave `DISCORD_WEBHOOK_URL` empty to disable the feature.
+
 ## Timezone
 
 Score `SubmittedAt` timestamps use the container's OS timezone. Set `TZ` in `.env` to an [IANA timezone name](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) before starting the stack:

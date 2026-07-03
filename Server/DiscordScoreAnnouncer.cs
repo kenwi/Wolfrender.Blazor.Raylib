@@ -1,0 +1,125 @@
+using System.Globalization;
+using System.Net.Http.Json;
+using Game.Features.Highscores.Shared;
+
+namespace Wolfrender.Highscores.Server;
+
+/// <summary>
+/// Posts accepted score submissions to a Discord webhook.
+/// Disabled when Discord:WebhookUrl is not configured. Announcements run in the
+/// background and never affect the submission response.
+/// </summary>
+public sealed class DiscordScoreAnnouncer
+{
+    private const int GoldColor = 0xF1C40F;
+    private const int SlateColor = 0x5865F2;
+
+    private readonly HttpClient _httpClient;
+    private readonly IConfiguration _configuration;
+    private readonly ILogger<DiscordScoreAnnouncer> _logger;
+
+    public DiscordScoreAnnouncer(
+        HttpClient httpClient,
+        IConfiguration configuration,
+        ILogger<DiscordScoreAnnouncer> logger)
+    {
+        _httpClient = httpClient;
+        _configuration = configuration;
+        _logger = logger;
+    }
+
+    /// <summary>Fire-and-forget announcement; errors are logged, never thrown.</summary>
+    public void AnnounceInBackground(ScoreSubmission submission, ScoreAddResult result)
+    {
+        _ = AnnounceAsync(submission, result);
+    }
+
+    private async Task AnnounceAsync(ScoreSubmission submission, ScoreAddResult result)
+    {
+        try
+        {
+            // Read configuration per call so /data/appsettings.json hot reload applies.
+            var webhookUrl = _configuration["Discord:WebhookUrl"];
+            if (string.IsNullOrWhiteSpace(webhookUrl))
+                return;
+
+            var announceTopRanks = _configuration.GetValue("Discord:AnnounceTopRanks", 0);
+            if (announceTopRanks > 0 && result.Rank > announceTopRanks)
+            {
+                _logger.LogInformation(
+                    "Discord announcement skipped (rank {Rank} below top {AnnounceTopRanks}): LevelId={LevelId}, PlayerName={PlayerName}",
+                    result.Rank,
+                    announceTopRanks,
+                    submission.LevelId,
+                    submission.PlayerName);
+                return;
+            }
+
+            var payload = BuildPayload(submission, result);
+            using var response = await _httpClient.PostAsJsonAsync(webhookUrl, payload);
+            response.EnsureSuccessStatusCode();
+
+            _logger.LogInformation(
+                "Discord announcement sent: LevelId={LevelId}, PlayerName={PlayerName}, Rank={Rank}",
+                submission.LevelId,
+                submission.PlayerName,
+                result.Rank);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Discord announcement failed: LevelId={LevelId}, PlayerName={PlayerName}",
+                submission.LevelId,
+                submission.PlayerName);
+        }
+    }
+
+    private object BuildPayload(ScoreSubmission submission, ScoreAddResult result)
+    {
+        var score = submission.FinalScore.ToString("N0", CultureInfo.InvariantCulture);
+        var time = FormatTime(submission.ElapsedSeconds);
+        bool isTopSpot = result.Rank == 1;
+
+        var title = isTopSpot
+            ? $"New #1 on {submission.LevelId}!"
+            : $"New score on {submission.LevelId}";
+
+        var description = isTopSpot
+            ? $"**{submission.PlayerName}** took the top spot with **{score}** points in {time}."
+            : $"**{submission.PlayerName}** scored **{score}** points in {time} " +
+              $"(rank #{result.Rank} of {result.TotalEntriesForLevel}).";
+
+        var gameUrl = _configuration["Discord:GameUrl"];
+        if (!string.IsNullOrWhiteSpace(gameUrl))
+            description += $"\nThink you can beat it? [Play now]({gameUrl})";
+
+        return new
+        {
+            embeds = new[]
+            {
+                new
+                {
+                    title,
+                    description,
+                    color = isTopSpot ? GoldColor : SlateColor,
+                    fields = new[]
+                    {
+                        new { name = "Kills", value = submission.Kills.ToString(CultureInfo.InvariantCulture), inline = true },
+                        new { name = "Treasures", value = submission.TreasuresCollected.ToString(CultureInfo.InvariantCulture), inline = true },
+                        new { name = "Secrets", value = submission.SecretsFound.ToString(CultureInfo.InvariantCulture), inline = true }
+                    },
+                    timestamp = DateTimeOffset.UtcNow.ToString("O")
+                }
+            }
+        };
+    }
+
+    private static string FormatTime(float elapsedSeconds)
+    {
+        var timeSpan = TimeSpan.FromSeconds(elapsedSeconds);
+        return timeSpan.TotalHours >= 1
+            ? timeSpan.ToString(@"h\:mm\:ss", CultureInfo.InvariantCulture)
+            : timeSpan.ToString(@"m\:ss", CultureInfo.InvariantCulture);
+    }
+}
