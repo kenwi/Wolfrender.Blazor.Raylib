@@ -43,10 +43,18 @@ public static class ScoreSubmissionHandler
             error = "Checksum verification failed.";
             var expected = ScoreChecksum.Compute(normalized);
             logger.LogWarning(
-                "Score submission rejected (checksum): LevelId={LevelId}, PlayerName={PlayerName}, " +
+                "Suspected fake score submission (checksum mismatch): LevelId={LevelId}, PlayerName={PlayerName}, " +
+                "FinalScore={FinalScore}, LevelScore={LevelScore}, Kills={Kills}, TreasuresCollected={TreasuresCollected}, " +
+                "SecretsFound={SecretsFound}, ElapsedSeconds={ElapsedSeconds:F3}, " +
                 "ProvidedChecksum={ProvidedChecksum}, ExpectedChecksum={ExpectedChecksum}",
                 normalized.LevelId,
                 normalized.PlayerName,
+                normalized.FinalScore,
+                normalized.LevelScore,
+                normalized.Kills,
+                normalized.TreasuresCollected,
+                normalized.SecretsFound,
+                normalized.ElapsedSeconds,
                 submission.Checksum,
                 expected);
             return false;

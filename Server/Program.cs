@@ -3,8 +3,11 @@ using Game.Features.Recording;
 using Microsoft.AspNetCore.HttpOverrides;
 using System.Text.Json;
 using Wolfrender.Highscores.Server;
+using Wolfrender.Highscores.Server.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Logging.AddFileLogger(builder.Configuration);
 
 const string dataConfigPath = "/data/appsettings.json";
 if (File.Exists(dataConfigPath))
@@ -45,10 +48,12 @@ app.UseForwardedHeaders();
 var startupLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Wolfrender.Highscores.Server");
 var scoreFilePath = app.Configuration["Highscores:FilePath"] ?? "highscores.json";
 var recordingsDirectory = app.Configuration["Recordings:Directory"] ?? "recordings";
+var logFilePath = app.Configuration["Logging:File:Path"];
 startupLogger.LogInformation(
-    "Highscores server starting. ScoreFile={ScoreFile}, RecordingsDirectory={RecordingsDirectory}, CorsOrigins={CorsOrigins}",
+    "Highscores server starting. ScoreFile={ScoreFile}, RecordingsDirectory={RecordingsDirectory}, LogFile={LogFile}, CorsOrigins={CorsOrigins}",
     Path.GetFullPath(scoreFilePath),
     Path.GetFullPath(recordingsDirectory),
+    string.IsNullOrWhiteSpace(logFilePath) ? "(disabled)" : Path.GetFullPath(logFilePath),
     string.Join(", ", app.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? []));
 
 if (!app.Environment.IsDevelopment())
@@ -77,11 +82,17 @@ app.MapPost("/api/scores", async (
 
     if (!ScoreSubmissionHandler.TryPrepare(submission, logger, out var normalized, out var error))
     {
+        var isSuspectedFake = error.Contains("Checksum", StringComparison.OrdinalIgnoreCase);
         logger.LogWarning(
-            "POST /api/scores rejected: ClientIp={ClientIp}, LevelId={LevelId}, PlayerName={PlayerName}, Error={Error}",
+            "POST /api/scores rejected: ClientIp={ClientIp}, Origin={Origin}, UserAgent={UserAgent}, " +
+            "LevelId={LevelId}, PlayerName={PlayerName}, FinalScore={FinalScore}, SuspectedFake={SuspectedFake}, Error={Error}",
             clientIp,
+            string.IsNullOrEmpty(origin) ? "(none)" : origin,
+            string.IsNullOrEmpty(userAgent) ? "(none)" : userAgent,
             submission.LevelId,
             submission.PlayerName,
+            submission.FinalScore,
+            isSuspectedFake,
             error);
         return Results.BadRequest(new { error });
     }
