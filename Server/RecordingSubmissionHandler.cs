@@ -17,11 +17,21 @@ public static class RecordingSubmissionHandler
         error = string.Empty;
 
         if (!RecordingNameSanitizer.TrySanitize(request.Name, out var sanitizedName, out error))
+        {
+            logger.LogWarning(
+                "Recording upload rejected (name): RawName={RawName}, Error={Error}",
+                request.Name,
+                error);
             return false;
+        }
 
         if (request.Recording is null)
         {
             error = "Recording payload is required.";
+            logger.LogWarning(
+                "Recording upload rejected (missing payload): Name={Name}, Error={Error}",
+                sanitizedName,
+                error);
             return false;
         }
 
@@ -29,18 +39,41 @@ public static class RecordingSubmissionHandler
         if (recording.Version < 1 || recording.Version > RecFile.CurrentVersion)
         {
             error = $"Unsupported recording version {recording.Version}.";
+            logger.LogWarning(
+                "Recording upload rejected (version): Name={Name}, Version={Version}, LevelPath={LevelPath}, " +
+                "EventCount={EventCount}, Error={Error}",
+                sanitizedName,
+                recording.Version,
+                recording.LevelPath,
+                recording.Events.Count,
+                error);
             return false;
         }
 
         if (string.IsNullOrWhiteSpace(recording.LevelPath))
         {
             error = "Recording levelPath is required.";
+            logger.LogWarning(
+                "Recording upload rejected (level path): Name={Name}, Version={Version}, EventCount={EventCount}, Error={Error}",
+                sanitizedName,
+                recording.Version,
+                recording.Events.Count,
+                error);
             return false;
         }
 
         if (recording.Events.Count > MaxEventCount)
         {
             error = $"Recording exceeds maximum event count ({MaxEventCount}).";
+            logger.LogWarning(
+                "Recording upload rejected (event count): Name={Name}, Version={Version}, LevelPath={LevelPath}, " +
+                "EventCount={EventCount}, MaxEventCount={MaxEventCount}, Error={Error}",
+                sanitizedName,
+                recording.Version,
+                recording.LevelPath,
+                recording.Events.Count,
+                MaxEventCount,
+                error);
             return false;
         }
 

@@ -57,7 +57,22 @@ public sealed class DiscordScoreAnnouncer
 
             var payload = BuildPayload(submission, result);
             using var response = await _httpClient.PostAsJsonAsync(webhookUrl, payload);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync();
+                if (responseBody.Length > 200)
+                    responseBody = responseBody[..200] + "...";
+
+                _logger.LogWarning(
+                    "Discord announcement failed: StatusCode={StatusCode}, LevelId={LevelId}, PlayerName={PlayerName}, " +
+                    "Rank={Rank}, ResponseBody={ResponseBody}",
+                    (int)response.StatusCode,
+                    submission.LevelId,
+                    submission.PlayerName,
+                    result.Rank,
+                    responseBody);
+                return;
+            }
 
             _logger.LogInformation(
                 "Discord announcement sent: LevelId={LevelId}, PlayerName={PlayerName}, Rank={Rank}",

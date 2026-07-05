@@ -1,6 +1,7 @@
 using Game.Features.Highscores.Shared;
 using Game.Features.Recording;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.Primitives;
 using System.Text.Json;
 using Wolfrender.Highscores.Server;
 using Wolfrender.Highscores.Server.Logging;
@@ -22,6 +23,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 
 builder.Services.AddSingleton<JsonFileScoreStore>();
 builder.Services.AddSingleton<FileRecordingStore>();
+builder.Services.AddSingleton<SubmissionRejectionTracker>();
 builder.Services.AddHttpClient<DiscordScoreAnnouncer>();
 builder.Services.AddCors(options =>
 {
@@ -44,6 +46,7 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 app.UseForwardedHeaders();
+app.UseMiddleware<RequestLoggingMiddleware>();
 
 var startupLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Wolfrender.Highscores.Server");
 var scoreFilePath = app.Configuration["Highscores:FilePath"] ?? "highscores.json";
@@ -56,6 +59,13 @@ startupLogger.LogInformation(
     string.IsNullOrWhiteSpace(logFilePath) ? "(disabled)" : Path.GetFullPath(logFilePath),
     string.Join(", ", app.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? []));
 
+if (File.Exists(dataConfigPath))
+{
+    ChangeToken.OnChange(
+        () => app.Configuration.GetReloadToken(),
+        () => startupLogger.LogInformation("Configuration reloaded from {ConfigPath}", dataConfigPath));
+}
+
 if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 app.UseCors();
@@ -64,6 +74,7 @@ app.MapPost("/api/scores", async (
     ScoreSubmission submission,
     JsonFileScoreStore store,
     DiscordScoreAnnouncer announcer,
+    SubmissionRejectionTracker rejectionTracker,
     HttpContext httpContext,
     ILogger<Program> logger,
     CancellationToken cancellationToken) =>
@@ -83,15 +94,29 @@ app.MapPost("/api/scores", async (
     if (!ScoreSubmissionHandler.TryPrepare(submission, logger, out var normalized, out var error))
     {
         var isSuspectedFake = error.Contains("Checksum", StringComparison.OrdinalIgnoreCase);
+        var rejectionCount = rejectionTracker.RecordRejection(clientIp);
+        if (rejectionTracker.IsRepeatOffender(clientIp, rejectionCount))
+        {
+            logger.LogWarning(
+                "Repeat score rejection offender: ClientIp={ClientIp}, RejectionCount={RejectionCount}, " +
+                "WindowMinutes={WindowMinutes}, Threshold={Threshold}",
+                clientIp,
+                rejectionCount,
+                rejectionTracker.Window.TotalMinutes,
+                rejectionTracker.Threshold);
+        }
+
         logger.LogWarning(
             "POST /api/scores rejected: ClientIp={ClientIp}, Origin={Origin}, UserAgent={UserAgent}, " +
-            "LevelId={LevelId}, PlayerName={PlayerName}, FinalScore={FinalScore}, SuspectedFake={SuspectedFake}, Error={Error}",
+            "LevelId={LevelId}, PlayerName={PlayerName}, FinalScore={FinalScore}, RejectionCount={RejectionCount}, " +
+            "SuspectedFake={SuspectedFake}, Error={Error}",
             clientIp,
             string.IsNullOrEmpty(origin) ? "(none)" : origin,
             string.IsNullOrEmpty(userAgent) ? "(none)" : userAgent,
             submission.LevelId,
             submission.PlayerName,
             submission.FinalScore,
+            rejectionCount,
             isSuspectedFake,
             error);
         return Results.BadRequest(new { error });
@@ -177,6 +202,7 @@ app.MapPost("/api/recordings", async (
 {
     var clientIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
     var origin = httpContext.Request.Headers.Origin.ToString();
+    var contentLength = httpRequest.ContentLength;
 
     RecordingUploadWireRequest request;
     try
@@ -187,15 +213,20 @@ app.MapPost("/api/recordings", async (
     }
     catch (JsonException ex)
     {
-        logger.LogWarning(ex, "POST /api/recordings rejected: invalid JSON");
+        logger.LogWarning(
+            ex,
+            "POST /api/recordings rejected: invalid JSON. ClientIp={ClientIp}, ContentLength={ContentLength}",
+            clientIp,
+            contentLength);
         return Results.BadRequest(new { error = $"Invalid recording JSON: {ex.Message}" });
     }
 
     logger.LogInformation(
-        "POST /api/recordings request: ClientIp={ClientIp}, Origin={Origin}, Name={Name}",
+        "POST /api/recordings request: ClientIp={ClientIp}, Origin={Origin}, Name={Name}, ContentLength={ContentLength}",
         clientIp,
         string.IsNullOrEmpty(origin) ? "(none)" : origin,
-        request.Name);
+        request.Name,
+        contentLength);
 
     RecFile recording;
     try
@@ -204,7 +235,12 @@ app.MapPost("/api/recordings", async (
     }
     catch (Exception ex)
     {
-        logger.LogWarning(ex, "POST /api/recordings rejected: invalid recording payload");
+        logger.LogWarning(
+            ex,
+            "POST /api/recordings rejected: invalid recording payload. ClientIp={ClientIp}, Name={Name}, ContentLength={ContentLength}",
+            clientIp,
+            request.Name,
+            contentLength);
         return Results.BadRequest(new { error = ex.Message });
     }
 
@@ -217,9 +253,14 @@ app.MapPost("/api/recordings", async (
     if (!RecordingSubmissionHandler.TryPrepare(upload, logger, out var normalized, out var error))
     {
         logger.LogWarning(
-            "POST /api/recordings rejected: ClientIp={ClientIp}, Name={Name}, Error={Error}",
+            "POST /api/recordings rejected: ClientIp={ClientIp}, Name={Name}, ContentLength={ContentLength}, " +
+            "Version={Version}, LevelPath={LevelPath}, EventCount={EventCount}, Error={Error}",
             clientIp,
             request.Name,
+            contentLength,
+            recording.Version,
+            recording.LevelPath,
+            recording.Events.Count,
             error);
         return Results.BadRequest(new { error });
     }

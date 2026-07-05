@@ -60,6 +60,24 @@ public static class ScoreSubmissionHandler
             return false;
         }
 
+        var suspiciousReasons = ScorePlausibilityChecker.GetSuspiciousReasons(normalized);
+        if (suspiciousReasons.Count > 0)
+        {
+            logger.LogWarning(
+                "Suspicious but accepted score submission: LevelId={LevelId}, PlayerName={PlayerName}, " +
+                "FinalScore={FinalScore}, LevelScore={LevelScore}, Kills={Kills}, TreasuresCollected={TreasuresCollected}, " +
+                "SecretsFound={SecretsFound}, ElapsedSeconds={ElapsedSeconds:F3}, Reasons={Reasons}",
+                normalized.LevelId,
+                normalized.PlayerName,
+                normalized.FinalScore,
+                normalized.LevelScore,
+                normalized.Kills,
+                normalized.TreasuresCollected,
+                normalized.SecretsFound,
+                normalized.ElapsedSeconds,
+                string.Join("; ", suspiciousReasons));
+        }
+
         logger.LogInformation(
             "Score submission accepted for storage: LevelId={LevelId}, PlayerName={PlayerName}, " +
             "FinalScore={FinalScore}, LevelScore={LevelScore}, Kills={Kills}, TreasuresCollected={TreasuresCollected}, " +
