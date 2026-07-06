@@ -33,6 +33,7 @@ public sealed class PlayerSystem
     private bool _levelCompleteHandled;
     private Func<bool> _isConsoleOpen = () => false;
     private Func<bool> _isHighscoreBlockingRestart = () => false;
+    private Func<bool> _isReplaying = () => false;
     private Action? _restartLevel;
 
     public PlayerSystem(
@@ -65,11 +66,16 @@ public sealed class PlayerSystem
 
     public Player Player => _player;
 
-    public void ConfigureLifecycle(Func<bool> isConsoleOpen, Action restartLevel, Func<bool>? isHighscoreBlockingRestart = null)
+    public void ConfigureLifecycle(
+        Func<bool> isConsoleOpen,
+        Action restartLevel,
+        Func<bool>? isHighscoreBlockingRestart = null,
+        Func<bool>? isReplaying = null)
     {
         _isConsoleOpen = isConsoleOpen;
         _restartLevel = restartLevel;
         _isHighscoreBlockingRestart = isHighscoreBlockingRestart ?? (() => false);
+        _isReplaying = isReplaying ?? (() => false);
     }
 
     public void ResetForLevelLoad(MapData mapData)
@@ -142,7 +148,9 @@ public sealed class PlayerSystem
     {
         Vector3 moveDirection = _inputSystem.GetMoveDirection(_player.Camera, input);
 
-        if (_player.IsFlying)
+        // Raw Raylib reads below bypass the input provider; ignore them during
+        // replay so live keyboard state cannot alter deterministic playback.
+        if (_player.IsFlying && !_isReplaying())
         {
             float vertical = 0f;
             if (IsKeyDown(KeyboardKey.LeftShift) || IsKeyDown(KeyboardKey.RightShift))
@@ -198,7 +206,7 @@ public sealed class PlayerSystem
 
     private void TryRestartFromGameOver()
     {
-        if (_isConsoleOpen())
+        if (_isConsoleOpen() || _isReplaying())
             return;
 
         bool restartPressed = IsKeyPressed(KeyboardKey.R)
@@ -222,7 +230,7 @@ public sealed class PlayerSystem
 
     private void TryRestartFromLevelComplete()
     {
-        if (_isConsoleOpen() || _isHighscoreBlockingRestart())
+        if (_isConsoleOpen() || _isHighscoreBlockingRestart() || _isReplaying())
             return;
 
         bool restartPressed = IsKeyPressed(KeyboardKey.R)

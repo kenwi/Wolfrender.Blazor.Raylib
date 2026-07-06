@@ -69,6 +69,8 @@ public class World : IScene
     private InputState _inputState = new();
     private SimulationPose _previousSimulationPose;
     private SimulationPose _currentSimulationPose;
+    private int _currentRngSeed;
+    private int? _rngSeedOverride;
 
     public Player Player => _player;
     public PlayerSystem PlayerSystem => _playerSystem;
@@ -168,11 +170,16 @@ public class World : IScene
             },
             () => _simulationClock.TickHz,
             tickHz => _simulationClock.SetTickHz(tickHz),
+            tick => SimulationChecksum.Capture(
+                tick, _player, _enemySystem.Enemies, _doorSystem.Doors, _scoreSystem),
+            () => _currentRngSeed,
+            seed => _rngSeedOverride = seed,
             result => _runtimeConsole.WriteFeedback(result));
         _playerSystem.ConfigureLifecycle(
             () => _consoleOverlay.IsOpen,
             () => _ = RestartCurrentLevel(),
-            () => _highscoreIntermission.IsBlockingRestart);
+            () => _highscoreIntermission.IsBlockingRestart,
+            () => _recordingSystem.IsReplaying);
         _playerSystem.ResetForLevelLoad(_mapData);
         ResetSimulationPoses();
         _exitSystem.Rebuild(_mapData);
@@ -424,6 +431,14 @@ public class World : IScene
 
     private void ResetLevelState()
     {
+        // A level reset invalidates recording/replay tick indexing (sim clock restarts
+        // at tick 0). The recording system's own restarts happen before it flags
+        // recording/replay active, so this only fires for external resets.
+        _recordingSystem.OnLevelStateReset();
+
+        _currentRngSeed = _rngSeedOverride ?? Random.Shared.Next();
+        _enemySystem.SetRandomSeed(_currentRngSeed);
+
         _playerSystem.ResetForLevelLoad(_mapData);
         _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
         _enemySystem.Rebuild(_mapData.Enemies, _mapData);
@@ -549,6 +564,10 @@ public class World : IScene
         if (!_recordingSystem.IsReplaying)
             _inputSystem.Update();
 
+        // Sample Raylib once per render frame; ticks consume latched edges/deltas
+        // so per-frame input maps 1:1 onto simulation ticks (see LiveInputProvider).
+        _recordingSystem.BeginInputFrame();
+
         _tickDiagnostics.BeginFrame(deltaTime);
         int ticksThisFrame = _simulationClock.Advance(deltaTime);
         _tickDiagnostics.RecordSimulationStep(_simulationClock);
@@ -595,6 +614,7 @@ public class World : IScene
             _enemySystem.Update(fixedDeltaTime, _inputState);
         }
 
+        _recordingSystem.OnTickSimulated(_simulationClock.TickIndex);
         AdvanceSimulationPose();
     }
 
@@ -765,6 +785,18 @@ public class World : IScene
     public ConsoleCommandResult StartReplayForConsole(string filename)
     {
         var result = _recordingSystem.StartReplay(filename);
+        if (result.Success)
+        {
+            _consoleOverlay.Close();
+            _inputSystem.DisableMouse();
+        }
+
+        return result;
+    }
+
+    public ConsoleCommandResult StartVerifyReplayForConsole(string filename)
+    {
+        var result = _recordingSystem.StartVerifyReplay(filename);
         if (result.Success)
         {
             _consoleOverlay.Close();

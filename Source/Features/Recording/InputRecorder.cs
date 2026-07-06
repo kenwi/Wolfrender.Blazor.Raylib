@@ -5,24 +5,34 @@ namespace Game.Features.Recording;
 public sealed class InputRecorder
 {
     private readonly List<InputEvent> _events = new();
+    private readonly List<ChecksumKeyframe> _checksums = new();
     private readonly Dictionary<GameplayKey, bool> _held = new();
 
     public IReadOnlyList<InputEvent> Events => _events;
+    public IReadOnlyList<ChecksumKeyframe> Checksums => _checksums;
+
+    /// <summary>Total simulated ticks captured, including trailing ticks without input events.</summary>
+    public long DurationTicks { get; private set; }
 
     public float Duration =>
         _events.Count > 0 ? _events[^1].Time : 0f;
 
-    public long DurationTicks =>
-        _events.Count > 0 ? _events[^1].Tick : 0;
-
     public void Reset()
     {
         _events.Clear();
+        _checksums.Clear();
         _held.Clear();
+        DurationTicks = 0;
+    }
+
+    public void CaptureChecksum(ChecksumKeyframe keyframe)
+    {
+        _checksums.Add(keyframe);
     }
 
     public void CaptureTick(InputPollResult poll, long tickIndex, int tickHz)
     {
+        DurationTicks = Math.Max(DurationTicks, tickIndex);
         float time = tickHz > 0 ? tickIndex / (float)tickHz : 0f;
 
         RecordHeldTransition(GameplayKey.MoveForward, poll.InputState.MoveForward, tickIndex, time);

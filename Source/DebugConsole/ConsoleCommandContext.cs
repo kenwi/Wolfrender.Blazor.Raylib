@@ -12,6 +12,7 @@ public sealed class ConsoleCommandContext
     public required Func<string, ConsoleCommandResult> StartRecording { get; init; }
     public required Func<ConsoleCommandResult> StopRecording { get; init; }
     public required Func<string, ConsoleCommandResult> StartReplay { get; init; }
+    public required Func<string, ConsoleCommandResult> VerifyReplay { get; init; }
     public required Func<ConsoleCommandResult> StopReplay { get; init; }
     public required Func<string, ConsoleCommandResult> SendRecording { get; init; }
     public required Func<ConsoleCommandResult> ToggleTickDiagnostics { get; init; }

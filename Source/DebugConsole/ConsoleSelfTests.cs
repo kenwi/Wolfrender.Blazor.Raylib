@@ -24,6 +24,8 @@ public static class ConsoleSelfTests
         TestObjectSpritesLayout();
         TestSecretWallJsonRoundTrip();
         TestRecFileRoundTrip();
+        TestRecFileLegacyParse();
+        TestSimulationChecksumDiff();
         TestRecFileValidator();
         TestLevelRoomMapDoorVisibility();
     }
@@ -168,6 +170,8 @@ public static class ConsoleSelfTests
             LevelPath = "resources/test.json",
             MouseSensitivity = 1.25f,
             TickHz = 60,
+            DurationTicks = 120,
+            RngSeed = 12345,
             PlayerSnapshot = new PlayerSnapshot
             {
                 PositionX = 1f,
@@ -177,7 +181,12 @@ public static class ConsoleSelfTests
                 ForwardY = 0f,
                 ForwardZ = 1f
             },
-            Events = events
+            Events = events,
+            Checksums = new[]
+            {
+                new ChecksumKeyframe(60, 0xDEADBEEF, 0x12345678, 0x0000FFFF, 0xABCDEF01),
+                new ChecksumKeyframe(120, 1, 2, 3, 4)
+            }
         };
 
         string path = Path.Combine(Path.GetTempPath(), $"wolfrender-rec-test-{Guid.NewGuid():N}.rec");
@@ -197,12 +206,66 @@ public static class ConsoleSelfTests
                 throw new InvalidOperationException("RecFile player snapshot round-trip mismatch.");
             if (loaded.Events.Count != events.Length)
                 throw new InvalidOperationException("RecFile event count round-trip mismatch.");
+            if (loaded.DurationTicks != 120 || loaded.ResolveDurationTicks() != 120)
+                throw new InvalidOperationException("RecFile durationTicks round-trip mismatch.");
+            if (loaded.RngSeed != 12345)
+                throw new InvalidOperationException("RecFile rngSeed round-trip mismatch.");
+            if (loaded.Checksums.Count != 2
+                || loaded.Checksums[0] != new ChecksumKeyframe(60, 0xDEADBEEF, 0x12345678, 0x0000FFFF, 0xABCDEF01)
+                || loaded.Checksums[1].Tick != 120)
+                throw new InvalidOperationException("RecFile checksum round-trip mismatch.");
         }
         finally
         {
             if (File.Exists(path))
                 File.Delete(path);
         }
+    }
+
+    private static void TestRecFileLegacyParse()
+    {
+        // v4 file written before durationTicks/rngSeed/checksums existed.
+        const string legacyJson = """
+        {
+            "version": 4,
+            "levelPath": "resources/test.json",
+            "mouseSensitivity": 1.0,
+            "tickHz": 60,
+            "events": [
+                { "kind": "keyDown", "tick": 1, "time": 0.016, "key": "moveForward" },
+                { "kind": "keyUp", "tick": 45, "time": 0.75, "key": "moveForward" }
+            ]
+        }
+        """;
+
+        var legacy = RecFileSerializer.Parse(legacyJson);
+        if (legacy.Version != 4 || !legacy.UsesTickIndexedEvents)
+            throw new InvalidOperationException("Legacy v4 recording parse mismatch.");
+        if (legacy.DurationTicks != 0)
+            throw new InvalidOperationException("Legacy recording should have no explicit durationTicks.");
+        if (legacy.ResolveDurationTicks() != 45)
+            throw new InvalidOperationException("Legacy recording should fall back to last event tick for duration.");
+        if (legacy.RngSeed != null)
+            throw new InvalidOperationException("Legacy recording should have no rngSeed.");
+        if (legacy.Checksums.Count != 0)
+            throw new InvalidOperationException("Legacy recording should have no checksums.");
+    }
+
+    private static void TestSimulationChecksumDiff()
+    {
+        var a = new ChecksumKeyframe(60, 1, 2, 3, 4);
+        var same = new ChecksumKeyframe(60, 1, 2, 3, 4);
+        var diff = new ChecksumKeyframe(60, 1, 99, 3, 44);
+
+        if (!a.Matches(same) || a.DiffComponents(same).Count != 0)
+            throw new InvalidOperationException("Identical checksums should match with no diffs.");
+
+        if (a.Matches(diff))
+            throw new InvalidOperationException("Different checksums should not match.");
+
+        var components = a.DiffComponents(diff);
+        if (components.Count != 2 || !components.Contains("enemies") || !components.Contains("score"))
+            throw new InvalidOperationException("Checksum diff should name the diverged components.");
     }
 
     private static void TestRecFileValidator()

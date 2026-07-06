@@ -19,7 +19,7 @@ public class EnemySystem
     private readonly PickupSystem? _pickupSystem;
     private readonly ScoreSystem? _scoreSystem;
     private readonly SoundPropagationSystem? _soundPropagationSystem;
-    private readonly Random _rng = new();
+    private Random _rng = new();
     private MapData _mapData = null!;
 
     // Throttled LOS update
@@ -65,6 +65,15 @@ public class EnemySystem
         _scoreSystem = scoreSystem;
         _soundPropagationSystem = soundPropagationSystem;
         _enemies = new List<Enemy>();
+    }
+
+    /// <summary>
+    /// Re-seed gameplay randomness. Called at level reset so recordings can store the
+    /// seed and replays reproduce identical RNG sequences.
+    /// </summary>
+    public void SetRandomSeed(int seed)
+    {
+        _rng = new Random(seed);
     }
 
     public static void ApplyPlacementSpawnState(Enemy enemy, EnemyPlacement placement)

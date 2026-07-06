@@ -7,19 +7,23 @@ public sealed class ReplayInputProvider : IInputProvider
     private int _nextEventIndex;
     private float _elapsed;
     private long _currentTick = 1;
+    private long _durationTicks;
     private bool _useTickTiming;
 
     public float Duration { get; private set; }
     public bool IsFinished { get; private set; }
 
-    public void Reset(IReadOnlyList<InputEvent> events, bool useTickTiming)
+    public void Reset(IReadOnlyList<InputEvent> events, bool useTickTiming, long durationTicks = 0)
     {
         _events = events;
         _nextEventIndex = 0;
         _elapsed = 0f;
         _currentTick = 1;
         _useTickTiming = useTickTiming;
-        IsFinished = events.Count == 0;
+        _durationTicks = durationTicks;
+        IsFinished = useTickTiming
+            ? durationTicks < 1
+            : events.Count == 0;
         Duration = events.Count > 0 ? events[^1].Time : 0f;
         _builder.Reset();
     }
@@ -37,14 +41,20 @@ public sealed class ReplayInputProvider : IInputProvider
             ApplyEventsUpTo(_elapsed);
         }
 
-        if (_nextEventIndex >= _events.Count)
-            IsFinished = true;
-
         var result = _builder.Build(isMouseFree: false);
         _builder.EndFrame();
 
         if (_useTickTiming)
+        {
             _currentTick++;
+            // Replay runs the full recorded tick span, including trailing
+            // ticks after the last input event (enemies/timers keep moving).
+            IsFinished = _currentTick > _durationTicks;
+        }
+        else
+        {
+            IsFinished = _nextEventIndex >= _events.Count;
+        }
 
         return result;
     }

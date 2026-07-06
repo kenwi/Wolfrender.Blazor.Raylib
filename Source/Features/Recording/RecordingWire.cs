@@ -12,8 +12,11 @@ public sealed class RecFileWire
     public string LevelPath { get; init; } = string.Empty;
     public float MouseSensitivity { get; init; }
     public int TickHz { get; init; }
+    public long DurationTicks { get; init; }
+    public int? RngSeed { get; init; }
     public PlayerSnapshot? Player { get; init; }
     public List<RecEventWire> Events { get; init; } = new();
+    public List<RecChecksumWire>? Checksums { get; init; }
 
     public static RecFileWire From(RecFile file) => new()
     {
@@ -21,8 +24,13 @@ public sealed class RecFileWire
         LevelPath = file.LevelPath,
         MouseSensitivity = file.MouseSensitivity,
         TickHz = file.ResolveTickHz(),
+        DurationTicks = file.ResolveDurationTicks(),
+        RngSeed = file.RngSeed,
         Player = file.PlayerSnapshot,
-        Events = file.Events.Select(RecEventWire.From).ToList()
+        Events = file.Events.Select(RecEventWire.From).ToList(),
+        Checksums = file.Checksums.Count > 0
+            ? file.Checksums.Select(RecChecksumWire.From).ToList()
+            : null
     };
 
     public RecFile ToRecFile()
@@ -45,16 +53,45 @@ public sealed class RecFileWire
             events = events.OrderBy(e => e.Tick).ThenBy(e => e.Time).ToList();
         else
             events = events.OrderBy(e => e.Time).ToList();
+
+        var checksums = Version >= 5 && Checksums != null
+            ? Checksums.Select(c => c.ToKeyframe()).OrderBy(c => c.Tick).ToList()
+            : (IReadOnlyList<ChecksumKeyframe>)Array.Empty<ChecksumKeyframe>();
+
         return new RecFile
         {
             Version = Version,
             LevelPath = LevelPath,
             MouseSensitivity = MouseSensitivity,
             TickHz = tickHz,
+            DurationTicks = Version >= 5 ? Math.Max(0, DurationTicks) : 0,
+            RngSeed = Version >= 5 ? RngSeed : null,
             PlayerSnapshot = Player,
-            Events = events
+            Events = events,
+            Checksums = checksums
         };
     }
+}
+
+public sealed class RecChecksumWire
+{
+    public long Tick { get; init; }
+    public uint Player { get; init; }
+    public uint Enemies { get; init; }
+    public uint Doors { get; init; }
+    public uint Score { get; init; }
+
+    public static RecChecksumWire From(ChecksumKeyframe keyframe) => new()
+    {
+        Tick = keyframe.Tick,
+        Player = keyframe.Player,
+        Enemies = keyframe.Enemies,
+        Doors = keyframe.Doors,
+        Score = keyframe.Score
+    };
+
+    public ChecksumKeyframe ToKeyframe() =>
+        new(Tick, Player, Enemies, Doors, Score);
 }
 
 public sealed class RecEventWire

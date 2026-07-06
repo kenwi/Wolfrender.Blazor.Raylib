@@ -45,6 +45,7 @@ public static class WorldConsoleBindings
             filename => world.StartRecordingForConsole(filename, getMouseSensitivity()),
             recordingSystem.StopRecording,
             world.StartReplayForConsole,
+            world.StartVerifyReplayForConsole,
             recordingSystem.StopReplay,
             recordingSystem.SendRecording,
             world.ToggleTickDiagnostics,
