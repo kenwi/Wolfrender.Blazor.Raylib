@@ -48,6 +48,15 @@ public class InputState
 
 public class InputSystem
 {
+    private enum BrowserCapturePhase
+    {
+        None,
+        /// <summary>Click requested lock; Raylib may still use absolute canvas coords.</summary>
+        AwaitingPointerLock,
+        /// <summary>Lock engaged; discard the first movement sample to clear stale state.</summary>
+        SuppressFirstLockedDelta,
+    }
+
     private bool _isMouseFree = true;
     private bool _isDebugEnabled = false;
     private bool _isMinimapEnabled = false;
@@ -58,11 +67,7 @@ public class InputSystem
     /// </summary>
     private int _suppressMouseDeltaPolls;
 
-    /// <summary>
-    /// Browser pointer lock engages asynchronously after click; the warp delta often
-    /// arrives on the first real movement instead of the capture frame.
-    /// </summary>
-    private bool _skipNextNonZeroMouseDelta;
+    private BrowserCapturePhase _browserCapturePhase;
 
     public bool IsMouseFree => _isMouseFree;
 
@@ -70,14 +75,19 @@ public class InputSystem
     public void SyncPointerLockReleased()
     {
         _isMouseFree = true;
-        _skipNextNonZeroMouseDelta = false;
+        _browserCapturePhase = BrowserCapturePhase.None;
     }
 
-    /// <summary>Browser pointer lock just engaged; flush and ignore the first movement delta.</summary>
+    /// <summary>Browser pointer lock just engaged.</summary>
     public void OnBrowserPointerLockAcquired()
     {
-        GetMouseDelta();
-        _skipNextNonZeroMouseDelta = true;
+        _browserCapturePhase = BrowserCapturePhase.SuppressFirstLockedDelta;
+    }
+
+    /// <summary>Browser rejected pointer lock; return to click-to-capture.</summary>
+    public void OnBrowserPointerLockFailed()
+    {
+        EnableMouse();
     }
 
     /// <summary>After closing an overlay: desktop re-captures; browser waits for click-to-capture.</summary>
@@ -129,11 +139,15 @@ public class InputSystem
         if (_isMouseFree)
         {
             EnableCursor();
+            ResetBrowserPointerCapture();
         }
         else
         {
             DisableCursor();
-            RecenterCapturedMouse();
+            if (OperatingSystem.IsBrowser())
+                BeginBrowserPointerCapture();
+            else
+                RecenterCapturedMouse();
         }
     }
 
@@ -141,30 +155,40 @@ public class InputSystem
     {
         _isMouseFree = false;
         DisableCursor();
-        RecenterCapturedMouse();
+        if (OperatingSystem.IsBrowser())
+            BeginBrowserPointerCapture();
+        else
+            RecenterCapturedMouse();
     }
 
     public void EnableMouse()
     {
         _isMouseFree = true;
-        _skipNextNonZeroMouseDelta = false;
+        ResetBrowserPointerCapture();
         EnableCursor();
     }
 
     public void CenterMouse()
     {
-        if (!_isMouseFree)
+        if (!_isMouseFree && !OperatingSystem.IsBrowser())
             RecenterCapturedMouse();
+    }
+
+    private void BeginBrowserPointerCapture()
+    {
+        _browserCapturePhase = BrowserCapturePhase.AwaitingPointerLock;
+    }
+
+    private void ResetBrowserPointerCapture()
+    {
+        _browserCapturePhase = BrowserCapturePhase.None;
     }
 
     private void RecenterCapturedMouse()
     {
         SetMousePosition(GetScreenWidth() / 2, GetScreenHeight() / 2);
         GetMouseDelta();
-        if (OperatingSystem.IsBrowser())
-            _skipNextNonZeroMouseDelta = true;
-        else
-            _suppressMouseDeltaPolls = 2;
+        _suppressMouseDeltaPolls = 2;
     }
 
     public InputState GetInputState()
@@ -175,11 +199,9 @@ public class InputSystem
             _suppressMouseDeltaPolls--;
             mouseDelta = Vector2.Zero;
         }
-        else if (_skipNextNonZeroMouseDelta &&
-                 (Math.Abs(mouseDelta.X) > 0.001f || Math.Abs(mouseDelta.Y) > 0.001f))
+        else if (OperatingSystem.IsBrowser())
         {
-            _skipNextNonZeroMouseDelta = false;
-            mouseDelta = Vector2.Zero;
+            mouseDelta = FilterBrowserMouseDelta(mouseDelta);
         }
 
         return new InputState
@@ -200,6 +222,29 @@ public class InputSystem
             IsPrimaryFireHeld = !_isMouseFree && IsMouseButtonDown(MouseButton.Left),
             WeaponSlotPressed = ReadWeaponSlotPressed(),
         };
+    }
+
+    private static bool IsBrowserPointerLockActive() =>
+        OperatingSystem.IsBrowser() && BrowserPointerLockBridge.QueryPointerLockActive();
+
+    private Vector2 FilterBrowserMouseDelta(Vector2 mouseDelta)
+    {
+        if (_browserCapturePhase == BrowserCapturePhase.AwaitingPointerLock && IsBrowserPointerLockActive())
+            _browserCapturePhase = BrowserCapturePhase.SuppressFirstLockedDelta;
+
+        switch (_browserCapturePhase)
+        {
+            case BrowserCapturePhase.AwaitingPointerLock:
+                return Vector2.Zero;
+
+            case BrowserCapturePhase.SuppressFirstLockedDelta:
+                if (Math.Abs(mouseDelta.X) > 0.001f || Math.Abs(mouseDelta.Y) > 0.001f)
+                    _browserCapturePhase = BrowserCapturePhase.None;
+                return Vector2.Zero;
+
+            default:
+                return mouseDelta;
+        }
     }
 
     private static int ReadWeaponSlotPressed()
@@ -262,4 +307,3 @@ public class InputSystem
         return Vector3.Zero;
     }
 }
-

@@ -366,6 +366,7 @@ public class World : IScene
         {
             _highscoreClient.PrefetchLeaderboardAccess(_currentLevelPath);
             BrowserPointerLockBridge.PointerLockAcquired = () => _inputSystem.OnBrowserPointerLockAcquired();
+            BrowserPointerLockBridge.PointerLockFailed = () => _inputSystem.OnBrowserPointerLockFailed();
             BrowserPointerLockBridge.PointerLockLost = HandleBrowserPointerLockLost;
             _inputSystem.EnableMouse();
         }
@@ -484,6 +485,7 @@ public class World : IScene
     public void OnExit()
     {
         BrowserPointerLockBridge.PointerLockAcquired = null;
+        BrowserPointerLockBridge.PointerLockFailed = null;
         BrowserPointerLockBridge.PointerLockLost = null;
         _optionsMenu.Dismiss();
         _inputSystem.EnableMouse();

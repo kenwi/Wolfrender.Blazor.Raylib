@@ -36,6 +36,7 @@ public partial class Raylib : IDisposable
     protected override async Task OnInitializedAsync()
     {
         await JSHost.ImportAsync("Raylib", "../js/raylib.js");
+        BrowserPointerLockBridge.IsPointerLockActive = () => IsPointerLockActive();
         Init(this, _id);
         await InitRaylib();
         SyncCanvasSize();
@@ -58,6 +59,9 @@ public partial class Raylib : IDisposable
     }
 
     #region Interop
+
+    [JSImport("raylib.isPointerLockActive", "Raylib")]
+    public static partial bool IsPointerLockActive();
 
     [JSImport("raylib.preloadFile", "Raylib")]
     public static partial Task PreloadFile(string path);
@@ -95,6 +99,12 @@ public partial class Raylib : IDisposable
     }
 
     [JSExport]
+    public static void OnPointerLockFailed()
+    {
+        BrowserPointerLockBridge.NotifyFailed();
+    }
+
+    [JSExport]
     public static void OnPointerLockAcquired()
     {
         BrowserPointerLockBridge.NotifyAcquired();
@@ -110,6 +120,7 @@ public partial class Raylib : IDisposable
 
     public void Dispose()
     {
+        BrowserPointerLockBridge.IsPointerLockActive = null;
         OnRender = null;
     }
 }
