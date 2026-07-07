@@ -43,10 +43,6 @@ class Raylib {
                 }
             });
 
-            globalThis.getDotnetRuntime(0).then(async ({ getAssemblyExports }) => {
-                this._exports = await getAssemblyExports("Wolfrender.Blazor.Raylib.dll");
-            });
-
             document.addEventListener('pointerlockchange', () => {
                 if (document.pointerLockElement) {
                     this.onPointerLockAcquired();
@@ -85,16 +81,28 @@ class Raylib {
         this.resize({});
     }
 
-    onPointerLockAcquired() {
-        this._exports?.Wolfrender.Blazor.Raylib.Components.Raylib.OnPointerLockAcquired();
+    async getExports() {
+        if (this._exports)
+            return this._exports;
+
+        const { getAssemblyExports } = await globalThis.getDotnetRuntime(0);
+        this._exports = await getAssemblyExports("Wolfrender.Blazor.Raylib.dll");
+        return this._exports;
     }
 
-    onPointerLockFailed() {
-        this._exports?.Wolfrender.Blazor.Raylib.Components.Raylib.OnPointerLockFailed();
+    async onPointerLockAcquired() {
+        const exports = await this.getExports();
+        exports.Wolfrender.Blazor.Raylib.Components.Raylib.OnPointerLockAcquired();
     }
 
-    onPointerLockLost() {
-        this._exports?.Wolfrender.Blazor.Raylib.Components.Raylib.OnPointerLockLost();
+    async onPointerLockFailed() {
+        const exports = await this.getExports();
+        exports.Wolfrender.Blazor.Raylib.Components.Raylib.OnPointerLockFailed();
+    }
+
+    async onPointerLockLost() {
+        const exports = await this.getExports();
+        exports.Wolfrender.Blazor.Raylib.Components.Raylib.OnPointerLockLost();
     }
 
     setFramePacing(vsyncEnabled, targetFps) {
