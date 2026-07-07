@@ -105,7 +105,11 @@ public class World : IScene
         _minimapSystem = new MinimapSystem(_level, _renderSystem);
         _exitSystem = new ExitSystem(_scoreSystem);
         _highscoreClient = new HighscoreClient();
-        _highscoreIntermission = new HighscoreIntermission(_highscoreClient);
+        _highscoreIntermission = new HighscoreIntermission(
+            _highscoreClient,
+            submission => _recordingSystem.PrepareRecordingForScoreSubmission(submission),
+            submission => _recordingSystem.QueueRecordingUploadForScore(submission),
+            () => _recordingSystem.DiscardCurrentRecording());
         _pickupSystem = new PickupSystem(_scoreSystem);
         _placedObjectSystem = new PlacedObjectSystem();
         _enemySystem = new EnemySystem(
@@ -361,6 +365,8 @@ public class World : IScene
         }
         else
             _inputSystem.DisableMouse();
+
+        TryStartAutoRecording();
     }
 
     public ConsoleCommandResult LoadLevel(string pathOrName)
@@ -458,6 +464,14 @@ public class World : IScene
 
         if (OperatingSystem.IsBrowser())
             _highscoreClient.PrefetchLeaderboardAccess(_currentLevelPath);
+
+        TryStartAutoRecording();
+    }
+
+    private void TryStartAutoRecording()
+    {
+        if (_recordingSystem.ShouldAutoRecordOnLevelReset)
+            _recordingSystem.StartAutoRecording(_optionsMenu.Settings.MouseSensitivity);
     }
 
     public void OnExit()

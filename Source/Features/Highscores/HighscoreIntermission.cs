@@ -19,6 +19,9 @@ public sealed class HighscoreIntermission
     }
 
     private readonly HighscoreClient _client;
+    private readonly Action<ScoreSubmission>? _prepareRecordingForScore;
+    private readonly Action<ScoreSubmission>? _uploadRecordingForScore;
+    private readonly Action? _discardRecording;
     private Phase _phase = Phase.Hidden;
     private string _levelId = string.Empty;
     private ScoreSystem? _score;
@@ -30,9 +33,16 @@ public sealed class HighscoreIntermission
     private string? _statusMessage;
     private Task? _pendingTask;
 
-    public HighscoreIntermission(HighscoreClient client)
+    public HighscoreIntermission(
+        HighscoreClient client,
+        Action<ScoreSubmission>? prepareRecordingForScore = null,
+        Action<ScoreSubmission>? uploadRecordingForScore = null,
+        Action? discardRecording = null)
     {
         _client = client;
+        _prepareRecordingForScore = prepareRecordingForScore;
+        _uploadRecordingForScore = uploadRecordingForScore;
+        _discardRecording = discardRecording;
     }
 
     public bool IsActive => _phase != Phase.Hidden;
@@ -166,8 +176,10 @@ public sealed class HighscoreIntermission
     {
         try
         {
+            _prepareRecordingForScore?.Invoke(submission);
             await _client.SubmitAsync(submission);
             _statusMessage = "Score submitted.";
+            _uploadRecordingForScore?.Invoke(submission);
         }
         catch (Exception ex)
         {
@@ -181,6 +193,7 @@ public sealed class HighscoreIntermission
 
     private void BeginLoadLeaderboard()
     {
+        _discardRecording?.Invoke();
         _phase = Phase.LoadingLeaderboard;
         _statusMessage = "Loading leaderboard...";
         _pendingTask = LoadLeaderboardAndContinueAsync();

@@ -1,6 +1,7 @@
 using Game.Core.Level;
 using Game.DebugConsole;
 using Game.Engine.Input;
+using Game.Features.Highscores.Shared;
 
 namespace Game.Features.Recording;
 
@@ -46,6 +47,7 @@ public sealed class RecordingSystem
     private int _checksumsMatched;
     private readonly List<string> _divergences = new();
     private bool _verifyReplayRequested;
+    private bool _preparingReplay;
 
     public RecordingSystem(InputSystem inputSystem)
     {
@@ -57,6 +59,7 @@ public sealed class RecordingSystem
     public IInputProvider ActiveProvider => _activeProvider;
     public bool IsRecording => _recordingPath != null;
     public bool IsReplaying => _activeProvider == _replayProvider;
+    public bool ShouldAutoRecordOnLevelReset => !_preparingReplay && !IsReplaying;
 
     public void Configure(
         Func<string, ConsoleCommandResult> loadLevel,
@@ -113,6 +116,8 @@ public sealed class RecordingSystem
         if (!restartResult.Success)
             return ConsoleCommandResult.Fail($"record: {restartResult.Message}");
 
+        DiscardCurrentRecording();
+
         _recorder.Reset();
         _liveProvider.ResetLatches();
         _recordingPlayerSnapshot = _capturePlayerSnapshot();
@@ -125,6 +130,52 @@ public sealed class RecordingSystem
             $"Recording to '{_recordingPath}' (level restarted, snapshot captured).");
     }
 
+    public void StartAutoRecording(float mouseSensitivity)
+    {
+        if (!ShouldAutoRecordOnLevelReset || IsRecording || IsReplaying
+            || _getCurrentLevelPath == null || _capturePlayerSnapshot == null)
+        {
+            return;
+        }
+
+        _recorder.Reset();
+        _liveProvider.ResetLatches();
+        _recordingPlayerSnapshot = _capturePlayerSnapshot();
+        _recordingPath = ResolveRecordingPath(CreateTempRecordingName());
+        _recordingLevelPath = _getCurrentLevelPath();
+        _recordingMouseSensitivity = mouseSensitivity;
+        _recordingRngSeed = _getRngSeed?.Invoke() ?? 0;
+    }
+
+    public void DiscardCurrentRecording() => ClearRecordingState();
+
+    public void PrepareRecordingForScoreSubmission(ScoreSubmission submission)
+    {
+        if (!IsRecording)
+            return;
+
+        string checksum = ScoreChecksum.Compute(submission);
+        if (!TryStopAndRenameRecording(checksum, out _))
+            DiscardCurrentRecording();
+    }
+
+    public void QueueRecordingUploadForScore(ScoreSubmission submission)
+    {
+        string checksum = ScoreChecksum.Compute(submission);
+        if (!RecordingNameSanitizer.TrySanitize(checksum, out var sanitizedName, out _))
+            return;
+
+        string path = ResolveRecordingPath(sanitizedName);
+        if (!File.Exists(path))
+            return;
+
+        if (_pendingUpload is { IsCompleted: false })
+            return;
+
+        _pendingUploadName = sanitizedName;
+        _pendingUpload = _uploadClient.SendAsync(sanitizedName, path);
+    }
+
     public ConsoleCommandResult StopRecording()
     {
         if (!IsRecording || _recordingPath == null || _recordingLevelPath == null)
@@ -135,28 +186,11 @@ public sealed class RecordingSystem
 
         try
         {
-            float duration = _recorder.Duration;
-            int eventCount = _recorder.Events.Count;
-            int tickHz = _getSimulationTickHz();
-            long durationTicks = _recorder.DurationTicks;
-            var file = new RecFile
-            {
-                Version = RecFile.CurrentVersion,
-                LevelPath = _recordingLevelPath,
-                MouseSensitivity = _recordingMouseSensitivity,
-                TickHz = tickHz,
-                DurationTicks = durationTicks,
-                RngSeed = _recordingRngSeed,
-                PlayerSnapshot = _recordingPlayerSnapshot,
-                Events = _recorder.Events.ToList(),
-                Checksums = _recorder.Checksums.ToList()
-            };
+            if (!TrySaveRecordingToDisk(out string path, out int eventCount, out long durationTicks, out float duration, out int tickHz, out int checksumCount))
+                return ConsoleCommandResult.Fail("stoprecord: Failed to save recording.");
 
-            string path = _recordingPath;
-            RecFileSerializer.Write(path, file);
-            ClearRecordingState();
             return ConsoleCommandResult.Ok(
-                $"Saved recording '{path}' ({eventCount} events, {durationTicks} ticks, {duration:F2}s, {tickHz} Hz, {file.Checksums.Count} checksums).");
+                $"Saved recording '{path}' ({eventCount} events, {durationTicks} ticks, {duration:F2}s, {tickHz} Hz, {checksumCount} checksums).");
         }
         catch (Exception ex)
         {
@@ -190,19 +224,26 @@ public sealed class RecordingSystem
             return ConsoleCommandResult.Fail(verify ? "Usage: verifyreplay <filename>" : "Usage: replay <filename>");
 
         string path = ResolveRecordingPath(filename);
+        _preparingReplay = true;
 
         try
         {
             var rec = RecFileSerializer.Read(path);
 
             if (!RecFileValidator.TryValidateForReplay(rec, LevelExists, out string validationError))
+            {
+                _preparingReplay = false;
                 return ConsoleCommandResult.Fail($"replay: {validationError}");
+            }
 
             if (!string.Equals(rec.LevelPath, _getCurrentLevelPath(), StringComparison.OrdinalIgnoreCase))
             {
                 var loadResult = _loadLevel(rec.LevelPath);
                 if (!loadResult.Success)
+                {
+                    _preparingReplay = false;
                     return ConsoleCommandResult.Fail($"Replay level load failed: {loadResult.Message}");
+                }
             }
 
             // Re-seed the level exactly as it was seeded when the recording started.
@@ -212,7 +253,10 @@ public sealed class RecordingSystem
             var restartResult = _restartLevel();
             _setRngSeedOverride?.Invoke(null);
             if (!restartResult.Success)
+            {
+                _preparingReplay = false;
                 return ConsoleCommandResult.Fail($"Replay restart failed: {restartResult.Message}");
+            }
 
             if (rec.PlayerSnapshot != null)
                 _applyPlayerSnapshot(rec.PlayerSnapshot);
@@ -228,6 +272,7 @@ public sealed class RecordingSystem
             _replayChecksums = rec.Checksums;
             _verifyReplayRequested = verify;
             _activeProvider = _replayProvider;
+            _preparingReplay = false;
 
             string snapshotNote = rec.PlayerSnapshot != null
                 ? "player snapshot restored"
@@ -252,11 +297,13 @@ public sealed class RecordingSystem
         }
         catch (InvalidDataException ex)
         {
+            _preparingReplay = false;
             StopReplayInternal(restoreControls: true);
             return ConsoleCommandResult.Fail($"replay: {ex.Message}");
         }
         catch (Exception ex)
         {
+            _preparingReplay = false;
             StopReplayInternal(restoreControls: true);
             return ConsoleCommandResult.Fail($"replay: {ex.Message}");
         }
@@ -383,13 +430,7 @@ public sealed class RecordingSystem
     public void OnLevelStateReset()
     {
         if (IsRecording)
-        {
-            var result = StopRecording();
-            _onConsoleFeedback?.Invoke(result.Success
-                ? ConsoleCommandResult.Ok($"Level reset while recording - recording stopped. {result.Message}")
-                : ConsoleCommandResult.Fail($"Level reset while recording - {result.Message}"));
-            return;
-        }
+            DiscardCurrentRecording();
 
         if (IsReplaying)
         {
@@ -458,6 +499,69 @@ public sealed class RecordingSystem
         _verifyReplayRequested = false;
     }
 
+    private bool TrySaveRecordingToDisk(
+        out string path,
+        out int eventCount,
+        out long durationTicks,
+        out float duration,
+        out int tickHz,
+        out int checksumCount)
+    {
+        path = string.Empty;
+        eventCount = 0;
+        durationTicks = 0;
+        duration = 0f;
+        tickHz = 0;
+        checksumCount = 0;
+
+        if (!IsRecording || _recordingPath == null || _recordingLevelPath == null || _getSimulationTickHz == null)
+            return false;
+
+        duration = _recorder.Duration;
+        eventCount = _recorder.Events.Count;
+        tickHz = _getSimulationTickHz();
+        durationTicks = _recorder.DurationTicks;
+        var file = new RecFile
+        {
+            Version = RecFile.CurrentVersion,
+            LevelPath = _recordingLevelPath,
+            MouseSensitivity = _recordingMouseSensitivity,
+            TickHz = tickHz,
+            DurationTicks = durationTicks,
+            RngSeed = _recordingRngSeed,
+            PlayerSnapshot = _recordingPlayerSnapshot,
+            Events = _recorder.Events.ToList(),
+            Checksums = _recorder.Checksums.ToList()
+        };
+
+        path = _recordingPath;
+        checksumCount = file.Checksums.Count;
+        RecFileSerializer.Write(path, file);
+        ClearRecordingState();
+        return true;
+    }
+
+    private bool TryStopAndRenameRecording(string checksum, out string finalPath)
+    {
+        finalPath = string.Empty;
+
+        if (!TrySaveRecordingToDisk(out string tempPath, out _, out _, out _, out _, out _))
+            return false;
+
+        if (!RecordingNameSanitizer.TrySanitize(checksum, out var sanitizedName, out _))
+        {
+            finalPath = tempPath;
+            return false;
+        }
+
+        finalPath = ResolveRecordingPath(sanitizedName);
+        if (File.Exists(finalPath))
+            File.Delete(finalPath);
+
+        File.Move(tempPath, finalPath);
+        return true;
+    }
+
     private void ClearRecordingState()
     {
         _recordingPath = null;
@@ -467,6 +571,8 @@ public sealed class RecordingSystem
         _recordingPlayerSnapshot = null;
         _recorder.Reset();
     }
+
+    private static string CreateTempRecordingName() => $"temp-{Guid.NewGuid():N}";
 
     private static void EnsureRecordingsFolderExists()
     {
