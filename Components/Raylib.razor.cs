@@ -37,6 +37,7 @@ public partial class Raylib : IDisposable
     {
         await JSHost.ImportAsync("Raylib", "../js/raylib.js");
         BrowserPointerLockBridge.IsPointerLockActive = () => IsPointerLockActive();
+        BrowserPointerLockBridge.ConsumePointerLockEvent = () => ConsumePointerLockEvent();
         Init(this, _id);
         await InitRaylib();
         SyncCanvasSize();
@@ -62,6 +63,9 @@ public partial class Raylib : IDisposable
 
     [JSImport("raylib.isPointerLockActive", "Raylib")]
     public static partial bool IsPointerLockActive();
+
+    [JSImport("raylib.consumePointerLockEvent", "Raylib")]
+    public static partial string ConsumePointerLockEvent();
 
     [JSImport("raylib.preloadFile", "Raylib")]
     public static partial Task PreloadFile(string path);
@@ -97,30 +101,13 @@ public partial class Raylib : IDisposable
 
         await Task.CompletedTask;
     }
-
-    [JSExport]
-    public static void OnPointerLockFailed()
-    {
-        BrowserPointerLockBridge.NotifyFailed();
-    }
-
-    [JSExport]
-    public static void OnPointerLockAcquired()
-    {
-        BrowserPointerLockBridge.NotifyAcquired();
-    }
-
-    [JSExport]
-    public static void OnPointerLockLost()
-    {
-        BrowserPointerLockBridge.NotifyLost();
-    }
     
     #endregion
 
     public void Dispose()
     {
         BrowserPointerLockBridge.IsPointerLockActive = null;
+        BrowserPointerLockBridge.ConsumePointerLockEvent = null;
         OnRender = null;
     }
 }

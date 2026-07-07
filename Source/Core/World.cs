@@ -365,9 +365,6 @@ public class World : IScene
         if (OperatingSystem.IsBrowser())
         {
             _highscoreClient.PrefetchLeaderboardAccess(_currentLevelPath);
-            BrowserPointerLockBridge.PointerLockAcquired = () => _inputSystem.OnBrowserPointerLockAcquired();
-            BrowserPointerLockBridge.PointerLockFailed = () => _inputSystem.OnBrowserPointerLockFailed();
-            BrowserPointerLockBridge.PointerLockLost = HandleBrowserPointerLockLost;
             _inputSystem.EnableMouse();
         }
         else
@@ -484,9 +481,6 @@ public class World : IScene
 
     public void OnExit()
     {
-        BrowserPointerLockBridge.PointerLockAcquired = null;
-        BrowserPointerLockBridge.PointerLockFailed = null;
-        BrowserPointerLockBridge.PointerLockLost = null;
         _optionsMenu.Dismiss();
         _inputSystem.EnableMouse();
     }
@@ -504,6 +498,25 @@ public class World : IScene
             return;
 
         _optionsMenu.Open(_inputSystem);
+    }
+
+    private void PollBrowserPointerLockEvents()
+    {
+        if (!OperatingSystem.IsBrowser())
+            return;
+
+        switch (BrowserPointerLockBridge.PollPointerLockEvent())
+        {
+            case "acquired":
+                _inputSystem.OnBrowserPointerLockAcquired();
+                break;
+            case "failed":
+                _inputSystem.OnBrowserPointerLockFailed();
+                break;
+            case "lost":
+                HandleBrowserPointerLockLost(IsKeyDown(KeyboardKey.Escape));
+                break;
+        }
     }
 
     public void Update(float deltaTime)
@@ -587,7 +600,10 @@ public class World : IScene
         }
 
         if (!_recordingSystem.IsReplaying)
+        {
+            PollBrowserPointerLockEvents();
             _inputSystem.Update();
+        }
 
         // Sample Raylib once per render frame; ticks consume latched edges/deltas
         // so per-frame input maps 1:1 onto simulation ticks (see LiveInputProvider).

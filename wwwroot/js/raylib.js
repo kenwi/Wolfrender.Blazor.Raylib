@@ -1,5 +1,5 @@
 class Raylib {
-    
+
     async preloadFile(path) {
         try {
             const response = await fetch(path);
@@ -8,20 +8,19 @@ class Raylib {
                 return;
             }
             const data = new Uint8Array(await response.arrayBuffer());
-            
-            // Ensure parent directories exist in the Emscripten VFS
+
             const parts = path.split('/');
             let dir = '';
             for (let i = 0; i < parts.length - 1; i++) {
                 dir += (i > 0 ? '/' : '') + parts[i];
                 try {
                     Blazor.runtime.Module.FS.mkdir(dir);
-                } catch(e) { /* directory may already exist */ }
+                } catch (e) { /* directory may already exist */ }
             }
-            
+
             Blazor.runtime.Module.FS.writeFile(path, data);
             console.log(`Preloaded: ${path}`);
-        } catch(e) {
+        } catch (e) {
             console.error(`Error preloading ${path}:`, e);
         }
     }
@@ -30,13 +29,18 @@ class Raylib {
         return !!document.pointerLockElement;
     }
 
+    consumePointerLockEvent() {
+        const evt = this._pointerLockEvent ?? '';
+        this._pointerLockEvent = null;
+        return evt;
+    }
+
     init(dotnetObject, id) {
         const canvas = document.getElementById(id)
         if (canvas) {
             Blazor.runtime.Module['canvas'] = canvas;
-            canvas.addEventListener('contextmenu',(e) => e.preventDefault());
+            canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
-            // Prevent browser default handling for keys that Raylib needs to capture
             canvas.addEventListener('keydown', (e) => {
                 if (e.key === 'Tab') {
                     e.preventDefault();
@@ -44,65 +48,68 @@ class Raylib {
             });
 
             document.addEventListener('pointerlockchange', () => {
-                if (document.pointerLockElement) {
-                    this.onPointerLockAcquired();
-                    return;
-                }
-
-                this.onPointerLockLost();
+                this._pointerLockEvent = document.pointerLockElement ? 'acquired' : 'lost';
             });
 
             document.addEventListener('pointerlockerror', () => {
-                this.onPointerLockFailed();
+                this._pointerLockEvent = 'failed';
             });
-            
+
             if (dotnetObject) {
                 Blazor.runtime.Module['canvasInstance'] = dotnetObject;
                 window.addEventListener("resize", this.resize, true);
             }
         }
     }
-    
-    async resize(e) {
-        const canvas = Blazor.runtime.Module['canvas']
-        const dotnetObject =  Blazor.runtime.Module['canvasInstance'];
-        
-        const dpr = Math.round(window.devicePixelRatio);
-        const width =  canvas.widthNative = canvas.width =  canvas.clientWidth;
-        const height = canvas.heightNative = canvas.height =  canvas.clientHeight;
 
+    async resolveRuntime() {
+        if (this._runtimeApi)
+            return this._runtimeApi;
 
-        const { getAssemblyExports } = await globalThis.getDotnetRuntime(0);
-        var exports = await getAssemblyExports("Wolfrender.Blazor.Raylib.dll");
-        exports.Wolfrender.Blazor.Raylib.Components.Raylib.ResizeCanvas(dotnetObject, width, height, dpr);
-    }
-    
-    syncCanvasSize() {
-        this.resize({});
+        const blazorRuntime = globalThis.Blazor?.runtime;
+        if (blazorRuntime) {
+            const runtime = typeof blazorRuntime.then === 'function'
+                ? await blazorRuntime
+                : blazorRuntime;
+            if (runtime?.getAssemblyExports) {
+                this._runtimeApi = runtime;
+                return runtime;
+            }
+        }
+
+        const dotnetRuntime = globalThis.getDotnetRuntime?.(0);
+        if (!dotnetRuntime)
+            throw new Error('Dotnet runtime is not available');
+
+        this._runtimeApi = typeof dotnetRuntime.then === 'function'
+            ? await dotnetRuntime
+            : dotnetRuntime;
+        return this._runtimeApi;
     }
 
     async getExports() {
         if (this._exports)
             return this._exports;
 
-        const { getAssemblyExports } = await globalThis.getDotnetRuntime(0);
-        this._exports = await getAssemblyExports("Wolfrender.Blazor.Raylib.dll");
+        const runtime = await this.resolveRuntime();
+        this._exports = await runtime.getAssemblyExports("Wolfrender.Blazor.Raylib.dll");
         return this._exports;
     }
 
-    async onPointerLockAcquired() {
+    async resize(e) {
+        const canvas = Blazor.runtime.Module['canvas']
+        const dotnetObject = Blazor.runtime.Module['canvasInstance'];
+
+        const dpr = Math.round(window.devicePixelRatio);
+        const width = canvas.widthNative = canvas.width = canvas.clientWidth;
+        const height = canvas.heightNative = canvas.height = canvas.clientHeight;
+
         const exports = await this.getExports();
-        exports.Wolfrender.Blazor.Raylib.Components.Raylib.OnPointerLockAcquired();
+        exports.Wolfrender.Blazor.Raylib.Components.Raylib.ResizeCanvas(dotnetObject, width, height, dpr);
     }
 
-    async onPointerLockFailed() {
-        const exports = await this.getExports();
-        exports.Wolfrender.Blazor.Raylib.Components.Raylib.OnPointerLockFailed();
-    }
-
-    async onPointerLockLost() {
-        const exports = await this.getExports();
-        exports.Wolfrender.Blazor.Raylib.Components.Raylib.OnPointerLockLost();
+    syncCanvasSize() {
+        void this.resize({});
     }
 
     setFramePacing(vsyncEnabled, targetFps) {
@@ -120,25 +127,28 @@ class Raylib {
             }
 
             let lastTime = performance.now();
-            const localRender = async (time) => {
-                const { getAssemblyExports } = await globalThis.getDotnetRuntime(0);
-                var exports = await getAssemblyExports("Wolfrender.Blazor.Raylib.dll");
-                
-                const now = performance.now();
-                let delta = now - lastTime;
+            const localRender = async () => {
+                try {
+                    const exports = await this.getExports();
 
-                const pacing = Blazor.runtime.Module['framePacing'];
-                const useVsync = pacing.vsync;
-                const frameCap = useVsync ? 0 : (1000.0 / pacing.fps);
-                
-               if (useVsync || delta >= frameCap) {
-                   exports.Wolfrender.Blazor.Raylib.Components.Raylib.EventAnimationFrame(dotnetObject, delta);
-                   lastTime = now;
-               }
-                
-               requestAnimationFrame(localRender);
+                    const now = performance.now();
+                    let delta = now - lastTime;
+
+                    const pacing = Blazor.runtime.Module['framePacing'];
+                    const useVsync = pacing.vsync;
+                    const frameCap = useVsync ? 0 : (1000.0 / pacing.fps);
+
+                    if (useVsync || delta >= frameCap) {
+                        exports.Wolfrender.Blazor.Raylib.Components.Raylib.EventAnimationFrame(dotnetObject, delta);
+                        lastTime = now;
+                    }
+                } catch (e) {
+                    console.error('Render loop failed to resolve dotnet exports:', e);
+                }
+
+                requestAnimationFrame(localRender);
             };
-            localRender(0);
+            localRender();
         }
         else {
             console.log("DotNetReference: ", dotnetObject);
