@@ -15,6 +15,7 @@ public sealed class RecordingSystem
     private readonly InputRecorder _recorder = new();
     private readonly ReplayInputProvider _replayProvider = new();
     private readonly RecordingUploadClient _uploadClient = new();
+    private readonly RecordingDownloadClient _downloadClient = new();
 
     private Func<string, ConsoleCommandResult>? _loadLevel;
     private Func<ConsoleCommandResult>? _restartLevel;
@@ -29,9 +30,12 @@ public sealed class RecordingSystem
     private Func<int>? _getRngSeed;
     private Action<int?>? _setRngSeedOverride;
     private Action<ConsoleCommandResult>? _onConsoleFeedback;
+    private Action? _onReplaySessionStarted;
 
     private Task? _pendingUpload;
     private string? _pendingUploadName;
+    private Task? _pendingDownload;
+    private int _pendingDownloadRank;
     private IInputProvider _activeProvider;
     private string? _recordingPath;
     private string? _recordingLevelPath;
@@ -74,7 +78,8 @@ public sealed class RecordingSystem
         Func<long, ChecksumKeyframe> captureChecksum,
         Func<int> getRngSeed,
         Action<int?> setRngSeedOverride,
-        Action<ConsoleCommandResult>? onConsoleFeedback = null)
+        Action<ConsoleCommandResult>? onConsoleFeedback = null,
+        Action? onReplaySessionStarted = null)
     {
         _loadLevel = loadLevel;
         _restartLevel = restartLevel;
@@ -89,6 +94,7 @@ public sealed class RecordingSystem
         _getRngSeed = getRngSeed;
         _setRngSeedOverride = setRngSeedOverride;
         _onConsoleFeedback = onConsoleFeedback;
+        _onReplaySessionStarted = onReplaySessionStarted;
     }
 
     /// <summary>Sample live input once per render frame, before the simulation tick loop.</summary>
@@ -338,6 +344,40 @@ public sealed class RecordingSystem
         return ConsoleCommandResult.Ok($"Uploading recording '{sanitizedName}'...");
     }
 
+    public ConsoleCommandResult ReplayRemote(int rank)
+    {
+        if (_getCurrentLevelPath == null)
+            return ConsoleCommandResult.Fail("Recording system is not configured.");
+
+        if (IsRecording)
+            return ConsoleCommandResult.Fail("Stop recording before replayremote.");
+
+        if (IsReplaying)
+            return ConsoleCommandResult.Fail("Already replaying. Use 'stopreplay' first.");
+
+        if (rank < 1)
+            return ConsoleCommandResult.Fail("Usage: replayremote <highscore position>");
+
+        var levelId = ScoreSanitizer.LevelIdFromPath(_getCurrentLevelPath());
+        if (string.IsNullOrEmpty(levelId))
+            return ConsoleCommandResult.Fail("Current level has no highscore id.");
+
+        if (_pendingUpload is { IsCompleted: false })
+            return ConsoleCommandResult.Fail("Recording upload already in progress.");
+
+        if (_pendingDownload is { IsCompleted: false })
+            return ConsoleCommandResult.Fail("Recording download already in progress.");
+
+        if (!RecordingNameSanitizer.TrySanitize(rank.ToString(), out var localName, out var sanitizeError))
+            return ConsoleCommandResult.Fail(sanitizeError);
+
+        string destinationPath = ResolveRecordingPath(localName);
+        _pendingDownloadRank = rank;
+        _pendingDownload = _downloadClient.DownloadAsync(levelId, rank, destinationPath);
+
+        return ConsoleCommandResult.Ok($"Downloading highscore #{rank} recording for '{levelId}'...");
+    }
+
     public static IReadOnlyList<string> ListRecordings()
     {
         EnsureRecordingsFolderExists();
@@ -352,6 +392,38 @@ public sealed class RecordingSystem
             StopReplayInternal(restoreControls: true);
 
         CompletePendingUpload();
+        CompletePendingDownload();
+    }
+
+    private void CompletePendingDownload()
+    {
+        if (_pendingDownload is not { IsCompleted: true } task)
+            return;
+
+        int rank = _pendingDownloadRank;
+        _pendingDownload = null;
+        _pendingDownloadRank = 0;
+
+        if (!task.IsCompletedSuccessfully)
+        {
+            var message = task.IsFaulted
+                ? $"replayremote: {task.Exception?.GetBaseException().Message ?? "Download failed."}"
+                : "replayremote: Download was cancelled.";
+            _onConsoleFeedback?.Invoke(ConsoleCommandResult.Fail(message));
+            return;
+        }
+
+        if (!RecordingNameSanitizer.TrySanitize(rank.ToString(), out var localName, out var sanitizeError))
+        {
+            _onConsoleFeedback?.Invoke(ConsoleCommandResult.Fail($"replayremote: {sanitizeError}"));
+            return;
+        }
+
+        var replayResult = StartReplay(localName);
+        if (replayResult.Success)
+            _onReplaySessionStarted?.Invoke();
+
+        _onConsoleFeedback?.Invoke(replayResult);
     }
 
     private void CompletePendingUpload()

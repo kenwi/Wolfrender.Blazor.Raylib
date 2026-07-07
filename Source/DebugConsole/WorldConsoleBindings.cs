@@ -48,6 +48,7 @@ public static class WorldConsoleBindings
             world.StartVerifyReplayForConsole,
             recordingSystem.StopReplay,
             recordingSystem.SendRecording,
+            recordingSystem.ReplayRemote,
             world.ToggleTickDiagnostics,
             world.SetTickDiagnostics,
             world.GetTickDiagnosticsStatus,

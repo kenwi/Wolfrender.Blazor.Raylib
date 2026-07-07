@@ -193,6 +193,99 @@ app.MapGet("/api/scores/{levelId}", async (
     return Results.Ok(entries);
 });
 
+app.MapGet("/api/scores/{levelId}/recordings/{rank:int}", async (
+    string levelId,
+    int rank,
+    JsonFileScoreStore scoreStore,
+    FileRecordingStore recordingStore,
+    HttpContext httpContext,
+    ILogger<Program> logger,
+    CancellationToken cancellationToken) =>
+{
+    var clientIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    var origin = httpContext.Request.Headers.Origin.ToString();
+
+    logger.LogInformation(
+        "GET /api/scores/{LevelId}/recordings/{Rank} request: ClientIp={ClientIp}, Origin={Origin}, RawLevelId={RawLevelId}, Rank={Rank}",
+        levelId,
+        rank,
+        clientIp,
+        string.IsNullOrEmpty(origin) ? "(none)" : origin,
+        levelId,
+        rank);
+
+    var sanitizedLevelId = ScoreSanitizer.SanitizeLevelId(levelId);
+    if (string.IsNullOrEmpty(sanitizedLevelId))
+    {
+        logger.LogWarning(
+            "GET /api/scores/{LevelId}/recordings/{Rank} rejected: ClientIp={ClientIp}, RawLevelId={RawLevelId}, Error=LevelId is required",
+            levelId,
+            rank,
+            clientIp,
+            levelId);
+        return Results.BadRequest(new { error = "LevelId is required." });
+    }
+
+    if (rank < 1)
+    {
+        logger.LogWarning(
+            "GET /api/scores/{LevelId}/recordings/{Rank} rejected: ClientIp={ClientIp}, Error=Rank must be at least 1",
+            sanitizedLevelId,
+            rank,
+            clientIp);
+        return Results.BadRequest(new { error = "Rank must be at least 1." });
+    }
+
+    var checksum = await scoreStore.GetChecksumByRankAsync(sanitizedLevelId, rank, cancellationToken);
+    if (checksum is null)
+    {
+        logger.LogWarning(
+            "GET /api/scores/{LevelId}/recordings/{Rank} not found: ClientIp={ClientIp}, LevelId={LevelId}",
+            sanitizedLevelId,
+            rank,
+            clientIp,
+            sanitizedLevelId);
+        return Results.NotFound(new { error = $"No highscore at rank {rank} for level '{sanitizedLevelId}'." });
+    }
+
+    if (!RecordingNameSanitizer.TrySanitize(checksum, out var sanitizedChecksum, out var sanitizeError))
+    {
+        logger.LogWarning(
+            "GET /api/scores/{LevelId}/recordings/{Rank} rejected: ClientIp={ClientIp}, Checksum={Checksum}, Error={Error}",
+            sanitizedLevelId,
+            rank,
+            clientIp,
+            checksum,
+            sanitizeError);
+        return Results.BadRequest(new { error = sanitizeError });
+    }
+
+    var recordingBytes = await recordingStore.TryReadBytesAsync(sanitizedChecksum, cancellationToken);
+    if (recordingBytes is null)
+    {
+        logger.LogWarning(
+            "GET /api/scores/{LevelId}/recordings/{Rank} recording missing: ClientIp={ClientIp}, Checksum={Checksum}",
+            sanitizedLevelId,
+            rank,
+            clientIp,
+            sanitizedChecksum);
+        return Results.NotFound(new { error = $"Recording for rank {rank} is not available on the server." });
+    }
+
+    logger.LogInformation(
+        "GET /api/scores/{LevelId}/recordings/{Rank} succeeded: ClientIp={ClientIp}, Checksum={Checksum}, Bytes={Bytes}",
+        sanitizedLevelId,
+        rank,
+        clientIp,
+        sanitizedChecksum,
+        recordingBytes.Length);
+
+    return Results.File(
+        recordingBytes,
+        contentType: "application/octet-stream",
+        fileDownloadName: $"{rank}.rec");
+});
+
 app.MapPost("/api/recordings", async (
     HttpRequest httpRequest,
     FileRecordingStore store,

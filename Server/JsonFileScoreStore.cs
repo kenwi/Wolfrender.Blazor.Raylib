@@ -96,6 +96,46 @@ public sealed class JsonFileScoreStore
         }
     }
 
+    public async Task<string?> GetChecksumByRankAsync(
+        string levelId,
+        int rank,
+        CancellationToken cancellationToken = default)
+    {
+        if (rank < 1)
+            return null;
+
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            var data = await ReadAsync(cancellationToken);
+            if (!data.Levels.TryGetValue(levelId, out var entries))
+                return null;
+
+            var checksum = entries
+                .OrderByDescending(e => e.FinalScore)
+                .ThenBy(e => e.ElapsedSeconds)
+                .ThenBy(e => e.SubmittedAt)
+                .Skip(rank - 1)
+                .Select(e => e.Checksum)
+                .FirstOrDefault();
+
+            if (string.IsNullOrEmpty(checksum))
+                return null;
+
+            _logger.LogInformation(
+                "Leaderboard checksum resolved: LevelId={LevelId}, Rank={Rank}, Checksum={Checksum}",
+                levelId,
+                rank,
+                checksum);
+
+            return checksum;
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
     public async Task<IReadOnlyList<HighscoreEntry>> GetTopAsync(
         string levelId,
         int top,

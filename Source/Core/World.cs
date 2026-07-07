@@ -178,7 +178,12 @@ public class World : IScene
                 tick, _player, _enemySystem.Enemies, _doorSystem.Doors, _scoreSystem),
             () => _currentRngSeed,
             seed => _rngSeedOverride = seed,
-            result => _runtimeConsole.WriteFeedback(result));
+            result => _runtimeConsole.WriteFeedback(result),
+            () =>
+            {
+                _consoleOverlay.Close();
+                _inputSystem.DisableMouse();
+            });
         _playerSystem.ConfigureLifecycle(
             () => _consoleOverlay.IsOpen,
             () => _ = RestartCurrentLevel(),
@@ -499,6 +504,7 @@ public class World : IScene
     public void Update(float deltaTime)
     {
         _soundSystem.Update();
+        _recordingSystem.Update(deltaTime);
         bool toggledConsoleThisFrame = false;
 
         if (_consoleOverlay.IsOpen && IsKeyPressed(KeyboardKey.Escape))
@@ -589,12 +595,11 @@ public class World : IScene
         for (int i = 0; i < ticksThisFrame; i++)
             SimulateGameplayTick(_simulationClock.FixedDeltaTime);
 
-        _recordingSystem.Update(deltaTime);
-
         if (_exitSystem.IsLevelComplete && !_highscoreIntermissionStarted)
         {
             _highscoreIntermissionStarted = true;
-            _highscoreIntermission.Begin(_currentLevelPath, _scoreSystem);
+            if (!_recordingSystem.IsReplaying)
+                _highscoreIntermission.Begin(_currentLevelPath, _scoreSystem);
         }
 
         if (_exitSystem.IsLevelComplete)
@@ -998,7 +1003,11 @@ public class World : IScene
         if (_highscoreIntermission.IsActive)
             _highscoreIntermission.Draw(_scoreSystem, screenWidth, screenHeight);
         else
-            LevelProgressOverlayHud.DrawLevelComplete(_scoreSystem, screenWidth, screenHeight);
+            LevelProgressOverlayHud.DrawLevelComplete(
+                _scoreSystem,
+                screenWidth,
+                screenHeight,
+                showRestartHint: !_recordingSystem.IsReplaying);
     }
 
     private void RenderMinimapAndDebugOverlays()
