@@ -52,6 +52,12 @@ public class InputSystem
     private bool _isDebugEnabled = false;
     private bool _isMinimapEnabled = false;
 
+    /// <summary>
+    /// After warping the cursor to center, Raylib can report a large delta on the
+    /// next poll(s). Skip rotation for those polls so capture starts from zero.
+    /// </summary>
+    private int _suppressMouseDeltaPolls;
+
     public bool IsMouseFree => _isMouseFree;
 
     /// <summary>Sync state when the browser releases pointer lock (e.g. ESC) without going through Raylib.</summary>
@@ -113,6 +119,7 @@ public class InputSystem
         else
         {
             DisableCursor();
+            RecenterCapturedMouse();
         }
     }
 
@@ -120,6 +127,7 @@ public class InputSystem
     {
         _isMouseFree = false;
         DisableCursor();
+        RecenterCapturedMouse();
     }
 
     public void EnableMouse()
@@ -131,20 +139,33 @@ public class InputSystem
     public void CenterMouse()
     {
         if (!_isMouseFree)
-        {
-            SetMousePosition(GetScreenWidth() / 2, GetScreenHeight() / 2);
-        }
+            RecenterCapturedMouse();
+    }
+
+    private void RecenterCapturedMouse()
+    {
+        SetMousePosition(GetScreenWidth() / 2, GetScreenHeight() / 2);
+        // Warp can appear on this poll or the next; flush now and skip upcoming polls.
+        GetMouseDelta();
+        _suppressMouseDeltaPolls = 2;
     }
 
     public InputState GetInputState()
     {
+        Vector2 mouseDelta = GetMouseDelta();
+        if (_suppressMouseDeltaPolls > 0)
+        {
+            _suppressMouseDeltaPolls--;
+            mouseDelta = Vector2.Zero;
+        }
+
         return new InputState
         {
             MoveForward = IsKeyDown(KeyboardKey.W),
             MoveBackward = IsKeyDown(KeyboardKey.S),
             MoveLeft = IsKeyDown(KeyboardKey.A),
             MoveRight = IsKeyDown(KeyboardKey.D),
-            MouseDelta = GetMouseDelta(),
+            MouseDelta = mouseDelta,
             IsMouseFree = _isMouseFree,
             IsPaused = false,
             IsDebugEnabled = _isDebugEnabled,

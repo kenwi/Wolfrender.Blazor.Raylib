@@ -371,6 +371,7 @@ public class World : IScene
         else
             _inputSystem.DisableMouse();
 
+        _recordingSystem.ResetInputLatches();
         TryStartAutoRecording();
     }
 

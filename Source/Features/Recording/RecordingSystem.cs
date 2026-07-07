@@ -104,6 +104,8 @@ public sealed class RecordingSystem
             _liveProvider.BeginFrame();
     }
 
+    public void ResetInputLatches() => _liveProvider.ResetLatches();
+
     public ConsoleCommandResult StartRecording(string filename, float mouseSensitivity)
     {
         if (_getCurrentLevelPath == null || _restartLevel == null || _capturePlayerSnapshot == null)
