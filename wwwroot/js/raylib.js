@@ -40,8 +40,10 @@ class Raylib {
             });
 
             document.addEventListener('pointerlockchange', () => {
-                if (document.pointerLockElement)
+                if (document.pointerLockElement) {
+                    this.onPointerLockAcquired();
                     return;
+                }
 
                 this.onPointerLockLost();
             });
@@ -69,6 +71,12 @@ class Raylib {
     
     syncCanvasSize() {
         this.resize({});
+    }
+
+    async onPointerLockAcquired() {
+        const { getAssemblyExports } = await globalThis.getDotnetRuntime(0);
+        const exports = await getAssemblyExports("Wolfrender.Blazor.Raylib.dll");
+        exports.Wolfrender.Blazor.Raylib.Components.Raylib.OnPointerLockAcquired();
     }
 
     async onPointerLockLost() {

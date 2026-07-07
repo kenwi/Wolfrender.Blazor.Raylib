@@ -95,6 +95,12 @@ public partial class Raylib : IDisposable
     }
 
     [JSExport]
+    public static void OnPointerLockAcquired()
+    {
+        BrowserPointerLockBridge.NotifyAcquired();
+    }
+
+    [JSExport]
     public static void OnPointerLockLost()
     {
         BrowserPointerLockBridge.NotifyLost();

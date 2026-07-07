@@ -58,12 +58,26 @@ public class InputSystem
     /// </summary>
     private int _suppressMouseDeltaPolls;
 
+    /// <summary>
+    /// Browser pointer lock engages asynchronously after click; the warp delta often
+    /// arrives on the first real movement instead of the capture frame.
+    /// </summary>
+    private bool _skipNextNonZeroMouseDelta;
+
     public bool IsMouseFree => _isMouseFree;
 
     /// <summary>Sync state when the browser releases pointer lock (e.g. ESC) without going through Raylib.</summary>
     public void SyncPointerLockReleased()
     {
         _isMouseFree = true;
+        _skipNextNonZeroMouseDelta = false;
+    }
+
+    /// <summary>Browser pointer lock just engaged; flush and ignore the first movement delta.</summary>
+    public void OnBrowserPointerLockAcquired()
+    {
+        GetMouseDelta();
+        _skipNextNonZeroMouseDelta = true;
     }
 
     /// <summary>After closing an overlay: desktop re-captures; browser waits for click-to-capture.</summary>
@@ -133,6 +147,7 @@ public class InputSystem
     public void EnableMouse()
     {
         _isMouseFree = true;
+        _skipNextNonZeroMouseDelta = false;
         EnableCursor();
     }
 
@@ -145,9 +160,11 @@ public class InputSystem
     private void RecenterCapturedMouse()
     {
         SetMousePosition(GetScreenWidth() / 2, GetScreenHeight() / 2);
-        // Warp can appear on this poll or the next; flush now and skip upcoming polls.
         GetMouseDelta();
-        _suppressMouseDeltaPolls = 2;
+        if (OperatingSystem.IsBrowser())
+            _skipNextNonZeroMouseDelta = true;
+        else
+            _suppressMouseDeltaPolls = 2;
     }
 
     public InputState GetInputState()
@@ -156,6 +173,12 @@ public class InputSystem
         if (_suppressMouseDeltaPolls > 0)
         {
             _suppressMouseDeltaPolls--;
+            mouseDelta = Vector2.Zero;
+        }
+        else if (_skipNextNonZeroMouseDelta &&
+                 (Math.Abs(mouseDelta.X) > 0.001f || Math.Abs(mouseDelta.Y) > 0.001f))
+        {
+            _skipNextNonZeroMouseDelta = false;
             mouseDelta = Vector2.Zero;
         }
 

@@ -4,11 +4,14 @@ using static Raylib_cs.Raylib;
 namespace Game.Engine.Input;
 
 /// <summary>
-/// Browser pointer-lock exits (usually ESC) are handled outside Raylib. JS notifies us here.
+/// Browser pointer-lock changes are handled outside Raylib. JS notifies us here.
 /// </summary>
 public static class BrowserPointerLockBridge
 {
+    public static Action? PointerLockAcquired;
     public static Action<bool>? PointerLockLost;
+
+    public static void NotifyAcquired() => PointerLockAcquired?.Invoke();
 
     public static void NotifyLost()
     {
