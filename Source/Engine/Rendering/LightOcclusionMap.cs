@@ -13,10 +13,16 @@ public sealed class LightOcclusionMap : IDisposable
     private Texture2D _roomTexture;
     private byte[] _occlusionPixels = Array.Empty<byte>();
     private byte[] _roomPixels = Array.Empty<byte>();
+    private byte[] _lastUploadedOcclusion = Array.Empty<byte>();
+    private byte[] _lastUploadedRoom = Array.Empty<byte>();
+    private Color[] _occlusionColors = Array.Empty<Color>();
+    private Color[] _roomColors = Array.Empty<Color>();
     private int _width;
     private int _height;
     private bool _hasOcclusionTexture;
     private bool _hasRoomTexture;
+    private bool _forceOcclusionUpload = true;
+    private bool _forceRoomUpload = true;
 
     public Texture2D OcclusionTexture => _occlusionTexture;
     public Texture2D RoomTexture => _roomTexture;
@@ -126,46 +132,72 @@ public sealed class LightOcclusionMap : IDisposable
             _height = height;
             _occlusionPixels = new byte[tileCount];
             _roomPixels = new byte[tileCount];
+            _lastUploadedOcclusion = new byte[tileCount];
+            _lastUploadedRoom = new byte[tileCount];
+            _occlusionColors = new Color[tileCount];
+            _roomColors = new Color[tileCount];
+            _forceOcclusionUpload = true;
+            _forceRoomUpload = true;
         }
 
         FillOcclusionPixels(mapData, doors);
         FillRoomPixels(roomMap);
 
-        UploadTexture(ref _occlusionTexture, ref _hasOcclusionTexture, _occlusionPixels);
-        UploadTexture(ref _roomTexture, ref _hasRoomTexture, _roomPixels, pointFilter: true);
+        UploadTextureIfChanged(
+            ref _occlusionTexture,
+            ref _hasOcclusionTexture,
+            _occlusionPixels,
+            _occlusionColors,
+            _lastUploadedOcclusion,
+            ref _forceOcclusionUpload);
+
+        UploadTextureIfChanged(
+            ref _roomTexture,
+            ref _hasRoomTexture,
+            _roomPixels,
+            _roomColors,
+            _lastUploadedRoom,
+            ref _forceRoomUpload,
+            pointFilter: true);
     }
 
-    private void UploadTexture(ref Texture2D texture, ref bool hasTexture, byte[] pixels, bool pointFilter = false)
+    private void UploadTextureIfChanged(
+        ref Texture2D texture,
+        ref bool hasTexture,
+        byte[] pixels,
+        Color[] colors,
+        byte[] lastUploaded,
+        ref bool forceUpload,
+        bool pointFilter = false)
     {
-        Image image = BuildImage(pixels);
-        if (hasTexture)
-            UnloadTexture(texture);
+        if (!forceUpload && pixels.AsSpan().SequenceEqual(lastUploaded))
+            return;
 
-        texture = LoadTextureFromImage(image);
-        if (pointFilter)
-            SetTextureFilter(texture, TextureFilter.Point);
+        FillColorBuffer(pixels, colors);
 
-        UnloadImage(image);
-        hasTexture = true;
-    }
-
-    private Image BuildImage(byte[] pixels)
-    {
-        Image image = GenImageColor(_width, _height, Color.Black);
-        for (int y = 0; y < _height; y++)
+        if (!hasTexture)
         {
-            for (int x = 0; x < _width; x++)
-            {
-                int index = LevelData.GetIndex(x, y, _width);
-                if (pixels[index] != 0)
-                {
-                    byte value = pixels[index];
-                    ImageDrawPixel(ref image, x, y, new Color(value, value, value, (byte)255));
-                }
-            }
+            Image image = GenImageColor(_width, _height, Color.Black);
+            texture = LoadTextureFromImage(image);
+            UnloadImage(image);
+            if (pointFilter)
+                SetTextureFilter(texture, TextureFilter.Point);
+
+            hasTexture = true;
         }
 
-        return image;
+        UpdateTexture(texture, colors);
+        pixels.CopyTo(lastUploaded, 0);
+        forceUpload = false;
+    }
+
+    private static void FillColorBuffer(byte[] pixels, Color[] colors)
+    {
+        for (int i = 0; i < pixels.Length; i++)
+        {
+            byte value = pixels[i];
+            colors[i] = value == 0 ? Color.Black : new Color(value, value, value, (byte)255);
+        }
     }
 
     private void FillOcclusionPixels(MapData mapData, IReadOnlyList<Door> doors)
@@ -243,6 +275,9 @@ public sealed class LightOcclusionMap : IDisposable
             UnloadTexture(_roomTexture);
             _hasRoomTexture = false;
         }
+
+        _forceOcclusionUpload = true;
+        _forceRoomUpload = true;
     }
 
     public void Dispose() => DisposeTextures();
