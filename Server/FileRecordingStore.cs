@@ -44,6 +44,9 @@ public sealed class FileRecordingStore
     public string GetRecordingPath(string sanitizedName) =>
         Path.Combine(_directory, $"{sanitizedName}.rec");
 
+    public bool RecordingExists(string sanitizedName) =>
+        File.Exists(GetRecordingPath(sanitizedName));
+
     public async Task<byte[]?> TryReadBytesAsync(string sanitizedName, CancellationToken cancellationToken = default)
     {
         string path = GetRecordingPath(sanitizedName);

@@ -70,6 +70,14 @@ if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 app.UseCors();
 
+{
+    var scoreStore = app.Services.GetRequiredService<JsonFileScoreStore>();
+    var updated = await scoreStore.SyncRecordingAvailabilityAsync();
+    startupLogger.LogInformation(
+        "Highscore recording availability sync finished. UpdatedEntries={UpdatedEntries}",
+        updated);
+}
+
 app.MapPost("/api/scores", async (
     ScoreSubmission submission,
     JsonFileScoreStore store,
@@ -289,6 +297,7 @@ app.MapGet("/api/scores/{levelId}/recordings/{rank:int}", async (
 app.MapPost("/api/recordings", async (
     HttpRequest httpRequest,
     FileRecordingStore store,
+    JsonFileScoreStore scoreStore,
     HttpContext httpContext,
     ILogger<Program> logger,
     CancellationToken cancellationToken) =>
@@ -359,6 +368,7 @@ app.MapPost("/api/recordings", async (
     }
 
     await store.SaveAsync(normalized, cancellationToken);
+    await scoreStore.TrySetHasRecordingByChecksumAsync(normalized.Name, hasRecording: true, cancellationToken);
 
     logger.LogInformation(
         "POST /api/recordings succeeded: ClientIp={ClientIp}, Name={Name}, LevelPath={LevelPath}, EventCount={EventCount}",

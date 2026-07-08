@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Game.Features.Highscores.Shared;
+using Game.Features.Recording;
 using Microsoft.Extensions.Logging;
 
 namespace Wolfrender.Highscores.Server;
@@ -18,12 +19,17 @@ public sealed class JsonFileScoreStore
     };
 
     private readonly string _filePath;
+    private readonly FileRecordingStore _recordingStore;
     private readonly ILogger<JsonFileScoreStore> _logger;
     private readonly SemaphoreSlim _lock = new(1, 1);
 
-    public JsonFileScoreStore(IConfiguration configuration, ILogger<JsonFileScoreStore> logger)
+    public JsonFileScoreStore(
+        IConfiguration configuration,
+        FileRecordingStore recordingStore,
+        ILogger<JsonFileScoreStore> logger)
     {
         _filePath = configuration["Highscores:FilePath"] ?? "highscores.json";
+        _recordingStore = recordingStore;
         _logger = logger;
         _logger.LogInformation("JsonFileScoreStore initialized. FilePath={FilePath}", Path.GetFullPath(_filePath));
     }
@@ -66,7 +72,8 @@ public sealed class JsonFileScoreStore
                 SecretsFound = submission.SecretsFound,
                 ElapsedSeconds = submission.ElapsedSeconds,
                 SubmittedAt = submittedAt,
-                Checksum = checksum
+                Checksum = checksum,
+                HasRecording = HasRecordingForChecksum(checksum)
             };
             entries.Add(newEntry);
 
@@ -159,7 +166,8 @@ public sealed class JsonFileScoreStore
                     PlayerName = entry.PlayerName,
                     FinalScore = entry.FinalScore,
                     ElapsedSeconds = entry.ElapsedSeconds,
-                    SubmittedAt = entry.SubmittedAt
+                    SubmittedAt = entry.SubmittedAt,
+                    HasRecording = entry.HasRecording
                 })
                 .ToArray();
 
@@ -177,6 +185,101 @@ public sealed class JsonFileScoreStore
         {
             _lock.Release();
         }
+    }
+
+    public async Task<int> SyncRecordingAvailabilityAsync(CancellationToken cancellationToken = default)
+    {
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            var data = await ReadAsync(cancellationToken);
+            int updated = 0;
+
+            foreach (var entry in data.Levels.Values.SelectMany(entries => entries))
+            {
+                bool hasRecording = HasRecordingForChecksum(entry.Checksum);
+                if (entry.HasRecording == hasRecording)
+                    continue;
+
+                entry.HasRecording = hasRecording;
+                updated++;
+            }
+
+            if (updated > 0)
+            {
+                await WriteAsync(data, cancellationToken);
+                _logger.LogInformation(
+                    "Recording availability synced: UpdatedEntries={UpdatedEntries}, FilePath={FilePath}",
+                    updated,
+                    _filePath);
+            }
+            else
+            {
+                _logger.LogInformation(
+                    "Recording availability sync complete: no changes needed. FilePath={FilePath}",
+                    _filePath);
+            }
+
+            return updated;
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task<bool> TrySetHasRecordingByChecksumAsync(
+        string checksum,
+        bool hasRecording,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(checksum))
+            return false;
+
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            var data = await ReadAsync(cancellationToken);
+            bool changed = false;
+
+            foreach (var entry in data.Levels.Values.SelectMany(entries => entries))
+            {
+                if (!string.Equals(entry.Checksum, checksum, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if (entry.HasRecording == hasRecording)
+                    return false;
+
+                entry.HasRecording = hasRecording;
+                changed = true;
+            }
+
+            if (!changed)
+                return false;
+
+            await WriteAsync(data, cancellationToken);
+            _logger.LogInformation(
+                "Recording availability updated: Checksum={Checksum}, HasRecording={HasRecording}, FilePath={FilePath}",
+                checksum,
+                hasRecording,
+                _filePath);
+            return true;
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    private bool HasRecordingForChecksum(string checksum)
+    {
+        if (string.IsNullOrWhiteSpace(checksum))
+            return false;
+
+        if (!RecordingNameSanitizer.TrySanitize(checksum, out var sanitizedName, out _))
+            return false;
+
+        return _recordingStore.RecordingExists(sanitizedName);
     }
 
     private static bool ContainsChecksum(HighscoreStoreData data, string checksum) =>
@@ -221,5 +324,6 @@ public sealed class JsonFileScoreStore
         public float ElapsedSeconds { get; set; }
         public DateTimeOffset SubmittedAt { get; set; }
         public string Checksum { get; set; } = string.Empty;
+        public bool HasRecording { get; set; }
     }
 }

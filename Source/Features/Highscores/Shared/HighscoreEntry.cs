@@ -8,4 +8,5 @@ public sealed class HighscoreEntry
     public int FinalScore { get; set; }
     public float ElapsedSeconds { get; set; }
     public DateTimeOffset SubmittedAt { get; set; }
+    public bool HasRecording { get; set; }
 }
