@@ -834,6 +834,9 @@ public class World : IScene
         return result;
     }
 
+    public ConsoleCommandResult StartReplayRemote(int rank) =>
+        _recordingSystem.ReplayRemote(rank);
+
     public ConsoleCommandResult StartVerifyReplayForConsole(string filename)
     {
         var result = _recordingSystem.StartVerifyReplay(filename);

@@ -17,6 +17,9 @@ public partial class ThreeDFirstPerson : IDisposable
 {
     [Inject] private IJSRuntime JS { get; set; } = default!;
 
+    [Parameter]
+    public int ReplayRank { get; set; }
+
     private int _screenWidth;
     private int _screenHeight;
 
@@ -101,6 +104,12 @@ public partial class ThreeDFirstPerson : IDisposable
 
         _activeScene = _gameScene;
         _activeScene.OnEnter();
+
+        if (ReplayRank > 0 && _gameScene is World world)
+        {
+            var result = world.StartReplayRemote(ReplayRank);
+            Log(result.Message);
+        }
     }
 
     private async void Render(float delta)
