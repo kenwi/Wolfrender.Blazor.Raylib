@@ -107,7 +107,9 @@ public sealed class DiscordScoreAnnouncer
 
         var gameUrl = _configuration["Discord:GameUrl"];
         if (!string.IsNullOrWhiteSpace(gameUrl))
-            description += $"\nThink you can beat it? [Play now]({gameUrl})";
+        {
+            description += $"\nThink you can beat it?\n[Play now]({gameUrl})\n[View replay]({gameUrl}/{result.Rank})";
+        }
 
         return new
         {
