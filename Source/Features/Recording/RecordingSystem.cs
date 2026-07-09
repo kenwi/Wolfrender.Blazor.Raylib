@@ -222,8 +222,7 @@ public sealed class RecordingSystem
             return ConsoleCommandResult.Fail("Recording system is not configured.");
         }
 
-        if (IsRecording)
-            return ConsoleCommandResult.Fail("Stop recording before replay.");
+        StopActiveRecordingForReplay();
 
         if (IsReplaying)
             return ConsoleCommandResult.Fail("Already replaying. Use 'stopreplay' first.");
@@ -351,8 +350,7 @@ public sealed class RecordingSystem
         if (_getCurrentLevelPath == null)
             return ConsoleCommandResult.Fail("Recording system is not configured.");
 
-        if (IsRecording)
-            return ConsoleCommandResult.Fail("Stop recording before replayremote.");
+        StopActiveRecordingForReplay();
 
         if (IsReplaying)
             return ConsoleCommandResult.Fail("Already replaying. Use 'stopreplay' first.");
@@ -634,6 +632,12 @@ public sealed class RecordingSystem
 
         File.Move(tempPath, finalPath);
         return true;
+    }
+
+    private void StopActiveRecordingForReplay()
+    {
+        if (IsRecording)
+            DiscardCurrentRecording();
     }
 
     private void ClearRecordingState()
