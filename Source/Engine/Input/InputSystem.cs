@@ -216,7 +216,7 @@ public class InputSystem
             IsDebugEnabled = _isDebugEnabled,
             IsMinimapEnabled = _isMinimapEnabled,
             IsInteractPressed =  IsKeyPressed(KeyboardKey.E),
-            IsChangeStatePressed = IsKeyPressed(KeyboardKey.C),
+            IsChangeStatePressed = IsKeyPressed(KeyboardKey.U),
             IsChangeAnimationPressed = IsKeyPressed(KeyboardKey.V),
             IsPrimaryFire = !_isMouseFree && IsMouseButtonPressed(MouseButton.Left),
             IsPrimaryFireHeld = !_isMouseFree && IsMouseButtonDown(MouseButton.Left),

@@ -61,6 +61,7 @@ public class World : IScene
     private readonly HighscoreIntermission _highscoreIntermission;
     private readonly HighscoreBoardOverlay _highscoreBoardOverlay;
     private readonly OptionsMenuSystem _optionsMenu = new();
+    private readonly ControlsIntroSystem _controlsIntroSystem = new();
     private bool _highscoreIntermissionStarted;
     private bool _suppressLevelCompleteClickRestart;
 
@@ -381,8 +382,10 @@ public class World : IScene
             _highscoreClient.PrefetchLeaderboardAccess(_currentLevelPath);
             _inputSystem.EnableMouse();
         }
-        else
+        else if (!_controlsIntroSystem.IsVisible)
             _inputSystem.DisableMouse();
+        else
+            _inputSystem.EnableMouse();
 
         _recordingSystem.ResetInputLatches();
         TryStartAutoRecording();
@@ -493,13 +496,25 @@ public class World : IScene
             _recordingSystem.StartAutoRecording(_optionsMenu.Settings.MouseSensitivity);
     }
 
+    private bool CanToggleControlsLayout() =>
+        !_controlsIntroSystem.IsBlockingIntro
+        && !_consoleOverlay.IsOpen
+        && !_optionsMenu.IsOpen
+        && !_highscoreBoardOverlay.IsOpen
+        && !_highscoreIntermission.IsBlockingRestart
+        && !_recordingSystem.IsReplaying
+        && _player.IsAlive
+        && !_exitSystem.IsLevelComplete;
+
     private bool CanToggleHighscoreBoard() =>
-        !_consoleOverlay.IsOpen
+        !_controlsIntroSystem.IsVisible
+        && !_consoleOverlay.IsOpen
         && !_optionsMenu.IsOpen
         && !_highscoreIntermission.BlocksHighscoreBoardToggle;
 
     private bool CanInstantRestartLevel() =>
-        !_consoleOverlay.IsOpen
+        !_controlsIntroSystem.IsVisible
+        && !_consoleOverlay.IsOpen
         && !_optionsMenu.IsOpen
         && !_highscoreBoardOverlay.IsOpen
         && !_highscoreIntermission.IsBlockingRestart
@@ -551,6 +566,24 @@ public class World : IScene
     {
         _soundSystem.Update();
         _recordingSystem.Update(deltaTime);
+
+        if (_controlsIntroSystem.IsBlockingIntro)
+        {
+            PollBrowserPointerLockEvents();
+            _inputSystem.Update();
+            if (_controlsIntroSystem.UpdateBlockingIntro(_inputSystem))
+                return;
+        }
+
+        if (_controlsIntroSystem.IsManualOpen)
+        {
+            PollBrowserPointerLockEvents();
+            _inputSystem.Update();
+            if (IsKeyPressed(KeyboardKey.C) || IsKeyPressed(KeyboardKey.Escape))
+                _controlsIntroSystem.CloseManual(_inputSystem);
+            return;
+        }
+
         bool toggledConsoleThisFrame = false;
 
         if (_consoleOverlay.IsOpen && IsKeyPressed(KeyboardKey.Escape))
@@ -628,6 +661,12 @@ public class World : IScene
             if (!_inputSystem.IsMouseFree)
                 _inputSystem.EnableMouse();
             _highscoreBoardOverlay.Update();
+            return;
+        }
+
+        if (CanToggleControlsLayout() && IsKeyPressed(KeyboardKey.C))
+        {
+            _controlsIntroSystem.ToggleManual(_inputSystem);
             return;
         }
 
@@ -876,6 +915,7 @@ public class World : IScene
 
     public ConsoleCommandResult StartReplayForConsole(string filename)
     {
+        _controlsIntroSystem.Dismiss();
         var result = _recordingSystem.StartReplay(filename);
         if (result.Success)
         {
@@ -886,11 +926,15 @@ public class World : IScene
         return result;
     }
 
-    public ConsoleCommandResult StartReplayRemote(int rank) =>
-        _recordingSystem.ReplayRemote(rank);
+    public ConsoleCommandResult StartReplayRemote(int rank)
+    {
+        _controlsIntroSystem.Dismiss();
+        return _recordingSystem.ReplayRemote(rank);
+    }
 
     public ConsoleCommandResult StartVerifyReplayForConsole(string filename)
     {
+        _controlsIntroSystem.Dismiss();
         var result = _recordingSystem.StartVerifyReplay(filename);
         if (result.Success)
         {
@@ -972,10 +1016,18 @@ public class World : IScene
         int renderHeight = GameRenderSpace.HudTextureHeight;
         bool consoleOpen = _consoleOverlay.IsOpen;
         bool optionsOpen = _optionsMenu.IsOpen;
-        bool showWeaponView = _player.IsAlive && !consoleOpen && !optionsOpen && !_exitSystem.IsBlockingGameplay;
+        bool controlsIntroVisible = _controlsIntroSystem.IsVisible;
+        bool showWeaponView = _player.IsAlive && !consoleOpen && !optionsOpen && !controlsIntroVisible && !_exitSystem.IsBlockingGameplay;
 
         BeginTextureMode(_hudRenderTexture);
         ClearBackground(new Color(0, 0, 0, 0));
+
+        if (controlsIntroVisible)
+        {
+            ControlsIntroHud.Draw(renderWidth, renderHeight, _controlsIntroSystem.IsBlockingIntro);
+            EndTextureMode();
+            return;
+        }
 
         RenderNotificationOverlays(renderWidth, renderHeight, consoleOpen);
 
