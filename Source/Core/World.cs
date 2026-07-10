@@ -494,6 +494,15 @@ public class World : IScene
         && !_optionsMenu.IsOpen
         && !_highscoreIntermission.BlocksHighscoreBoardToggle;
 
+    private bool CanInstantRestartLevel() =>
+        !_consoleOverlay.IsOpen
+        && !_optionsMenu.IsOpen
+        && !_highscoreBoardOverlay.IsOpen
+        && !_highscoreIntermission.IsBlockingRestart
+        && !_recordingSystem.IsReplaying
+        && _player.IsAlive
+        && !_exitSystem.IsLevelComplete;
+
     public void OnExit()
     {
         _optionsMenu.Dismiss();
@@ -629,6 +638,12 @@ public class World : IScene
                 _inputSystem.EnableMouse();
             else
                 _inputSystem.RestoreGameplayMouse();
+            return;
+        }
+
+        if (CanInstantRestartLevel() && IsKeyPressed(KeyboardKey.R))
+        {
+            _ = RestartCurrentLevel();
             return;
         }
 
