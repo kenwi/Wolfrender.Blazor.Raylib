@@ -59,8 +59,10 @@ public class World : IScene
     private readonly SecretSystem _secretSystem;
     private readonly HighscoreClient _highscoreClient;
     private readonly HighscoreIntermission _highscoreIntermission;
+    private readonly HighscoreBoardOverlay _highscoreBoardOverlay;
     private readonly OptionsMenuSystem _optionsMenu = new();
     private bool _highscoreIntermissionStarted;
+    private bool _suppressLevelCompleteClickRestart;
 
     private RenderTexture2D _sceneRenderTexture;
     private RenderTexture2D _hudRenderTexture;
@@ -105,11 +107,6 @@ public class World : IScene
         _minimapSystem = new MinimapSystem(_level, _renderSystem);
         _exitSystem = new ExitSystem(_scoreSystem);
         _highscoreClient = new HighscoreClient();
-        _highscoreIntermission = new HighscoreIntermission(
-            _highscoreClient,
-            submission => _recordingSystem.PrepareRecordingForScoreSubmission(submission),
-            submission => _recordingSystem.QueueRecordingUploadForScore(submission),
-            () => _recordingSystem.DiscardCurrentRecording());
         _pickupSystem = new PickupSystem(_scoreSystem);
         _placedObjectSystem = new PlacedObjectSystem();
         _enemySystem = new EnemySystem(
@@ -156,6 +153,18 @@ public class World : IScene
             _consoleOverlay,
             _recordingSystem,
             () => _optionsMenu.Settings.MouseSensitivity);
+        _highscoreIntermission = new HighscoreIntermission(
+            _highscoreClient,
+            submission => _recordingSystem.PrepareRecordingForScoreSubmission(submission),
+            submission => _recordingSystem.QueueRecordingUploadForScore(submission),
+            () => _recordingSystem.DiscardCurrentRecording(),
+            StartReplayRemote,
+            result => _runtimeConsole.WriteFeedback(result));
+        _highscoreBoardOverlay = new HighscoreBoardOverlay(
+            _highscoreClient,
+            () => _currentLevelPath,
+            StartReplayRemote,
+            result => _runtimeConsole.WriteFeedback(result));
         _recordingSystem.Configure(
             LoadLevel,
             RestartCurrentLevel,
@@ -188,7 +197,8 @@ public class World : IScene
             () => _consoleOverlay.IsOpen,
             () => _ = RestartCurrentLevel(),
             () => _highscoreIntermission.IsBlockingRestart,
-            () => _recordingSystem.IsReplaying);
+            () => _recordingSystem.IsReplaying,
+            () => _suppressLevelCompleteClickRestart);
         _playerSystem.ResetForLevelLoad(_mapData);
         ResetSimulationPoses();
         _exitSystem.Rebuild(_mapData);
@@ -479,6 +489,11 @@ public class World : IScene
             _recordingSystem.StartAutoRecording(_optionsMenu.Settings.MouseSensitivity);
     }
 
+    private bool CanToggleHighscoreBoard() =>
+        !_consoleOverlay.IsOpen
+        && !_optionsMenu.IsOpen
+        && !_highscoreIntermission.BlocksHighscoreBoardToggle;
+
     public void OnExit()
     {
         _optionsMenu.Dismiss();
@@ -599,6 +614,24 @@ public class World : IScene
             return;
         }
 
+        if (_highscoreBoardOverlay.IsOpen)
+        {
+            if (!_inputSystem.IsMouseFree)
+                _inputSystem.EnableMouse();
+            _highscoreBoardOverlay.Update();
+            return;
+        }
+
+        if (CanToggleHighscoreBoard() && IsKeyPressed(KeyboardKey.H))
+        {
+            _highscoreBoardOverlay.Toggle();
+            if (_highscoreBoardOverlay.IsOpen)
+                _inputSystem.EnableMouse();
+            else
+                _inputSystem.RestoreGameplayMouse();
+            return;
+        }
+
         if (!_recordingSystem.IsReplaying)
         {
             PollBrowserPointerLockEvents();
@@ -612,6 +645,10 @@ public class World : IScene
         _tickDiagnostics.BeginFrame(deltaTime);
         int ticksThisFrame = _simulationClock.Advance(deltaTime);
         _tickDiagnostics.RecordSimulationStep(_simulationClock);
+
+        _suppressLevelCompleteClickRestart = false;
+        if (_exitSystem.IsLevelComplete && _highscoreIntermission.IsLeaderboardInteractive)
+            _suppressLevelCompleteClickRestart = _highscoreIntermission.TryHandleLeaderboardInput();
 
         for (int i = 0; i < ticksThisFrame; i++)
             SimulateGameplayTick(_simulationClock.FixedDeltaTime);
@@ -998,6 +1035,9 @@ public class World : IScene
 
         if (!_player.IsAlive && !consoleOpen)
             PlaySessionOverlayHud.DrawGameOver(screenWidth, screenHeight);
+
+        if (_highscoreBoardOverlay.IsOpen)
+            _highscoreBoardOverlay.Draw(screenWidth, screenHeight);
     }
 
     /// <summary>Centered banner notifications drawn at internal resolution.</summary>

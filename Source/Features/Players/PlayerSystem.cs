@@ -34,6 +34,7 @@ public sealed class PlayerSystem
     private Func<bool> _isConsoleOpen = () => false;
     private Func<bool> _isHighscoreBlockingRestart = () => false;
     private Func<bool> _isReplaying = () => false;
+    private Func<bool> _suppressLevelCompleteClickRestart = () => false;
     private Action? _restartLevel;
 
     public PlayerSystem(
@@ -70,12 +71,14 @@ public sealed class PlayerSystem
         Func<bool> isConsoleOpen,
         Action restartLevel,
         Func<bool>? isHighscoreBlockingRestart = null,
-        Func<bool>? isReplaying = null)
+        Func<bool>? isReplaying = null,
+        Func<bool>? suppressLevelCompleteClickRestart = null)
     {
         _isConsoleOpen = isConsoleOpen;
         _restartLevel = restartLevel;
         _isHighscoreBlockingRestart = isHighscoreBlockingRestart ?? (() => false);
         _isReplaying = isReplaying ?? (() => false);
+        _suppressLevelCompleteClickRestart = suppressLevelCompleteClickRestart ?? (() => false);
     }
 
     public void ResetForLevelLoad(MapData mapData)
@@ -234,7 +237,7 @@ public sealed class PlayerSystem
             return;
 
         bool restartPressed = IsKeyPressed(KeyboardKey.R)
-            || IsMouseButtonPressed(MouseButton.Left);
+            || (!_suppressLevelCompleteClickRestart() && IsMouseButtonPressed(MouseButton.Left));
 
         if (!restartPressed)
             return;

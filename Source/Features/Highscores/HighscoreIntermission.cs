@@ -1,3 +1,4 @@
+using Game.DebugConsole;
 using Game.Features.Highscores.Shared;
 using Game.Features.LevelProgress;
 using Raylib_cs;
@@ -22,6 +23,8 @@ public sealed class HighscoreIntermission
     private readonly Action<ScoreSubmission>? _prepareRecordingForScore;
     private readonly Action<ScoreSubmission>? _uploadRecordingForScore;
     private readonly Action? _discardRecording;
+    private readonly Func<int, ConsoleCommandResult>? _startReplayRemote;
+    private readonly Action<ConsoleCommandResult>? _onReplayFeedback;
     private Phase _phase = Phase.Hidden;
     private string _levelId = string.Empty;
     private ScoreSystem? _score;
@@ -37,12 +40,16 @@ public sealed class HighscoreIntermission
         HighscoreClient client,
         Action<ScoreSubmission>? prepareRecordingForScore = null,
         Action<ScoreSubmission>? uploadRecordingForScore = null,
-        Action? discardRecording = null)
+        Action? discardRecording = null,
+        Func<int, ConsoleCommandResult>? startReplayRemote = null,
+        Action<ConsoleCommandResult>? onReplayFeedback = null)
     {
         _client = client;
         _prepareRecordingForScore = prepareRecordingForScore;
         _uploadRecordingForScore = uploadRecordingForScore;
         _discardRecording = discardRecording;
+        _startReplayRemote = startReplayRemote;
+        _onReplayFeedback = onReplayFeedback;
     }
 
     public bool IsActive => _phase != Phase.Hidden;
@@ -53,6 +60,11 @@ public sealed class HighscoreIntermission
 
     /// <summary>When true, console toggle keys are ignored so name entry is not interrupted.</summary>
     public bool BlocksConsoleToggle => _phase is Phase.NameEntry;
+
+    /// <summary>When true, the in-game H highscore board should stay hidden.</summary>
+    public bool BlocksHighscoreBoardToggle => IsActive;
+
+    public bool IsLeaderboardInteractive => _phase is Phase.LoadingLeaderboard or Phase.Leaderboard;
 
     public void ResetForLevel()
     {
@@ -234,6 +246,20 @@ public sealed class HighscoreIntermission
             _phase = Phase.Hidden;
     }
 
+    public bool TryHandleLeaderboardInput()
+    {
+        if (_phase != Phase.Leaderboard || _startReplayRemote is null)
+            return false;
+
+        if (!HighscoreLeaderboardHud.TryHandleViewReplayClick(GetMousePosition(), out int rank))
+            return HighscoreLeaderboardHud.IsMouseOverReplayButton(GetMousePosition());
+
+        var result = _startReplayRemote(rank);
+        _onReplayFeedback?.Invoke(result);
+        _phase = Phase.Hidden;
+        return true;
+    }
+
     private void DrawNameEntryPanel(ScoreSystem score, int screenWidth, int screenHeight)
     {
         var layout = LevelProgressOverlayHud.DrawIntermissionFrame(screenWidth, screenHeight, "SUBMIT SCORE");
@@ -257,65 +283,20 @@ public sealed class HighscoreIntermission
 
     private void DrawLeaderboardPanel(int screenWidth, int screenHeight)
     {
-        var layout = LevelProgressOverlayHud.DrawIntermissionFrame(screenWidth, screenHeight, "HIGH SCORES");
-        const int lineSize = LevelProgressOverlayHud.IntermissionLineSize - 4;
-        var highlight = new Color(120, 220, 120, 255);
+        var highlight = _submittedFinalScore.HasValue
+            ? new HighscoreLeaderboardHud.HighlightMatch(
+                _submittedPlayerName,
+                _submittedFinalScore,
+                _submittedElapsedSeconds)
+            : (HighscoreLeaderboardHud.HighlightMatch?)null;
 
-        int y = layout.ContentY;
-
-        if (_phase == Phase.LoadingLeaderboard)
-        {
-            DrawText(_statusMessage ?? "Loading leaderboard...", layout.ContentX, y, lineSize, Color.RayWhite);
-            return;
-        }
-
-        if (!string.IsNullOrEmpty(_statusMessage))
-        {
-            DrawText(_statusMessage, layout.ContentX, y, lineSize, new Color(255, 140, 140, 255));
-            y += 24;
-        }
-
-        if (_leaderboard.Count == 0)
-        {
-            DrawText("No scores yet.", layout.ContentX, y, lineSize, Color.RayWhite);
-        }
-        else
-        {
-            int contentLeft = layout.ContentX;
-            int contentRight = layout.PanelX + layout.PanelW - 40;
-            const int columnGap = 20;
-
-            int rankColWidth = MeasureText($"{_leaderboard.Max(e => e.Rank)}.", lineSize);
-            int maxTimeWidth = MeasureText("999:59", lineSize);
-            int timeColRight = contentRight;
-            int scoreColRight = timeColRight - maxTimeWidth - columnGap;
-            int nameColLeft = contentLeft + rankColWidth + columnGap;
-
-            foreach (var entry in _leaderboard)
-            {
-                int minutes = (int)entry.ElapsedSeconds / 60;
-                int seconds = (int)entry.ElapsedSeconds % 60;
-
-                bool highlightEntry = _submittedFinalScore.HasValue
-                    && entry.FinalScore == _submittedFinalScore.Value
-                    && string.Equals(entry.PlayerName, _submittedPlayerName, StringComparison.Ordinal)
-                    && MathF.Abs(entry.ElapsedSeconds - (_submittedElapsedSeconds ?? 0f)) < 0.05f;
-
-                var color = highlightEntry ? highlight : Color.RayWhite;
-
-                DrawText($"{entry.Rank}.", contentLeft, y, lineSize, color);
-                DrawText(entry.PlayerName, nameColLeft, y, lineSize, color);
-
-                string scoreText = entry.FinalScore.ToString();
-                DrawText(scoreText, scoreColRight - MeasureText(scoreText, lineSize), y, lineSize, color);
-
-                string timeText = $"{minutes}:{seconds:D2}";
-                DrawText(timeText, timeColRight - MeasureText(timeText, lineSize), y, lineSize, color);
-
-                y += 22;
-            }
-        }
-
-        LevelProgressOverlayHud.DrawIntermissionHint("Press R or click to continue", layout, screenWidth, lineSize);
+        HighscoreLeaderboardHud.Draw(
+            _leaderboard,
+            screenWidth,
+            screenHeight,
+            _phase == Phase.LoadingLeaderboard,
+            _statusMessage,
+            highlight,
+            footerHint: "Esc to close  |  R or click to continue");
     }
 }

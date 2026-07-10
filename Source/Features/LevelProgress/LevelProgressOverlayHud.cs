@@ -12,6 +12,7 @@ public static class LevelProgressOverlayHud
 
     public const int IntermissionPanelW = 600;
     public const int IntermissionPanelH = 360;
+    public const int IntermissionLeaderboardPanelW = 760;
     public const int IntermissionLineSize = 22;
 
     public readonly record struct IntermissionPanelLayout(
@@ -38,13 +39,18 @@ public static class LevelProgressOverlayHud
             screenWidth,
             screenHeight);
 
-    public static IntermissionPanelLayout DrawIntermissionFrame(int screenWidth, int screenHeight, string title)
+    public static IntermissionPanelLayout DrawIntermissionFrame(
+        int screenWidth,
+        int screenHeight,
+        string title,
+        int panelWidth = IntermissionPanelW,
+        int panelHeight = IntermissionPanelH)
     {
-        int panelX = (screenWidth - IntermissionPanelW) / 2;
-        int panelY = (screenHeight - IntermissionPanelH) / 2;
+        int panelX = (screenWidth - panelWidth) / 2;
+        int panelY = (screenHeight - panelHeight) / 2;
 
-        DrawRectangle(panelX, panelY, IntermissionPanelW, IntermissionPanelH, PanelFill);
-        DrawRectangleLines(panelX, panelY, IntermissionPanelW, IntermissionPanelH, Accent);
+        DrawRectangle(panelX, panelY, panelWidth, panelHeight, PanelFill);
+        DrawRectangleLines(panelX, panelY, panelWidth, panelHeight, Accent);
 
         const int titleSize = 40;
         int titleW = MeasureText(title, titleSize);
@@ -53,8 +59,8 @@ public static class LevelProgressOverlayHud
         return new IntermissionPanelLayout(
             panelX,
             panelY,
-            IntermissionPanelW,
-            IntermissionPanelH,
+            panelWidth,
+            panelHeight,
             panelX + 40,
             panelY + 80);
     }
