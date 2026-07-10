@@ -21,7 +21,7 @@ public sealed class HighscoreIntermission
 
     private readonly HighscoreClient _client;
     private readonly Action<ScoreSubmission>? _prepareRecordingForScore;
-    private readonly Action<ScoreSubmission>? _uploadRecordingForScore;
+    private readonly Func<ScoreSubmission, Task?>? _uploadRecordingForScore;
     private readonly Action? _discardRecording;
     private readonly Func<int, ConsoleCommandResult>? _startReplayRemote;
     private readonly Action<ConsoleCommandResult>? _onReplayFeedback;
@@ -39,7 +39,7 @@ public sealed class HighscoreIntermission
     public HighscoreIntermission(
         HighscoreClient client,
         Action<ScoreSubmission>? prepareRecordingForScore = null,
-        Action<ScoreSubmission>? uploadRecordingForScore = null,
+        Func<ScoreSubmission, Task?>? uploadRecordingForScore = null,
         Action? discardRecording = null,
         Func<int, ConsoleCommandResult>? startReplayRemote = null,
         Action<ConsoleCommandResult>? onReplayFeedback = null)
@@ -191,7 +191,22 @@ public sealed class HighscoreIntermission
             _prepareRecordingForScore?.Invoke(submission);
             await _client.SubmitAsync(submission);
             _statusMessage = "Score submitted.";
-            _uploadRecordingForScore?.Invoke(submission);
+
+            var uploadTask = _uploadRecordingForScore?.Invoke(submission);
+            if (uploadTask is not null)
+            {
+                try
+                {
+                    _statusMessage = "Uploading recording...";
+                    await uploadTask;
+                    _statusMessage = "Syncing recordings...";
+                    await _client.SyncRecordingAvailabilityAsync();
+                }
+                catch (Exception uploadEx)
+                {
+                    _statusMessage = $"Recording upload failed: {uploadEx.Message}";
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -222,7 +237,7 @@ public sealed class HighscoreIntermission
     {
         try
         {
-            _leaderboard = await _client.GetTopAsync(_levelId);
+            _leaderboard = await _client.GetTopWithSyncedRecordingsAsync(_levelId);
             _statusMessage = null;
         }
         catch (Exception ex)

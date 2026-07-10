@@ -294,6 +294,24 @@ app.MapGet("/api/scores/{levelId}/recordings/{rank:int}", async (
         fileDownloadName: $"{rank}.rec");
 });
 
+app.MapPost("/api/recordings/sync", async (
+    JsonFileScoreStore scoreStore,
+    HttpContext httpContext,
+    ILogger<Program> logger,
+    CancellationToken cancellationToken) =>
+{
+    var clientIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    logger.LogInformation("POST /api/recordings/sync request: ClientIp={ClientIp}", clientIp);
+
+    var updated = await scoreStore.SyncRecordingAvailabilityAsync(cancellationToken);
+    logger.LogInformation(
+        "POST /api/recordings/sync succeeded: ClientIp={ClientIp}, UpdatedEntries={UpdatedEntries}",
+        clientIp,
+        updated);
+
+    return Results.Ok(new { updatedEntries = updated });
+});
+
 app.MapPost("/api/recordings", async (
     HttpRequest httpRequest,
     FileRecordingStore store,

@@ -156,7 +156,7 @@ public class World : IScene
         _highscoreIntermission = new HighscoreIntermission(
             _highscoreClient,
             submission => _recordingSystem.PrepareRecordingForScoreSubmission(submission),
-            submission => _recordingSystem.QueueRecordingUploadForScore(submission),
+            submission => _recordingSystem.UploadRecordingForScoreAsync(submission),
             () => _recordingSystem.DiscardCurrentRecording(),
             StartReplayRemote,
             result => _runtimeConsole.WriteFeedback(result));

@@ -32,6 +32,8 @@ Recordings: `POST http://localhost:5080/api/recordings` (JSON body with `name` a
 
 Download a highscore recording: `GET http://localhost:5080/api/scores/{levelId}/recordings/{rank}` (returns `{rank}.rec` for the playthrough at that leaderboard position).
 
+Sync recording flags with on-disk files: `POST http://localhost:5080/api/recordings/sync`.
+
 ## Discord score announcements
 
 When a score is accepted, the server can post an embed to a Discord channel via webhook: player name, points, time, kills/treasures/secrets, and a gold "New #1" callout when someone takes the top spot.

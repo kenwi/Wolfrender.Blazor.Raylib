@@ -109,7 +109,7 @@ public sealed class HighscoreBoardOverlay
         {
             _leaderboard = string.IsNullOrEmpty(levelId)
                 ? Array.Empty<HighscoreEntry>()
-                : await _client.GetTopAsync(levelId);
+                : await _client.GetTopWithSyncedRecordingsAsync(levelId);
             _statusMessage = null;
         }
         catch (Exception ex)

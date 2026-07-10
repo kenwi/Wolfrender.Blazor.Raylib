@@ -72,6 +72,21 @@ public sealed class HighscoreClient
         return entries ?? [];
     }
 
+    public async Task SyncRecordingAvailabilityAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsync("api/recordings/sync", null, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<IReadOnlyList<HighscoreEntry>> GetTopWithSyncedRecordingsAsync(
+        string levelId,
+        int top = HighscoreConfig.DefaultTopCount,
+        CancellationToken cancellationToken = default)
+    {
+        await SyncRecordingAvailabilityAsync(cancellationToken);
+        return await GetTopAsync(levelId, top, cancellationToken);
+    }
+
     /// <summary>
     /// Fire-and-forget leaderboard fetch at level start so the browser can prompt
     /// for cross-origin access before level-complete score submission.

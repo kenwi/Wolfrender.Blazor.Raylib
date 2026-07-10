@@ -167,21 +167,25 @@ public sealed class RecordingSystem
             DiscardCurrentRecording();
     }
 
-    public void QueueRecordingUploadForScore(ScoreSubmission submission)
+    public void QueueRecordingUploadForScore(ScoreSubmission submission) =>
+        _ = UploadRecordingForScoreAsync(submission);
+
+    public Task? UploadRecordingForScoreAsync(ScoreSubmission submission)
     {
         string checksum = ScoreChecksum.Compute(submission);
         if (!RecordingNameSanitizer.TrySanitize(checksum, out var sanitizedName, out _))
-            return;
+            return null;
 
         string path = ResolveRecordingPath(sanitizedName);
         if (!File.Exists(path))
-            return;
+            return null;
 
         if (_pendingUpload is { IsCompleted: false })
-            return;
+            return _pendingUpload;
 
         _pendingUploadName = sanitizedName;
         _pendingUpload = _uploadClient.SendAsync(sanitizedName, path);
+        return _pendingUpload;
     }
 
     public ConsoleCommandResult StopRecording()
