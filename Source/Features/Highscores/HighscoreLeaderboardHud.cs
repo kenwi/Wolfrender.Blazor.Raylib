@@ -64,7 +64,7 @@ public static class HighscoreLeaderboardHud
             const int buttonHeight = 22;
 
             int rankColWidth = MeasureText($"{entries.Max(e => e.Rank)}.", lineSize);
-            int maxTimeWidth = MeasureText("999:59", lineSize);
+            int maxTimeWidth = MeasureText(HighscoreTimeFormat.Format(5999.99f), lineSize);
             int buttonWidth = MeasureText(ViewReplayLabel, lineSize - 2) + 16;
             int replayColRight = contentRight;
             int timeColRight = replayColRight - buttonWidth - columnGap;
@@ -73,14 +73,11 @@ public static class HighscoreLeaderboardHud
 
             foreach (var entry in entries)
             {
-                int minutes = (int)entry.ElapsedSeconds / 60;
-                int seconds = (int)entry.ElapsedSeconds % 60;
-
                 bool highlightEntry = highlight is { } match
                     && match.FinalScore.HasValue
                     && entry.FinalScore == match.FinalScore.Value
                     && string.Equals(entry.PlayerName, match.PlayerName, StringComparison.Ordinal)
-                    && MathF.Abs(entry.ElapsedSeconds - (match.ElapsedSeconds ?? 0f)) < 0.05f;
+                    && MathF.Abs(entry.ElapsedSeconds - (match.ElapsedSeconds ?? 0f)) < 0.005f;
 
                 var color = highlightEntry ? highlightColor : Color.RayWhite;
 
@@ -90,7 +87,7 @@ public static class HighscoreLeaderboardHud
                 string scoreText = entry.FinalScore.ToString();
                 DrawText(scoreText, scoreColRight - MeasureText(scoreText, lineSize), y, lineSize, color);
 
-                string timeText = $"{minutes}:{seconds:D2}";
+                string timeText = HighscoreTimeFormat.Format(entry.ElapsedSeconds);
                 DrawText(timeText, timeColRight - MeasureText(timeText, lineSize), y, lineSize, color);
 
                 if (entry.HasRecording)
