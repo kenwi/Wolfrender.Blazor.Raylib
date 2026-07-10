@@ -69,7 +69,7 @@ public sealed class HighscoreBoardOverlay
 
         PollPendingTask();
 
-        if (HighscoreLeaderboardHud.TryHandleViewReplayClick(GetMousePosition(), out int rank))
+        if (HighscoreLeaderboardHud.TryHandleViewReplayClick(out int rank))
         {
             var result = _startReplayRemote(rank);
             _onFeedback?.Invoke(result);

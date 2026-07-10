@@ -134,9 +134,16 @@ public sealed class HighscoreIntermission
                 return;
             case Phase.LoadingLeaderboard:
             case Phase.Leaderboard:
-                DrawLeaderboardPanel(screenWidth, screenHeight);
-                break;
+                return;
         }
+    }
+
+    public void DrawLeaderboard(int hudWidth, int hudHeight)
+    {
+        if (_phase is not Phase.LoadingLeaderboard and not Phase.Leaderboard)
+            return;
+
+        DrawLeaderboardPanel(hudWidth, hudHeight);
     }
 
     private void UpdateLevelScoreAdvance()
@@ -266,8 +273,8 @@ public sealed class HighscoreIntermission
         if (_phase != Phase.Leaderboard || _startReplayRemote is null)
             return false;
 
-        if (!HighscoreLeaderboardHud.TryHandleViewReplayClick(GetMousePosition(), out int rank))
-            return HighscoreLeaderboardHud.IsMouseOverReplayButton(GetMousePosition());
+        if (!HighscoreLeaderboardHud.TryHandleViewReplayClick(out int rank))
+            return HighscoreLeaderboardHud.IsMouseOverReplayButton();
 
         var result = _startReplayRemote(rank);
         _onReplayFeedback?.Invoke(result);

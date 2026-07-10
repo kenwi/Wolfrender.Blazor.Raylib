@@ -8,6 +8,9 @@ namespace Game.Features.Hud;
 /// <summary>Maps window-space coordinates to the internal game render resolution.</summary>
 public static class GameRenderSpace
 {
+    public const int HudTextureWidth = (int)(1920 * 0.7f);
+    public const int HudTextureHeight = (int)(1080 * 0.7f);
+
     public static int InternalWidth => RenderData.InternalWidth;
     public static int InternalHeight => RenderData.InternalHeight;
 
@@ -19,6 +22,16 @@ public static class GameRenderSpace
         return new Vector2(
             windowPoint.X * RenderData.InternalWidth / windowWidth,
             windowPoint.Y * RenderData.InternalHeight / windowHeight);
+    }
+
+    public static Vector2 WindowToHudTexture(Vector2 windowPoint, int windowWidth, int windowHeight)
+    {
+        if (windowWidth <= 0 || windowHeight <= 0)
+            return windowPoint;
+
+        return new Vector2(
+            windowPoint.X * HudTextureWidth / windowWidth,
+            windowPoint.Y * HudTextureHeight / windowHeight);
     }
 
     public static void DrawTextureToWindow(Texture2D texture, int windowWidth, int windowHeight)

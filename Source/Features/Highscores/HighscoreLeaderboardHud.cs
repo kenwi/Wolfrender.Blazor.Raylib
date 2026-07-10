@@ -1,5 +1,6 @@
 using System.Numerics;
 using Game.Features.Highscores.Shared;
+using Game.Features.Hud;
 using Game.Features.LevelProgress;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
@@ -108,15 +109,16 @@ public static class HighscoreLeaderboardHud
         LevelProgressOverlayHud.DrawIntermissionHint(footerHint, layout, screenWidth, lineSize);
     }
 
-    public static bool TryHandleViewReplayClick(Vector2 mousePosition, out int rank)
+    public static bool TryHandleViewReplayClick(out int rank)
     {
         rank = 0;
         if (!IsMouseButtonPressed(MouseButton.Left))
             return false;
 
+        var mouse = GetHudMousePosition();
         foreach (var (entryRank, button) in ReplayButtons)
         {
-            if (!CheckCollisionPointRec(mousePosition, button))
+            if (!CheckCollisionPointRec(mouse, button))
                 continue;
 
             rank = entryRank;
@@ -126,20 +128,29 @@ public static class HighscoreLeaderboardHud
         return false;
     }
 
-    public static bool IsMouseOverReplayButton(Vector2 mousePosition)
+    public static bool IsMouseOverReplayButton()
     {
+        var mouse = GetHudMousePosition();
         foreach (var (_, button) in ReplayButtons)
         {
-            if (CheckCollisionPointRec(mousePosition, button))
+            if (CheckCollisionPointRec(mouse, button))
                 return true;
         }
 
         return false;
     }
 
+    private static Vector2 GetHudMousePosition()
+    {
+        return GameRenderSpace.WindowToHudTexture(
+            GetMousePosition(),
+            GetScreenWidth(),
+            GetScreenHeight());
+    }
+
     private static void DrawReplayButton(Rectangle rect)
     {
-        bool hovered = CheckCollisionPointRec(GetMousePosition(), rect);
+        bool hovered = CheckCollisionPointRec(GetHudMousePosition(), rect);
         var fill = hovered ? new Color(70, 110, 70, 255) : new Color(50, 50, 50, 255);
         DrawRectangleRec(rect, fill);
         DrawRectangleLinesEx(rect, 1f, new Color(140, 180, 140, 255));

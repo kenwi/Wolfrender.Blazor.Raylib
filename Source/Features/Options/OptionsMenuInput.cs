@@ -16,14 +16,9 @@ public static class OptionsMenuInput
         public bool AudioChanged { get; init; }
     }
 
-    public static Result Update(
-        GameSettings settings,
-        int renderWidth,
-        int renderHeight,
-        int windowWidth,
-        int windowHeight)
+    public static Result Update(GameSettings settings, int windowWidth, int windowHeight)
     {
-        var layout = OptionsMenuLayout.Compute(renderWidth, renderHeight);
+        var layout = OptionsMenuLayout.Compute(GameRenderSpace.HudTextureWidth, GameRenderSpace.HudTextureHeight);
         bool windowDisplayChanged = false;
         bool gameResolutionChanged = false;
         bool graphicsChanged = false;
@@ -85,7 +80,7 @@ public static class OptionsMenuInput
             }
         }
 
-        var mouse = GameRenderSpace.WindowToInternal(GetMousePosition(), windowWidth, windowHeight);
+        var mouse = GameRenderSpace.WindowToHudTexture(GetMousePosition(), windowWidth, windowHeight);
         bool click = IsMouseButtonPressed(MouseButton.Left);
         bool drag = IsMouseButtonDown(MouseButton.Left);
 

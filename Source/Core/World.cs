@@ -211,7 +211,7 @@ public class World : IScene
             ResolveWindowWidth(),
             ResolveWindowHeight());
         _sceneRenderTexture = LoadRenderTexture(RenderData.InternalWidth, RenderData.InternalHeight);
-        _hudRenderTexture = LoadRenderTexture(RenderData.InternalWidth, RenderData.InternalHeight);
+        _hudRenderTexture = LoadRenderTexture(GameRenderSpace.HudTextureWidth, GameRenderSpace.HudTextureHeight);
         _hasSceneRenderTexture = true;
         _hasHudRenderTexture = true;
         Debug.Setup(_doorSystem.Doors, _player, _animationSystem, _enemySystem);
@@ -339,26 +339,30 @@ public class World : IScene
 
     private void RecreateRenderTextures()
     {
-        int newWidth = RenderData.InternalWidth;
-        int newHeight = RenderData.InternalHeight;
+        int sceneWidth = RenderData.InternalWidth;
+        int sceneHeight = RenderData.InternalHeight;
 
-        if (_hasSceneRenderTexture &&
-            _sceneRenderTexture.Texture.Width == newWidth &&
-            _sceneRenderTexture.Texture.Height == newHeight &&
-            _hasHudRenderTexture &&
-            _hudRenderTexture.Texture.Width == newWidth &&
-            _hudRenderTexture.Texture.Height == newHeight)
-            return;
+        if (!_hasSceneRenderTexture ||
+            _sceneRenderTexture.Texture.Width != sceneWidth ||
+            _sceneRenderTexture.Texture.Height != sceneHeight)
+        {
+            if (_hasSceneRenderTexture)
+                UnloadRenderTexture(_sceneRenderTexture);
 
-        if (_hasSceneRenderTexture)
-            UnloadRenderTexture(_sceneRenderTexture);
-        if (_hasHudRenderTexture)
-            UnloadRenderTexture(_hudRenderTexture);
+            _sceneRenderTexture = LoadRenderTexture(sceneWidth, sceneHeight);
+            _hasSceneRenderTexture = true;
+        }
 
-        _sceneRenderTexture = LoadRenderTexture(newWidth, newHeight);
-        _hudRenderTexture = LoadRenderTexture(newWidth, newHeight);
-        _hasSceneRenderTexture = true;
-        _hasHudRenderTexture = true;
+        if (!_hasHudRenderTexture ||
+            _hudRenderTexture.Texture.Width != GameRenderSpace.HudTextureWidth ||
+            _hudRenderTexture.Texture.Height != GameRenderSpace.HudTextureHeight)
+        {
+            if (_hasHudRenderTexture)
+                UnloadRenderTexture(_hudRenderTexture);
+
+            _hudRenderTexture = LoadRenderTexture(GameRenderSpace.HudTextureWidth, GameRenderSpace.HudTextureHeight);
+            _hasHudRenderTexture = true;
+        }
     }
 
     public void OnEnter()
@@ -559,11 +563,7 @@ public class World : IScene
 
         if (_optionsMenu.IsOpen)
         {
-            var inputResult = _optionsMenu.HandleInput(
-                RenderData.InternalWidth,
-                RenderData.InternalHeight,
-                GetScreenWidth(),
-                GetScreenHeight());
+            var inputResult = _optionsMenu.HandleInput(GetScreenWidth(), GetScreenHeight());
 
             if (inputResult.WindowDisplayChanged)
             {
@@ -968,8 +968,8 @@ public class World : IScene
 
     private void RenderHudToTexture()
     {
-        int renderWidth = RenderData.InternalWidth;
-        int renderHeight = RenderData.InternalHeight;
+        int renderWidth = GameRenderSpace.HudTextureWidth;
+        int renderHeight = GameRenderSpace.HudTextureHeight;
         bool consoleOpen = _consoleOverlay.IsOpen;
         bool optionsOpen = _optionsMenu.IsOpen;
         bool showWeaponView = _player.IsAlive && !consoleOpen && !optionsOpen && !_exitSystem.IsBlockingGameplay;
@@ -984,6 +984,15 @@ public class World : IScene
 
         if (optionsOpen)
             OptionsMenuHud.Draw(_optionsMenu.Settings, renderWidth, renderHeight);
+
+        if (!_player.IsAlive && !consoleOpen)
+            PlaySessionOverlayHud.DrawGameOver(renderWidth, renderHeight);
+
+        if (_highscoreBoardOverlay.IsOpen)
+            _highscoreBoardOverlay.Draw(renderWidth, renderHeight);
+
+        if (_highscoreIntermission.IsLeaderboardInteractive)
+            _highscoreIntermission.DrawLeaderboard(renderWidth, renderHeight);
 
         EndTextureMode();
     }
@@ -1047,12 +1056,6 @@ public class World : IScene
 
         _effectSystem.RenderScreenOverlay(screenWidth, screenHeight);
         RenderIntermissionOverlay(screenWidth, screenHeight, consoleOpen);
-
-        if (!_player.IsAlive && !consoleOpen)
-            PlaySessionOverlayHud.DrawGameOver(screenWidth, screenHeight);
-
-        if (_highscoreBoardOverlay.IsOpen)
-            _highscoreBoardOverlay.Draw(screenWidth, screenHeight);
     }
 
     /// <summary>Centered banner notifications drawn at internal resolution.</summary>
