@@ -25,6 +25,17 @@ class Raylib {
         }
     }
 
+    setMovementCaptureArmed(armed) {
+        Blazor.runtime.Module['movementCaptureArmed'] = !!armed;
+    }
+
+    requestPointerLock() {
+        const canvas = Blazor.runtime.Module['canvas'];
+        if (canvas && !document.pointerLockElement) {
+            canvas.requestPointerLock();
+        }
+    }
+
     isPointerLockActive() {
         return !!document.pointerLockElement;
     }
@@ -39,12 +50,26 @@ class Raylib {
         const canvas = document.getElementById(id)
         if (canvas) {
             Blazor.runtime.Module['canvas'] = canvas;
+            canvas.tabIndex = 0;
             canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+            canvas.addEventListener('mousedown', () => canvas.focus());
+
+            const movementKeys = ['KeyW', 'KeyA', 'KeyS', 'KeyD'];
+            const tryMovementPointerLock = () => {
+                if (Blazor.runtime.Module['movementCaptureArmed']
+                    && !document.pointerLockElement) {
+                    canvas.requestPointerLock();
+                }
+            };
+
+            document.addEventListener('keydown', (e) => {
+                if (movementKeys.includes(e.code))
+                    tryMovementPointerLock();
+            });
 
             canvas.addEventListener('keydown', (e) => {
-                if (e.key === 'Tab') {
+                if (e.key === 'Tab')
                     e.preventDefault();
-                }
             });
 
             document.addEventListener('pointerlockchange', () => {

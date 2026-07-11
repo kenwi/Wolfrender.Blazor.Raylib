@@ -7,6 +7,11 @@ public static class BrowserPointerLockBridge
 {
     public static Func<bool>? IsPointerLockActive;
     public static Func<string?>? ConsumePointerLockEvent;
+    public static Action? RequestPointerLock;
+    public static Action<bool>? SetMovementCaptureArmed;
+
+    /// <summary>When true, the browser host may request pointer lock on WASD keydown.</summary>
+    public static bool MovementCaptureArmed { get; set; }
 
     public static bool QueryPointerLockActive() => IsPointerLockActive?.Invoke() ?? false;
 

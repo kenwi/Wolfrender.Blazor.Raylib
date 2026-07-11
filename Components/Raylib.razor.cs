@@ -38,6 +38,8 @@ public partial class Raylib : IDisposable
         await JSHost.ImportAsync("Raylib", "../js/raylib.js");
         BrowserPointerLockBridge.IsPointerLockActive = () => IsPointerLockActive();
         BrowserPointerLockBridge.ConsumePointerLockEvent = () => ConsumePointerLockEvent();
+        BrowserPointerLockBridge.RequestPointerLock = RequestPointerLock;
+        BrowserPointerLockBridge.SetMovementCaptureArmed = SetMovementCaptureArmed;
         Init(this, _id);
         await InitRaylib();
         SyncCanvasSize();
@@ -66,6 +68,12 @@ public partial class Raylib : IDisposable
 
     [JSImport("raylib.consumePointerLockEvent", "Raylib")]
     public static partial string ConsumePointerLockEvent();
+
+    [JSImport("raylib.requestPointerLock", "Raylib")]
+    public static partial void RequestPointerLock();
+
+    [JSImport("raylib.setMovementCaptureArmed", "Raylib")]
+    public static partial void SetMovementCaptureArmed(bool armed);
 
     [JSImport("raylib.preloadFile", "Raylib")]
     public static partial Task PreloadFile(string path);
@@ -108,6 +116,8 @@ public partial class Raylib : IDisposable
     {
         BrowserPointerLockBridge.IsPointerLockActive = null;
         BrowserPointerLockBridge.ConsumePointerLockEvent = null;
+        BrowserPointerLockBridge.RequestPointerLock = null;
+        BrowserPointerLockBridge.SetMovementCaptureArmed = null;
         OnRender = null;
     }
 }

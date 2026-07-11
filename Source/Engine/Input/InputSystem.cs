@@ -109,6 +109,9 @@ public class InputSystem
             DisableMouse();
         }
 
+        if (!suppressClickToCapture && _isMouseFree && IsMovementKeyPressed())
+            DisableMouse();
+
         if (IsKeyPressed(KeyboardKey.L))
         {
             _isMouseFree = !_isMouseFree;
@@ -156,7 +159,10 @@ public class InputSystem
         _isMouseFree = false;
         DisableCursor();
         if (OperatingSystem.IsBrowser())
+        {
             BeginBrowserPointerCapture();
+            BrowserPointerLockBridge.RequestPointerLock?.Invoke();
+        }
         else
             RecenterCapturedMouse();
     }
@@ -259,6 +265,12 @@ public class InputSystem
             return 4;
         return 0;
     }
+
+    private static bool IsMovementKeyPressed() =>
+        IsKeyPressed(KeyboardKey.W)
+        || IsKeyPressed(KeyboardKey.A)
+        || IsKeyPressed(KeyboardKey.S)
+        || IsKeyPressed(KeyboardKey.D);
 
     public Vector3 GetMoveDirection(Camera3D camera) =>
         GetMoveDirection(camera, GetInputState());

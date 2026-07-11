@@ -522,6 +522,47 @@ public class World : IScene
         && _player.IsAlive
         && !_exitSystem.IsLevelComplete;
 
+    private bool ShouldFreeMouseForOverlays() =>
+        _consoleOverlay.IsOpen
+        || _optionsMenu.IsOpen
+        || _highscoreBoardOverlay.IsOpen
+        || _highscoreIntermission.IsLeaderboardInteractive
+        || _controlsIntroSystem.IsVisible;
+
+    private bool ShouldCaptureGameplayMouse() =>
+        !_recordingSystem.IsReplaying
+        && _player.IsAlive
+        && !_exitSystem.IsLevelComplete
+        && !ShouldFreeMouseForOverlays();
+
+    private bool ShouldDeferGameplayMouseCapture() =>
+        ShouldFreeMouseForOverlays()
+        || _recordingSystem.IsReplaying
+        || !_player.IsAlive
+        || _exitSystem.IsLevelComplete;
+
+    private void SyncOverlayMouseCapture()
+    {
+        if (ShouldFreeMouseForOverlays())
+        {
+            if (!_inputSystem.IsMouseFree)
+                _inputSystem.EnableMouse();
+            return;
+        }
+
+        if (ShouldCaptureGameplayMouse() && _inputSystem.IsMouseFree)
+            _inputSystem.RestoreGameplayMouse();
+    }
+
+    private void ArmBrowserMovementCapture()
+    {
+        bool waitingForGameplayStart = _controlsIntroSystem.IsBlockingIntro && _inputSystem.IsMouseFree;
+        bool armed = _inputSystem.IsMouseFree
+            && (ShouldCaptureGameplayMouse() || waitingForGameplayStart);
+        BrowserPointerLockBridge.MovementCaptureArmed = armed;
+        BrowserPointerLockBridge.SetMovementCaptureArmed?.Invoke(armed);
+    }
+
     public void OnExit()
     {
         _optionsMenu.Dismiss();
@@ -566,11 +607,13 @@ public class World : IScene
     {
         _soundSystem.Update();
         _recordingSystem.Update(deltaTime);
+        SyncOverlayMouseCapture();
 
         if (_controlsIntroSystem.IsBlockingIntro)
         {
             PollBrowserPointerLockEvents();
-            _inputSystem.Update();
+            ArmBrowserMovementCapture();
+            _inputSystem.Update(suppressClickToCapture: true);
             if (_controlsIntroSystem.UpdateBlockingIntro(_inputSystem))
                 return;
         }
@@ -578,7 +621,7 @@ public class World : IScene
         if (_controlsIntroSystem.IsManualOpen)
         {
             PollBrowserPointerLockEvents();
-            _inputSystem.Update();
+            _inputSystem.Update(suppressClickToCapture: true);
             if (IsKeyPressed(KeyboardKey.C) || IsKeyPressed(KeyboardKey.Escape))
                 _controlsIntroSystem.CloseManual(_inputSystem);
             return;
@@ -658,9 +701,8 @@ public class World : IScene
 
         if (_highscoreBoardOverlay.IsOpen)
         {
-            if (!_inputSystem.IsMouseFree)
-                _inputSystem.EnableMouse();
             _highscoreBoardOverlay.Update();
+            SyncOverlayMouseCapture();
             return;
         }
 
@@ -673,10 +715,7 @@ public class World : IScene
         if (CanToggleHighscoreBoard() && IsKeyPressed(KeyboardKey.H))
         {
             _highscoreBoardOverlay.Toggle();
-            if (_highscoreBoardOverlay.IsOpen)
-                _inputSystem.EnableMouse();
-            else
-                _inputSystem.RestoreGameplayMouse();
+            SyncOverlayMouseCapture();
             return;
         }
 
@@ -689,7 +728,8 @@ public class World : IScene
         if (!_recordingSystem.IsReplaying)
         {
             PollBrowserPointerLockEvents();
-            _inputSystem.Update();
+            ArmBrowserMovementCapture();
+            _inputSystem.Update(suppressClickToCapture: ShouldDeferGameplayMouseCapture());
         }
 
         // Sample Raylib once per render frame; ticks consume latched edges/deltas
