@@ -43,7 +43,7 @@ public sealed class DiscordScoreAnnouncer
             if (string.IsNullOrWhiteSpace(webhookUrl))
                 return;
 
-            var announceTopRanks = _configuration.GetValue("Discord:AnnounceTopRanks", 0);
+            var announceTopRanks = _configuration.GetValue("Discord:AnnounceTopRanks", 10);
             if (announceTopRanks > 0 && result.Rank > announceTopRanks)
             {
                 _logger.LogInformation(
