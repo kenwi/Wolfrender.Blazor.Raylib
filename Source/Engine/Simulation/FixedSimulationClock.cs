@@ -17,6 +17,11 @@ public sealed class FixedSimulationClock
     public int TicksConsumedLastFrame { get; private set; }
     public bool HitTickCapLastFrame { get; private set; }
 
+    /// <summary>
+    /// Advance the simulation tick index by one. Call exactly once per simulated tick.
+    /// </summary>
+    public void AdvanceTick() => TickIndex++;
+
     public void SetTickHz(int tickHz)
     {
         TickHz = ClampTickHz(tickHz);
@@ -34,7 +39,6 @@ public sealed class FixedSimulationClock
         while (_accumulator >= FixedDeltaTime && ticks < FixedSimulationSettings.MaxTicksPerFrame)
         {
             _accumulator -= FixedDeltaTime;
-            TickIndex++;
             ticks++;
         }
 

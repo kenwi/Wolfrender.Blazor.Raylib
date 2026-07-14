@@ -738,14 +738,18 @@ public class World : IScene
 
         _tickDiagnostics.BeginFrame(deltaTime);
         int ticksThisFrame = _simulationClock.Advance(deltaTime);
-        _tickDiagnostics.RecordSimulationStep(_simulationClock);
 
         _suppressLevelCompleteClickRestart = false;
         if (_exitSystem.IsLevelComplete && _highscoreIntermission.IsLeaderboardInteractive)
             _suppressLevelCompleteClickRestart = _highscoreIntermission.TryHandleLeaderboardInput();
 
         for (int i = 0; i < ticksThisFrame; i++)
+        {
+            _simulationClock.AdvanceTick();
             SimulateGameplayTick(_simulationClock.FixedDeltaTime);
+        }
+
+        _tickDiagnostics.RecordSimulationStep(_simulationClock);
 
         if (_exitSystem.IsLevelComplete && !_highscoreIntermissionStarted)
         {
