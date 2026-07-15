@@ -76,7 +76,7 @@ public static class ControlsIntroHud
             new("Mouse", "Look around"),
             new("Mouse left", "Fire"),
             new("C", "Controls"),
-            new("E", "Open doors"),
+            new("E", "Open doors, activate exit"),
             new("H", "High score board"),
             new("P", "Pause game"),
             new("R", "Restart level"),
