@@ -75,10 +75,10 @@ public static class ControlsIntroHud
             new("W A S D", "Move"),
             new("Mouse", "Look around"),
             new("Mouse left", "Fire"),
-            new("C", "Controls"),
+            new("1-4", "Select weapon"),
+            new("C", "Toggle Controls HUD"),
             new("E", "Open doors, activate exit"),
-            new("H", "High score board"),
-            new("P", "Pause game"),
+            new("H", "Toggle high score board"),
             new("R", "Restart level"),
         };
 
