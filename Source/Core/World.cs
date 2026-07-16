@@ -578,7 +578,11 @@ public class World : IScene
     {
         _inputSystem.SyncPointerLockReleased();
 
-        if (!escapeHeld || _consoleOverlay.IsOpen || _optionsMenu.IsOpen || _highscoreIntermission.CapturesEscapeKey)
+        if (!escapeHeld
+            || _consoleOverlay.IsOpen
+            || _optionsMenu.IsOpen
+            || _highscoreBoardOverlay.IsOpen
+            || _highscoreIntermission.CapturesEscapeKey)
             return;
 
         _optionsMenu.Open(_inputSystem);
@@ -666,6 +670,13 @@ public class World : IScene
 
         if (IsKeyPressed(KeyboardKey.Escape) && !_highscoreIntermission.CapturesEscapeKey)
         {
+            if (_highscoreBoardOverlay.IsOpen)
+            {
+                _highscoreBoardOverlay.Close();
+                SyncOverlayMouseCapture();
+                return;
+            }
+
             if (_consoleOverlay.IsOpen)
                 _consoleOverlay.Close();
 
