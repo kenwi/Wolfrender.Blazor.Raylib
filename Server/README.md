@@ -168,7 +168,17 @@ docker compose --profile tunnel down
 
 # Rebuild after code changes
 docker compose --profile tunnel up -d --build
+
+# Refresh cloudflared to the newest :latest image
+# (--build only rebuilds highscores; local :latest can stay stale)
+docker compose --profile tunnel pull cloudflared
+docker compose --profile tunnel up -d --build --force-recreate
+
+# Or pull all images and recreate in one step
+docker compose --profile tunnel up -d --build --force-recreate --pull always
 ```
+
+`cloudflared` runs with `--no-autoupdate`, so version upgrades require pulling a new image as above. Transient QUIC / edge disconnect warnings in the cloudflared logs are usually harmless if the tunnel re-registers shortly after.
 
 ## Notes
 
