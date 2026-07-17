@@ -60,7 +60,7 @@ public sealed class ConsoleOverlay
     {
         float wheel = GetMouseWheelMove();
         if (MathF.Abs(wheel) > 0.01f)
-            _scrollbackOffsetLines += (int)MathF.Round(wheel * 3f);
+            _scrollbackOffsetLines += (int)MathF.Round(wheel);
 
         if (IsKeyPressed(KeyboardKey.PageUp))
             _scrollbackOffsetLines += 8;
