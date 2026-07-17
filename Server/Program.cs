@@ -72,10 +72,12 @@ app.UseCors();
 
 {
     var scoreStore = app.Services.GetRequiredService<JsonFileScoreStore>();
-    var updated = await scoreStore.SyncRecordingAvailabilityAsync();
+    var synced = await scoreStore.SyncRecordingAvailabilityAsync();
+    var removed = await scoreStore.RemoveEntriesWithoutRecordingsAsync();
     startupLogger.LogInformation(
-        "Highscore recording availability sync finished. UpdatedEntries={UpdatedEntries}",
-        updated);
+        "Highscore startup cleanup finished. SyncedEntries={SyncedEntries}, RemovedEntries={RemovedEntries}",
+        synced,
+        removed);
 }
 
 app.MapPost("/api/scores", async (

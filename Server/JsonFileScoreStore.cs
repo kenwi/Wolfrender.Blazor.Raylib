@@ -187,6 +187,47 @@ public sealed class JsonFileScoreStore
         }
     }
 
+    public async Task<int> RemoveEntriesWithoutRecordingsAsync(CancellationToken cancellationToken = default)
+    {
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            var data = await ReadAsync(cancellationToken);
+            int removed = 0;
+
+            foreach (var (levelId, entries) in data.Levels.ToList())
+            {
+                int before = entries.Count;
+                entries.RemoveAll(entry => !HasRecordingForChecksum(entry.Checksum));
+                removed += before - entries.Count;
+
+                if (entries.Count == 0)
+                    data.Levels.Remove(levelId);
+            }
+
+            if (removed > 0)
+            {
+                await WriteAsync(data, cancellationToken);
+                _logger.LogInformation(
+                    "Removed highscore entries without recordings: RemovedEntries={RemovedEntries}, FilePath={FilePath}",
+                    removed,
+                    _filePath);
+            }
+            else
+            {
+                _logger.LogInformation(
+                    "Highscore recording cleanup complete: no entries to remove. FilePath={FilePath}",
+                    _filePath);
+            }
+
+            return removed;
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
     public async Task<int> SyncRecordingAvailabilityAsync(CancellationToken cancellationToken = default)
     {
         await _lock.WaitAsync(cancellationToken);
