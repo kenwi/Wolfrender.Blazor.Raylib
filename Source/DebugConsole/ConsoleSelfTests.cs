@@ -28,6 +28,139 @@ public static class ConsoleSelfTests
         TestSimulationChecksumDiff();
         TestRecFileValidator();
         TestLevelRoomMapDoorVisibility();
+        TestConsoleTextSelectionNormalizeAndExtract();
+        TestConsoleTextSelectionReplaceInputRange();
+        TestConsoleTextSelectionFirstPasteLine();
+        TestConsoleTextSelectionGetWordRange();
+        TestConsoleTextSelectionFullLineExtend();
+        TestConsoleTextSelectionWordExtend();
+    }
+
+    private static void TestConsoleTextSelectionWordExtend()
+    {
+        const string line = "set Player.Speed 1.5";
+
+        if (ConsoleTextSelection.TryMoveWordBoundary(line, 16, 1) != 20)
+            throw new InvalidOperationException("Right from word end should land on next word end.");
+        if (ConsoleTextSelection.TryMoveWordBoundary(line, 4, -1) != 0)
+            throw new InvalidOperationException("Left from word start should land on previous word start.");
+        if (ConsoleTextSelection.TryMoveWordBoundary(line, 0, -1) is not null)
+            throw new InvalidOperationException("Left at start of line should not move.");
+        if (ConsoleTextSelection.TryMoveWordBoundary(line, 20, 1) is not null)
+            throw new InvalidOperationException("Right at end of line should not move.");
+
+        var (snapStart, snapEnd) = ConsoleTextSelection.SnapToWordBounds(line, 6, 10);
+        if (snapStart != 4 || snapEnd != 16)
+            throw new InvalidOperationException("SnapToWordBounds should expand to the full word.");
+
+        var (anchorRight, focusRight) = ConsoleTextSelection.BuildWordSelection(0, 4, 16, 0, 20);
+        if (anchorRight.CharIndex != 4 || focusRight.CharIndex != 20)
+            throw new InvalidOperationException("Rightward word selection should grow from origin start.");
+
+        var (anchorLeft, focusLeft) = ConsoleTextSelection.BuildWordSelection(0, 4, 16, 0, 0);
+        if (anchorLeft.CharIndex != 16 || focusLeft.CharIndex != 0)
+            throw new InvalidOperationException("Leftward word selection should grow from origin end.");
+    }
+
+    private static void TestConsoleTextSelectionFullLineExtend()
+    {
+        var (anchorUp, focusUp) = ConsoleTextSelection.BuildFullLineSelection(5, 3, 10, 8);
+        if (anchorUp.LineIndex != 5 || anchorUp.CharIndex != 10
+            || focusUp.LineIndex != 3 || focusUp.CharIndex != 0)
+            throw new InvalidOperationException("Upward full-line selection should pin origin end and focus start.");
+
+        var (anchorDown, focusDown) = ConsoleTextSelection.BuildFullLineSelection(5, 7, 10, 4);
+        if (anchorDown.LineIndex != 5 || anchorDown.CharIndex != 0
+            || focusDown.LineIndex != 7 || focusDown.CharIndex != 4)
+            throw new InvalidOperationException("Downward full-line selection should pin origin start and focus end.");
+
+        var (anchorSame, focusSame) = ConsoleTextSelection.BuildFullLineSelection(2, 2, 6, 6);
+        if (anchorSame.CharIndex != 0 || focusSame.CharIndex != 6 || anchorSame.LineIndex != 2)
+            throw new InvalidOperationException("Same-line full selection should cover the whole line.");
+
+        if (ConsoleTextSelection.TryMoveLineIndex(0, -1, 5) is not null)
+            throw new InvalidOperationException("Cannot move up from first scrollback line.");
+        if (ConsoleTextSelection.TryMoveLineIndex(4, 1, 5) != ConsoleTextPos.InputLineIndex)
+            throw new InvalidOperationException("Down from last scrollback should reach input.");
+        if (ConsoleTextSelection.TryMoveLineIndex(ConsoleTextPos.InputLineIndex, -1, 5) != 4)
+            throw new InvalidOperationException("Up from input should reach last scrollback line.");
+        if (ConsoleTextSelection.TryMoveLineIndex(ConsoleTextPos.InputLineIndex, 1, 5) is not null)
+            throw new InvalidOperationException("Cannot move down from input line.");
+    }
+
+    private static void TestConsoleTextSelectionGetWordRange()
+    {
+        const string line = "set Player.Speed 1.5";
+        var (start, end) = ConsoleTextSelection.GetWordRange(line, 6);
+        if (start != 4 || end != 16 || line[start..end] != "Player.Speed")
+            throw new InvalidOperationException($"GetWordRange mismatch: [{start},{end})='{line[start..end]}'.");
+
+        var (wsStart, wsEnd) = ConsoleTextSelection.GetWordRange(line, 3);
+        if (wsStart != 3 || wsEnd != 4 || line[wsStart..wsEnd] != " ")
+            throw new InvalidOperationException("GetWordRange should select the whitespace run.");
+
+        var anchor = new ConsoleTextPos(0, 4);
+        var focus = new ConsoleTextPos(0, 16);
+        var pos = new ConsoleTextPos(0, 8);
+        if (!ConsoleTextSelection.IsExactWordSelection(line, anchor, focus, pos))
+            throw new InvalidOperationException("IsExactWordSelection should be true for matching word.");
+
+        var otherPos = new ConsoleTextPos(0, 0);
+        if (ConsoleTextSelection.IsExactWordSelection(line, anchor, focus, otherPos))
+            throw new InvalidOperationException("IsExactWordSelection should be false for a different word.");
+    }
+
+    private static void TestConsoleTextSelectionNormalizeAndExtract()
+    {
+        var a = new ConsoleTextPos(0, 2);
+        var b = new ConsoleTextPos(1, 3);
+        var (start, end) = ConsoleTextSelection.Normalize(b, a);
+        if (start.LineIndex != 0 || start.CharIndex != 2 || end.LineIndex != 1 || end.CharIndex != 3)
+            throw new InvalidOperationException("ConsoleTextSelection.Normalize should order positions.");
+
+        var scrollback = new List<string> { "abcdef", "ghijkl" };
+        string extracted = ConsoleTextSelection.Extract(scrollback, "input", a, b);
+        if (extracted != "cdef\nghi")
+            throw new InvalidOperationException($"Scrollback extract mismatch: '{extracted}'.");
+
+        var inA = new ConsoleTextPos(ConsoleTextPos.InputLineIndex, 1);
+        var inB = new ConsoleTextPos(ConsoleTextPos.InputLineIndex, 4);
+        string inputExtract = ConsoleTextSelection.Extract(scrollback, "abcdef", inB, inA);
+        if (inputExtract != "bcd")
+            throw new InvalidOperationException($"Input extract mismatch: '{inputExtract}'.");
+
+        if (ConsoleTextSelection.HasSelection(inA, inA))
+            throw new InvalidOperationException("Identical positions should not count as a selection.");
+        if (!ConsoleTextSelection.HasSelection(inA, inB))
+            throw new InvalidOperationException("Distinct positions should count as a selection.");
+
+        var mixedStart = new ConsoleTextPos(1, 2);
+        var mixedEnd = new ConsoleTextPos(ConsoleTextPos.InputLineIndex, 3);
+        string mixed = ConsoleTextSelection.Extract(scrollback, "abcdef", mixedStart, mixedEnd);
+        if (mixed != "ijkl\nabc")
+            throw new InvalidOperationException($"Mixed scrollback+input extract mismatch: '{mixed}'.");
+    }
+
+    private static void TestConsoleTextSelectionReplaceInputRange()
+    {
+        var buffer = new System.Text.StringBuilder("hello world");
+        int cursor = ConsoleTextSelection.ReplaceInputRange(buffer, 6, 11, "there");
+        if (buffer.ToString() != "hello there" || cursor != 11)
+            throw new InvalidOperationException($"ReplaceInputRange mismatch: '{buffer}' cursor={cursor}.");
+
+        cursor = ConsoleTextSelection.DeleteInputRange(buffer, 0, 6);
+        if (buffer.ToString() != "there" || cursor != 0)
+            throw new InvalidOperationException($"DeleteInputRange mismatch: '{buffer}' cursor={cursor}.");
+    }
+
+    private static void TestConsoleTextSelectionFirstPasteLine()
+    {
+        if (ConsoleTextSelection.FirstPasteLine("one\r\ntwo\nthree") != "one")
+            throw new InvalidOperationException("FirstPasteLine should keep only the first line.");
+        if (ConsoleTextSelection.FirstPasteLine("single") != "single")
+            throw new InvalidOperationException("FirstPasteLine should preserve single-line paste.");
+        if (ConsoleTextSelection.FirstPasteLine("") != string.Empty)
+            throw new InvalidOperationException("FirstPasteLine should handle empty clipboard.");
     }
 
     private static void TestParserQuotedArgs()
