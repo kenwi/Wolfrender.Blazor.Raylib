@@ -65,6 +65,7 @@ public class World : IScene
     private readonly PlayOptionsFacade _playOptions;
     private readonly PlayOverlayInputController _overlayInput;
     private readonly PlayConsoleCommands _consoleCommands;
+    private readonly PlayHudComposer _hudComposer;
     private bool _highscoreIntermissionStarted;
     private bool _suppressLevelCompleteClickRestart;
 
@@ -236,6 +237,24 @@ public class World : IScene
             _runtimeConsole,
             ExecuteConsoleLine,
             RestartCurrentLevel);
+        _hudComposer = new PlayHudComposer(
+            _player,
+            _consoleOverlay,
+            _optionsMenu,
+            _controlsIntroSystem,
+            _exitSystem,
+            _doorSystem,
+            _weaponSystem,
+            _effectSystem,
+            _scoreSystem,
+            _animationSystem,
+            _highscoreBoardOverlay,
+            _highscoreIntermission,
+            _recordingSystem,
+            _tickDiagnostics,
+            _minimapSystem,
+            () => _inputState,
+            () => _player.Camera);
 
         Debug.Setup(_doorSystem.Doors, _player, _animationSystem, _enemySystem);
         _playOptions.InitializeRenderTargets();
@@ -587,8 +606,10 @@ public class World : IScene
     public void Render()
     {
         RenderSceneToTexture();
-        RenderHudToTexture();
-        RenderToScreen();
+        _hudComposer.RenderHudToTexture(_playOptions.HudRenderTexture);
+        _hudComposer.ComposeToScreen(
+            _playOptions.SceneRenderTexture.Texture,
+            _playOptions.HudRenderTexture.Texture);
     }
 
     private void RenderSceneToTexture()
@@ -647,150 +668,5 @@ public class World : IScene
 
         EndMode3D();
         EndTextureMode();
-    }
-
-    private void RenderHudToTexture()
-    {
-        int renderWidth = GameRenderSpace.HudTextureWidth;
-        int renderHeight = GameRenderSpace.HudTextureHeight;
-        bool consoleOpen = _consoleOverlay.IsOpen;
-        bool optionsOpen = _optionsMenu.IsOpen;
-        bool controlsIntroVisible = _controlsIntroSystem.IsVisible;
-        bool showWeaponView = _player.IsAlive && !consoleOpen && !optionsOpen && !controlsIntroVisible && !_exitSystem.IsBlockingGameplay;
-
-        BeginTextureMode(_playOptions.HudRenderTexture);
-        ClearBackground(new Color(0, 0, 0, 0));
-
-        if (controlsIntroVisible)
-        {
-            ControlsIntroHud.Draw(renderWidth, renderHeight, _controlsIntroSystem.IsBlockingIntro);
-            EndTextureMode();
-            return;
-        }
-
-        RenderNotificationOverlays(renderWidth, renderHeight, consoleOpen);
-
-        if (!consoleOpen && !_inputState.IsMouseFree && showWeaponView)
-            PlaySessionOverlayHud.DrawReticle(_effectSystem, renderWidth, renderHeight);
-
-        if (optionsOpen)
-            OptionsMenuHud.Draw(_optionsMenu.Settings, renderWidth, renderHeight);
-
-        if (!_player.IsAlive && !consoleOpen)
-            PlaySessionOverlayHud.DrawGameOver(renderWidth, renderHeight);
-
-        if (_highscoreBoardOverlay.IsOpen)
-            _highscoreBoardOverlay.Draw(renderWidth, renderHeight);
-
-        if (_highscoreIntermission.IsLeaderboardInteractive)
-            _highscoreIntermission.DrawLeaderboard(renderWidth, renderHeight);
-
-        EndTextureMode();
-    }
-
-    private void RenderToScreen()
-    {
-        int screenWidth = GetScreenWidth();
-        int screenHeight = GetScreenHeight();
-
-        BeginDrawing();
-        ClearBackground(Color.Black);
-
-        GameRenderSpace.DrawTextureToWindow(_playOptions.SceneRenderTexture.Texture, screenWidth, screenHeight);
-        GameRenderSpace.DrawTextureToWindow(_playOptions.HudRenderTexture.Texture, screenWidth, screenHeight);
-
-        RenderDebugLabels(screenWidth, screenHeight);
-        RenderPlayHud(screenWidth, screenHeight);
-        RenderMinimapAndDebugOverlays();
-
-        _consoleOverlay.Render();
-
-        EndDrawing();
-    }
-
-    private void RenderDebugLabels(int screenWidth, int screenHeight)
-    {
-        DrawFPS(10, screenHeight - 120);
-
-        var mouseLabel = _optionsMenu.IsOpen || _inputState.IsMouseFree ? "MOUSE: FREE" : "MOUSE: LOCKED";
-        var mouseColor = _optionsMenu.IsOpen || _inputState.IsMouseFree ? Color.Green : Color.Red;
-        int mouseLabelWidth = MeasureText(mouseLabel, 20);
-        DrawText(mouseLabel, screenWidth - mouseLabelWidth - 10, 10, 20, mouseColor);
-
-        var healthLabel = $"HEALTH: {(int)_player.Health} / {(int)_player.MaxHealth}";
-        DrawText(healthLabel, 10, 40, 20, _player.IsAlive ? Color.RayWhite : Color.Red);
-
-        if (_tickDiagnostics.OverlayEnabled)
-            TickDiagnosticsHud.Draw(_tickDiagnostics);
-
-        RecordingStatusHud.Draw(
-            _recordingSystem.IsRecording,
-            _recordingSystem.IsReplaying,
-            screenWidth);
-    }
-
-    private void RenderPlayHud(int screenWidth, int screenHeight)
-    {
-        bool consoleOpen = _consoleOverlay.IsOpen;
-        bool optionsOpen = _optionsMenu.IsOpen;
-        bool inActiveLevel = _player.IsAlive && !_exitSystem.IsLevelComplete;
-        bool showWeaponView = _player.IsAlive && !consoleOpen && !optionsOpen && !_exitSystem.IsBlockingGameplay;
-
-        if (inActiveLevel)
-        {
-            LevelProgressOverlayHud.DrawScore(_scoreSystem, screenWidth);
-            CombatOverlayHud.DrawInventory(_player);
-        }
-
-        if (showWeaponView)
-            _animationSystem.RenderWeaponOverlay(screenWidth, screenHeight);
-
-        _effectSystem.RenderScreenOverlay(screenWidth, screenHeight);
-        RenderIntermissionOverlay(screenWidth, screenHeight, consoleOpen);
-    }
-
-    /// <summary>Centered banner notifications drawn at internal resolution.</summary>
-    private void RenderNotificationOverlays(int renderWidth, int renderHeight, bool consoleOpen)
-    {
-        if (consoleOpen || _exitSystem.IsLevelComplete || !_player.IsAlive)
-            return;
-
-        if (_exitSystem.IsExitPending)
-        {
-            LevelProgressOverlayHud.DrawExitCountdown(_exitSystem.ExitCountdownRemaining, renderWidth, renderHeight);
-            return;
-        }
-
-        if (_doorSystem.HasLockedHint)
-            DoorOverlayHud.DrawLockedHint(_doorSystem, renderWidth, renderHeight);
-        else if (_weaponSystem.HasNoAmmoHint)
-            CombatOverlayHud.DrawNoAmmoHint(_weaponSystem, renderWidth, renderHeight);
-    }
-
-    /// <summary>Full-screen intermission panels remain in window space.</summary>
-    private void RenderIntermissionOverlay(int screenWidth, int screenHeight, bool consoleOpen)
-    {
-        if (consoleOpen || !_exitSystem.IsLevelComplete)
-            return;
-
-        if (_highscoreIntermission.IsActive)
-            _highscoreIntermission.Draw(_scoreSystem, screenWidth, screenHeight);
-        else
-            LevelProgressOverlayHud.DrawLevelComplete(
-                _scoreSystem,
-                screenWidth,
-                screenHeight,
-                showRestartHint: !_recordingSystem.IsReplaying);
-    }
-
-    private void RenderMinimapAndDebugOverlays()
-    {
-        if (_inputState.IsMinimapEnabled)
-            _minimapSystem.Render(_player);
-
-        int renderW = RenderData.InternalWidth;
-        int renderH = RenderData.InternalHeight;
-        Debug.DrawWorldOverlays(_inputState.IsDebugEnabled, _player.Camera, renderW, renderH);
-        Debug.Draw(_inputState.IsDebugEnabled);
     }
 }
