@@ -1110,13 +1110,14 @@ public class EditorGui
         ImGui.Begin("Pathfinding Visualizer", ref _showPathfinding, ImGuiWindowFlags.AlwaysAutoResize);
         ImGui.SetWindowFontScale(_guiScale);
 
-        switch (state.PathPickingMode)
+        var pathTool = state.PathfindingTool;
+        switch (pathTool.PickingMode)
         {
-            case EditorState.PathPickMode.Start:
+            case PathfindingEditorTool.PathPickMode.Start:
                 ImGui.TextColored(new Vector4(1f, 0.85f, 0.2f, 1f),
                     "Click a tile to set START  (Esc: cancel)");
                 break;
-            case EditorState.PathPickMode.End:
+            case PathfindingEditorTool.PathPickMode.End:
                 ImGui.TextColored(new Vector4(1f, 0.85f, 0.2f, 1f),
                     "Click a tile to set END  (Esc: cancel)");
                 break;
@@ -1129,26 +1130,26 @@ public class EditorGui
 
         DrawEndpointRow(
             label: "Start",
-            point: state.PathStart,
+            point: pathTool.PathStart,
             assignedColor: new Vector4(0.3f, 1f, 0.4f, 1f),
             buttonLabel: "Pick Start",
-            onClick: state.StartPickingPathStart);
+            onClick: pathTool.StartPickingStart);
 
         DrawEndpointRow(
             label: "End",
-            point: state.PathEnd,
+            point: pathTool.PathEnd,
             assignedColor: new Vector4(1f, 0.4f, 0.4f, 1f),
             buttonLabel: "Pick End",
-            onClick: state.StartPickingPathEnd);
+            onClick: pathTool.StartPickingEnd);
 
         ImGui.Separator();
 
-        if (state.PathResult != null && state.PathResult.Count > 0)
+        if (pathTool.PathResult != null && pathTool.PathResult.Count > 0)
         {
             ImGui.TextColored(new Vector4(0.3f, 0.8f, 1f, 1f),
-                $"Path: {state.PathResult.Count} tiles");
+                $"Path: {pathTool.PathResult.Count} tiles");
         }
-        else if (state.PathStart.HasValue && state.PathEnd.HasValue)
+        else if (pathTool.PathStart.HasValue && pathTool.PathEnd.HasValue)
         {
             ImGui.TextColored(new Vector4(1f, 0.3f, 0.3f, 1f), "No path found");
         }
@@ -1161,10 +1162,10 @@ public class EditorGui
         ImGui.Spacing();
 
         if (ImGui.Button("Recompute", new Vector2(120, 0)))
-            state.RecomputePath();
+            pathTool.Recompute();
         ImGui.SameLine();
         if (ImGui.Button("Clear", new Vector2(120, 0)))
-            state.ClearPath();
+            pathTool.Clear();
 
         ImGui.Separator();
 
@@ -1195,7 +1196,8 @@ public class EditorGui
         ImGui.Begin("Sound Propagation", ref _showSoundPropagation, ImGuiWindowFlags.AlwaysAutoResize);
         ImGui.SetWindowFontScale(_guiScale);
 
-        if (state.SoundPropagationPicking)
+        var soundTool = state.SoundPropagationTool;
+        if (soundTool.IsPicking)
         {
             ImGui.TextColored(new Vector4(1f, 0.85f, 0.2f, 1f),
                 "Click a tile to test propagation  (Esc: cancel)");
@@ -1218,10 +1220,10 @@ public class EditorGui
 
         ImGui.Separator();
 
-        if (state.SoundPropagationTiles is { Count: > 0 })
+        if (soundTool.OverlayTiles is { Count: > 0 })
         {
             ImGui.TextColored(new Vector4(1f, 0.65f, 0.2f, 1f),
-                $"Reached {state.SoundPropagationTiles.Count} tiles");
+                $"Reached {soundTool.OverlayTiles.Count} tiles");
         }
         else
         {
@@ -1232,10 +1234,10 @@ public class EditorGui
         ImGui.Spacing();
 
         if (ImGui.Button("Test at tile", new Vector2(120, 0)))
-            state.StartSoundPropagationPick();
+            soundTool.StartPick();
         ImGui.SameLine();
         if (ImGui.Button("Clear", new Vector2(120, 0)))
-            state.ClearSoundPropagation();
+            soundTool.Clear();
 
         ImGui.End();
     }

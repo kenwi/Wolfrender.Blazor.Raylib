@@ -75,7 +75,7 @@ public class LevelEditorScene : IScene
 
         // Status message and GUI scaling
         _state.UpdateStatusTimer(deltaTime);
-        _state.TickSoundPropagationOverlay((float)GetTime());
+        _state.SoundPropagationTool.TickOverlay((float)GetTime());
         _gui.HandleScalingInput();
 
         // Read ImGui IO before keyboard routing
@@ -130,11 +130,11 @@ public class LevelEditorScene : IScene
         {
             _mapInteraction.HandlePatrolPathInput(imGuiWantsMouse);
         }
-        else if (_state.PathPickingMode != EditorState.PathPickMode.None)
+        else if (_state.PathfindingTool.PickingMode != PathfindingEditorTool.PathPickMode.None)
         {
             HandlePathPickInput(imGuiWantsMouse);
         }
-        else if (_state.SoundPropagationPicking)
+        else if (_state.SoundPropagationTool.IsPicking)
         {
             HandleSoundPropagationPickInput(imGuiWantsMouse);
         }
@@ -148,7 +148,7 @@ public class LevelEditorScene : IScene
     {
         if (IsKeyPressed(KeyboardKey.Escape))
         {
-            _state.CancelPathPicking();
+            _state.PathfindingTool.CancelPicking();
             return;
         }
 
@@ -157,7 +157,7 @@ public class LevelEditorScene : IScene
         var worldPos = _state.Camera.ScreenToWorld(GetMousePosition());
         int tx = (int)MathF.Floor(worldPos.X);
         int ty = (int)MathF.Floor(worldPos.Y);
-        _state.SetPathPickPoint(tx, ty);
+        _state.PathfindingTool.SetPickPoint(tx, ty);
 
         // Keep painting/enemy drag suppressed for the rest of this press —
         // otherwise a long-held click would paint a tile on the very next frame
@@ -169,7 +169,7 @@ public class LevelEditorScene : IScene
     {
         if (IsKeyPressed(KeyboardKey.Escape))
         {
-            _state.CancelSoundPropagationPick();
+            _state.SoundPropagationTool.CancelPick();
             return;
         }
 
@@ -178,7 +178,7 @@ public class LevelEditorScene : IScene
         var worldPos = _state.Camera.ScreenToWorld(GetMousePosition());
         int tx = (int)MathF.Floor(worldPos.X);
         int ty = (int)MathF.Floor(worldPos.Y);
-        _state.RunSoundPropagationTest(tx, ty, (float)GetTime());
+        _state.SoundPropagationTool.RunTest(tx, ty, (float)GetTime());
 
         _suppressMapClickUntilRelease = true;
     }
@@ -231,9 +231,15 @@ public class LevelEditorScene : IScene
             _state.HoveredPlayer, _state.IsPlayerSelected, _state.IsDraggingPlayer);
 
         // Pathfinding visualizer overlay
-        _mapRenderer.DrawPathPreview(_state.PathStart, _state.PathEnd, _state.PathResult, _state.Camera);
+        _mapRenderer.DrawPathPreview(
+            _state.PathfindingTool.PathStart,
+            _state.PathfindingTool.PathEnd,
+            _state.PathfindingTool.PathResult,
+            _state.Camera);
 
-        _mapRenderer.DrawSoundPropagationOverlay(_state.SoundPropagationTiles, _state.Camera);
+        _mapRenderer.DrawSoundPropagationOverlay(
+            _state.SoundPropagationTool.OverlayTiles,
+            _state.Camera);
 
         if (_state.ShowRoomOverlay)
             _mapRenderer.DrawRoomOverlay(_state.RoomMap, _state.Camera);
@@ -287,15 +293,15 @@ public class LevelEditorScene : IScene
             int msgW = MeasureText(msg, 24);
             DrawText(msg, (GetScreenWidth() - msgW) / 2, GetScreenHeight() - 100, 24, Color.Yellow);
         }
-        else if (_state.PathPickingMode != EditorState.PathPickMode.None)
+        else if (_state.PathfindingTool.PickingMode != PathfindingEditorTool.PathPickMode.None)
         {
-            string msg = _state.PathPickingMode == EditorState.PathPickMode.Start
+            string msg = _state.PathfindingTool.PickingMode == PathfindingEditorTool.PathPickMode.Start
                 ? "PICKING PATHFINDING START - LMB: Set tile | Esc: Cancel"
                 : "PICKING PATHFINDING END - LMB: Set tile | Esc: Cancel";
             int msgW = MeasureText(msg, 24);
             DrawText(msg, (GetScreenWidth() - msgW) / 2, GetScreenHeight() - 100, 24, Color.Yellow);
         }
-        else if (_state.SoundPropagationPicking)
+        else if (_state.SoundPropagationTool.IsPicking)
         {
             const string msg = "TEST SOUND PROPAGATION - LMB: Set origin | Esc: Cancel";
             int msgW = MeasureText(msg, 24);

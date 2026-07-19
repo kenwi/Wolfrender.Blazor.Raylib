@@ -7,7 +7,6 @@ using Game.Features.Enemies;
 using Game.Features.LevelProgress;
 using Game.Features.Pickups;
 using Game.Features.Players;
-using Game.Features.SoundPropagation;
 using Game.Features.WorldObjects;
 
 namespace Game.Editor;
@@ -68,18 +67,8 @@ public class EditorState
     // Simulation
     public bool IsSimulating;
 
-    // Pathfinding visualizer
-    public enum PathPickMode { None, Start, End }
-    public PathPickMode PathPickingMode;
-    public Vector2? PathStart;
-    public Vector2? PathEnd;
-    public List<Vector2>? PathResult;
-
-    // Sound propagation visualizer
-    public bool SoundPropagationPicking;
-    public List<Vector2>? SoundPropagationTiles;
-    public float SoundPropagationShowUntil;
-    public const float SoundPropagationDurationSeconds = 2f;
+    public PathfindingEditorTool PathfindingTool { get; }
+    public SoundPropagationEditorTool SoundPropagationTool { get; }
 
     /// <summary>When true, draw translucent room regions over the map.</summary>
     public bool ShowRoomOverlay;
@@ -142,6 +131,23 @@ public class EditorState
         Player = player;
         Camera = new EditorCamera();
         Camera.CenterOnMap(mapData.Width, mapData.Height);
+
+        PathfindingEditorTool? pathTool = null;
+        SoundPropagationEditorTool? soundTool = null;
+        pathTool = new PathfindingEditorTool(
+            mapData,
+            doorSystem,
+            NotifyStateChanged,
+            () => soundTool!.CancelPickSilent());
+        soundTool = new SoundPropagationEditorTool(
+            mapData,
+            doorSystem,
+            () => IsSimulating,
+            msg => SetStatus(msg),
+            NotifyStateChanged,
+            () => pathTool!.CancelPickingSilent());
+        PathfindingTool = pathTool;
+        SoundPropagationTool = soundTool;
 
         Layers = new List<EditorLayer>
         {
@@ -1194,140 +1200,6 @@ public class EditorState
         }
 
         return false;
-    }
-
-    // ─── Pathfinding visualizer ──────────────────────────────────────────────────
-
-    public void StartPickingPathStart()
-    {
-        SoundPropagationPicking = false;
-        PathPickingMode = PathPickMode.Start;
-        NotifyStateChanged();
-    }
-
-    public void StartPickingPathEnd()
-    {
-        SoundPropagationPicking = false;
-        PathPickingMode = PathPickMode.End;
-        NotifyStateChanged();
-    }
-
-    public void CancelPathPicking()
-    {
-        if (PathPickingMode == PathPickMode.None) return;
-        PathPickingMode = PathPickMode.None;
-        NotifyStateChanged();
-    }
-
-    /// <summary>
-    /// Set whichever endpoint is being picked, then recompute the path. Out-of-bounds clicks are ignored.
-    /// </summary>
-    public void SetPathPickPoint(int tileX, int tileY)
-    {
-        if (tileX < 0 || tileX >= MapData.Width || tileY < 0 || tileY >= MapData.Height) return;
-
-        var point = new Vector2(tileX, tileY);
-        switch (PathPickingMode)
-        {
-            case PathPickMode.Start: PathStart = point; break;
-            case PathPickMode.End: PathEnd = point; break;
-            default: return;
-        }
-
-        PathPickingMode = PathPickMode.None;
-        RecomputePath();
-        NotifyStateChanged();
-    }
-
-    public void ClearPath()
-    {
-        PathStart = null;
-        PathEnd = null;
-        PathResult = null;
-        PathPickingMode = PathPickMode.None;
-        NotifyStateChanged();
-    }
-
-    /// <summary>
-    /// Recompute <see cref="PathResult"/> from the current start/end using the same A*
-    /// the EnemySystem uses (so the visualizer shows exactly what the AI sees).
-    /// </summary>
-    public void RecomputePath()
-    {
-        PathResult = null;
-        if (!PathStart.HasValue || !PathEnd.HasValue) return;
-
-        var startTile = PathStart.Value;
-        var endTile = PathEnd.Value;
-        var (sx, sy, sw, sh) = Pathfinding.ComputeSliceBounds(
-            startTile, endTile, MapData.Width, MapData.Height);
-        PathResult = Pathfinding.FindPath(
-            MapData, DoorSystem.Doors, sx, sy, sw, sh, startTile, endTile);
-    }
-
-    // ─── Sound propagation visualizer ────────────────────────────────────────────
-
-    public void StartSoundPropagationPick()
-    {
-        PathPickingMode = PathPickMode.None;
-        SoundPropagationPicking = true;
-        NotifyStateChanged();
-    }
-
-    public void CancelSoundPropagationPick()
-    {
-        if (!SoundPropagationPicking) return;
-        SoundPropagationPicking = false;
-        NotifyStateChanged();
-    }
-
-    public void RunSoundPropagationTest(int tileX, int tileY, float now)
-    {
-        SoundPropagationPicking = false;
-
-        if (tileX < 0 || tileX >= MapData.Width || tileY < 0 || tileY >= MapData.Height)
-            return;
-
-        bool treatAllDoorsClosed = !IsSimulating;
-        var reach = SoundPropagation.ComputeReach(
-            MapData, DoorSystem.Doors, tileX, tileY, treatAllDoorsClosed);
-
-        if (reach.Count == 0)
-        {
-            SoundPropagationTiles = null;
-            SoundPropagationShowUntil = 0;
-            SetStatus("Sound propagation: invalid origin (wall or closed door)");
-            NotifyStateChanged();
-            return;
-        }
-
-        SoundPropagationTiles = reach
-            .Select(t => new Vector2(t.X, t.Y))
-            .ToList();
-        SoundPropagationShowUntil = now + SoundPropagationDurationSeconds;
-        SetStatus($"Sound reached {reach.Count} tiles");
-        NotifyStateChanged();
-    }
-
-    public void TickSoundPropagationOverlay(float now)
-    {
-        if (SoundPropagationTiles == null || SoundPropagationShowUntil <= 0)
-            return;
-
-        if (now >= SoundPropagationShowUntil)
-        {
-            SoundPropagationTiles = null;
-            SoundPropagationShowUntil = 0;
-            NotifyStateChanged();
-        }
-    }
-
-    public void ClearSoundPropagation()
-    {
-        SoundPropagationPicking = false;
-        SoundPropagationTiles = null;
-        SoundPropagationShowUntil = 0;
-        NotifyStateChanged();
     }
 
     public void SwapLayers(int from, int to)
