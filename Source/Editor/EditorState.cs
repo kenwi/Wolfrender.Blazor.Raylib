@@ -41,12 +41,6 @@ public class EditorState
     // Cursor info
     public bool CursorInfoFollowsMouse;
 
-    // Pickup editing
-    public PickupType SelectedPickupType = PickupType.Health;
-    public int HoveredPickupIndex = -1;
-    public int SelectedPickupIndex = -1;
-    public bool IsDraggingPickup;
-
     // Player spawn editing
     public bool HoveredPlayer;
     public bool IsPlayerSelected;
@@ -59,6 +53,7 @@ public class EditorState
     public SoundPropagationEditorTool SoundPropagationTool { get; }
     public SecretWallEditorTool SecretWallTool { get; }
     public EnemyEditorTool EnemyTool { get; }
+    public PickupEditorTool PickupTool { get; }
 
     public int HoveredEnemyIndex
     {
@@ -81,6 +76,30 @@ public class EditorState
     public bool IsEditingPatrolPath => EnemyTool.IsEditingPatrolPath;
     public int PatrolEditEnemyIndex => EnemyTool.PatrolEditEnemyIndex;
     public List<PatrolWaypoint> PatrolPathInProgress => EnemyTool.PatrolPathInProgress;
+
+    public PickupType SelectedPickupType
+    {
+        get => PickupTool.SelectedType;
+        set => PickupTool.SelectedType = value;
+    }
+
+    public int HoveredPickupIndex
+    {
+        get => PickupTool.HoveredIndex;
+        set => PickupTool.HoveredIndex = value;
+    }
+
+    public int SelectedPickupIndex
+    {
+        get => PickupTool.SelectedIndex;
+        set => PickupTool.SelectedIndex = value;
+    }
+
+    public bool IsDraggingPickup
+    {
+        get => PickupTool.IsDragging;
+        set => PickupTool.IsDragging = value;
+    }
 
     /// <summary>When true, draw translucent room regions over the map.</summary>
     public bool ShowRoomOverlay;
@@ -112,11 +131,6 @@ public class EditorState
 
     // Undo batching for paint strokes and entity drags
     private List<TileChange>? _paintStroke;
-    private int _pickupDragIndex = -1;
-    private int _pickupDragStartX;
-    private int _pickupDragStartY;
-    private int? _pickupDragRemovedIndex;
-    private PickupPlacementData? _pickupDragRemovedPlacement;
     private int _playerDragStartX;
     private int _playerDragStartY;
     private float _playerDragStartRotation;
@@ -157,16 +171,33 @@ public class EditorState
             () => pathTool!.CancelPickingSilent());
         PathfindingTool = pathTool;
         SoundPropagationTool = soundTool;
-        EnemyTool = new EnemyEditorTool(
+
+        EnemyEditorTool? enemyTool = null;
+        PickupEditorTool? pickupTool = null;
+        enemyTool = new EnemyEditorTool(
             mapData,
             UndoStack,
             NotifyStateChanged,
             OnEnemyPlacementEdited,
             () =>
             {
-                DeselectPickup();
+                pickupTool!.Deselect();
                 DeselectPlayer();
             });
+        pickupTool = new PickupEditorTool(
+            mapData,
+            UndoStack,
+            NotifyStateChanged,
+            msg => SetStatus(msg),
+            CanPlacePickupAt,
+            () =>
+            {
+                enemyTool!.Deselect();
+                DeselectPlayer();
+            });
+        EnemyTool = enemyTool;
+        PickupTool = pickupTool;
+
         SecretWallTool = new SecretWallEditorTool(
             mapData,
             UndoStack,
@@ -175,7 +206,7 @@ public class EditorState
             () =>
             {
                 EnemyTool.Deselect();
-                DeselectPickup();
+                PickupTool.Deselect();
                 DeselectPlayer();
             });
 
@@ -462,11 +493,7 @@ public class EditorState
 
     public void DeselectEnemy() => EnemyTool.Deselect();
 
-    public void DeselectPickup()
-    {
-        SelectedPickupIndex = -1;
-        IsDraggingPickup = false;
-    }
+    public void DeselectPickup() => PickupTool.Deselect();
 
     public void DeselectPlayer()
     {
@@ -537,190 +564,30 @@ public class EditorState
         EnemyTool.ClearPatrolPath(index);
 
     public int FindPickupIndexAt(int tileX, int tileY) =>
-        MapData.Pickups.FindIndex(p => p.TileX == tileX && p.TileY == tileY);
+        PickupTool.FindIndexAt(tileX, tileY);
 
-    public void PlacePickup(int x, int y)
-    {
-        if (x < 0 || x >= MapData.Width || y < 0 || y >= MapData.Height) return;
-        if (!CanPlacePickupAt(x, y))
-        {
-            SetStatus("Cannot place pickup on walls or doors");
-            return;
-        }
+    public void PlacePickup(int x, int y) => PickupTool.Place(x, y);
 
-        int? replacedIndex = null;
-        PickupPlacementData? replacedPlacement = null;
-        int existing = FindPickupIndexAt(x, y);
-        if (existing >= 0)
-        {
-            replacedIndex = existing;
-            replacedPlacement = PickupPlacementData.FromPlacement(MapData.Pickups[existing]);
-            MapData.Pickups.RemoveAt(existing);
-        }
+    public void SelectPickup(int index) => PickupTool.Select(index);
 
-        var placement = new PickupPlacement
-        {
-            TileX = x,
-            TileY = y,
-            Type = SelectedPickupType
-        };
-        MapData.Pickups.Add(placement);
-        int index = MapData.Pickups.Count - 1;
-        UndoStack.Push(new PlacePickupCommand(
-            index,
-            PickupPlacementData.FromPlacement(placement),
-            replacedIndex,
-            replacedPlacement));
-        DeselectEnemy();
-        DeselectPlayer();
-        SelectedPickupIndex = index;
-        IsDraggingPickup = true;
-        BeginPickupDrag();
-        SetStatus($"Placed {SelectedPickupType} pickup");
-        NotifyStateChanged();
-    }
+    public void BeginPickupDrag() => PickupTool.BeginDrag();
 
-    public void SelectPickup(int index)
-    {
-        DeselectEnemy();
-        DeselectPlayer();
-        SelectedPickupIndex = index;
-        IsDraggingPickup = true;
-        if (index >= 0 && index < MapData.Pickups.Count)
-            SelectedPickupType = MapData.Pickups[index].Type;
-        BeginPickupDrag();
-        NotifyStateChanged();
-    }
+    public void EndPickupDrag() => PickupTool.EndDrag();
 
-    public void BeginPickupDrag()
-    {
-        if (SelectedPickupIndex < 0 || SelectedPickupIndex >= MapData.Pickups.Count) return;
-        var pickup = MapData.Pickups[SelectedPickupIndex];
-        _pickupDragIndex = SelectedPickupIndex;
-        _pickupDragStartX = pickup.TileX;
-        _pickupDragStartY = pickup.TileY;
-        _pickupDragRemovedIndex = null;
-        _pickupDragRemovedPlacement = null;
-    }
+    public void MovePickup(int x, int y) => PickupTool.MoveSelected(x, y);
 
-    public void EndPickupDrag()
-    {
-        if (_pickupDragIndex < 0 || _pickupDragIndex >= MapData.Pickups.Count)
-        {
-            _pickupDragIndex = -1;
-            _pickupDragRemovedIndex = null;
-            _pickupDragRemovedPlacement = null;
-            return;
-        }
+    public void DeleteSelectedPickup() => PickupTool.DeleteSelected();
 
-        var pickup = MapData.Pickups[_pickupDragIndex];
-        if (pickup.TileX != _pickupDragStartX || pickup.TileY != _pickupDragStartY
-            || _pickupDragRemovedIndex.HasValue)
-        {
-            UndoStack.Push(new MovePickupCommand(
-                _pickupDragIndex,
-                _pickupDragStartX,
-                _pickupDragStartY,
-                pickup.TileX,
-                pickup.TileY,
-                _pickupDragRemovedIndex,
-                _pickupDragRemovedPlacement));
-            NotifyStateChanged();
-        }
+    public void DeletePickupAt(int index) => PickupTool.DeleteAt(index);
 
-        _pickupDragIndex = -1;
-        _pickupDragRemovedIndex = null;
-        _pickupDragRemovedPlacement = null;
-    }
+    public void SetPickupTilePosition(int index, int tileX, int tileY) =>
+        PickupTool.SetTilePosition(index, tileX, tileY);
 
-    public void MovePickup(int x, int y)
-    {
-        if (SelectedPickupIndex < 0 || SelectedPickupIndex >= MapData.Pickups.Count) return;
-        if (x < 0 || x >= MapData.Width || y < 0 || y >= MapData.Height) return;
-        if (!CanPlacePickupAt(x, y)) return;
+    public void SetPickupAmount(int index, int amount) =>
+        PickupTool.SetAmount(index, amount);
 
-        var pickup = MapData.Pickups[SelectedPickupIndex];
-        if (pickup.TileX == x && pickup.TileY == y)
-            return;
-
-        int occupant = FindPickupIndexAt(x, y);
-        if (occupant >= 0 && occupant != SelectedPickupIndex)
-        {
-            if (!_pickupDragRemovedIndex.HasValue)
-            {
-                _pickupDragRemovedIndex = occupant;
-                _pickupDragRemovedPlacement = PickupPlacementData.FromPlacement(MapData.Pickups[occupant]);
-            }
-            MapData.Pickups.RemoveAt(occupant);
-            if (SelectedPickupIndex > occupant)
-                SelectedPickupIndex--;
-            if (_pickupDragIndex > occupant)
-                _pickupDragIndex--;
-        }
-
-        pickup.TileX = x;
-        pickup.TileY = y;
-        if (SelectedPickupIndex >= MapData.Pickups.Count)
-            SelectedPickupIndex = MapData.Pickups.Count - 1;
-    }
-
-    public void DeleteSelectedPickup()
-    {
-        if (SelectedPickupIndex < 0 || SelectedPickupIndex >= MapData.Pickups.Count) return;
-        int index = SelectedPickupIndex;
-        var data = PickupPlacementData.FromPlacement(MapData.Pickups[index]);
-        MapData.Pickups.RemoveAt(index);
-        UndoStack.Push(new RemovePickupCommand(index, data));
-        SelectedPickupIndex = -1;
-        NotifyStateChanged();
-    }
-
-    public void DeletePickupAt(int index)
-    {
-        if (index < 0 || index >= MapData.Pickups.Count) return;
-        var data = PickupPlacementData.FromPlacement(MapData.Pickups[index]);
-        MapData.Pickups.RemoveAt(index);
-        UndoStack.Push(new RemovePickupCommand(index, data));
-        if (SelectedPickupIndex == index)
-            SelectedPickupIndex = -1;
-        else if (SelectedPickupIndex > index)
-            SelectedPickupIndex--;
-        NotifyStateChanged();
-    }
-
-    public void SetPickupTilePosition(int index, int tileX, int tileY)
-    {
-        if (index < 0 || index >= MapData.Pickups.Count) return;
-        tileX = Math.Clamp(tileX, 0, MapData.Width - 1);
-        tileY = Math.Clamp(tileY, 0, MapData.Height - 1);
-        RecordPickupChange(index, pickup =>
-        {
-            pickup.TileX = tileX;
-            pickup.TileY = tileY;
-        });
-    }
-
-    public void SetPickupAmount(int index, int amount)
-    {
-        if (index < 0 || index >= MapData.Pickups.Count) return;
-        RecordPickupChange(index, pickup => pickup.Amount = Math.Max(0, amount));
-    }
-
-    public void SetPickupType(int index, PickupType type)
-    {
-        if (index < 0 || index >= MapData.Pickups.Count) return;
-        RecordPickupChange(index, pickup => pickup.Type = type);
-        SelectedPickupType = type;
-    }
-
-    private void RecordPickupChange(int index, Action<PickupPlacement> apply)
-    {
-        var before = PickupPlacementData.FromPlacement(MapData.Pickups[index]);
-        apply(MapData.Pickups[index]);
-        var after = PickupPlacementData.FromPlacement(MapData.Pickups[index]);
-        UndoStack.Push(new ModifyPickupCommand(index, before, after));
-        NotifyStateChanged();
-    }
+    public void SetPickupType(int index, PickupType type) =>
+        PickupTool.SetType(index, type);
 
     public void AddPatrolWaypoint(int x, int y) => EnemyTool.AddPatrolWaypoint(x, y);
 
@@ -790,16 +657,14 @@ public class EditorState
         MapData.Spawn = new PlayerSpawnPlacement();
         DeselectPlayer();
         EnemyTool.ClearSelectionAndHover();
-        SelectedPickupIndex = -1;
-        HoveredPickupIndex = -1;
+        PickupTool.ClearSelectionAndHover();
         ClearWallSelection();
     }
 
     public void RefreshLayerReferences()
     {
         EnemyTool.ClearSelectionAndHover();
-        SelectedPickupIndex = -1;
-        HoveredPickupIndex = -1;
+        PickupTool.ClearSelectionAndHover();
         ClearWallSelection();
         DeselectPlayer();
 

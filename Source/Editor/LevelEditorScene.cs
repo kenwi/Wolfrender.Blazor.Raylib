@@ -209,9 +209,11 @@ public class LevelEditorScene : IScene
             }
             else if (layer.Name == EditorState.PickupsLayerName)
             {
+                int hoveredPickup = _state.HoveredPickupIndex;
                 _mapRenderer.RenderPickupLayer(
                     _state.Camera, _state.IsMouseOverUI,
-                    ref _state.HoveredPickupIndex, _state.SelectedPickupIndex);
+                    ref hoveredPickup, _state.SelectedPickupIndex);
+                _state.HoveredPickupIndex = hoveredPickup;
             }
             else if (layer.Name == EditorState.ObjectsLayerName)
             {
@@ -278,11 +280,11 @@ public class LevelEditorScene : IScene
         if (menuToggleSim) _state.ToggleSimulation();
         _gui.RenderFileDialogs(_state);
         _gui.RenderLayerPanel(_state.Layers, _state);
-        _gui.RenderTilePalette(_state.Layers, _state.ActiveLayerIndex, _state, ref _state.SelectedTileId, ref _state.SelectedPickupType);
+        _gui.RenderTilePalette(_state.Layers, _state.ActiveLayerIndex, _state, ref _state.SelectedTileId);
         _gui.RenderPickupPalette(_state);
         _gui.RenderInfoPanel(tileX, tileY, worldPos, tileInBounds, _state.CursorInfoFollowsMouse, _state.Layers);
         _gui.RenderEntityPropertiesPanel(_state);
-        _gui.RenderPickupPropertiesPanel(_state, ref _state.SelectedPickupIndex);
+        _gui.RenderPickupPropertiesPanel(_state);
         _gui.RenderWallPropertiesPanel(_state);
         _gui.RenderDebugLogPanel();
         _gui.RenderPathfindingPanel(_state);

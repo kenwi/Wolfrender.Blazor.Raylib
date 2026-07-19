@@ -121,9 +121,11 @@ public class WebEditorScene : IScene
             }
             else if (layer.Name == EditorState.PickupsLayerName)
             {
+                int hoveredPickup = State.HoveredPickupIndex;
                 _mapRenderer.RenderPickupLayer(
                     State.Camera, State.IsMouseOverUI,
-                    ref State.HoveredPickupIndex, State.SelectedPickupIndex);
+                    ref hoveredPickup, State.SelectedPickupIndex);
+                State.HoveredPickupIndex = hoveredPickup;
             }
             else if (layer.Name == EditorState.ObjectsLayerName)
             {

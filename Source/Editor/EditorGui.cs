@@ -561,7 +561,7 @@ public class EditorGui
 
     // ─── Tile Palette ────────────────────────────────────────────────────────────
 
-    public void RenderTilePalette(List<EditorLayer> layers, int activeLayerIndex, EditorState editorState, ref uint selectedTileId, ref PickupType selectedPickupType)
+    public void RenderTilePalette(List<EditorLayer> layers, int activeLayerIndex, EditorState editorState, ref uint selectedTileId)
     {
         if (!_showTilePalette) return;
 
@@ -780,9 +780,10 @@ public class EditorGui
 
     // ─── Pickup Properties Panel ───────────────────────────────────────────────────
 
-    public void RenderPickupPropertiesPanel(EditorState state, ref int selectedPickupIndex)
+    public void RenderPickupPropertiesPanel(EditorState state)
     {
         if (!_showPickupProperties) return;
+        int selectedPickupIndex = state.SelectedPickupIndex;
         if (selectedPickupIndex < 0 || selectedPickupIndex >= _mapData.Pickups.Count)
             return;
 
@@ -815,10 +816,7 @@ public class EditorGui
         }
 
         if (ImGui.Button("Delete Pickup"))
-        {
             state.DeletePickupAt(selectedPickupIndex);
-            selectedPickupIndex = -1;
-        }
 
         ImGui.End();
     }
