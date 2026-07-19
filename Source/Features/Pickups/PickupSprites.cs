@@ -1,4 +1,5 @@
 using System.Numerics;
+using Game.Features.WorldObjects;
 using Raylib_cs;
 
 namespace Game.Features.Pickups;

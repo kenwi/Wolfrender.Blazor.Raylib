@@ -6,12 +6,17 @@ public class CollisionSystem
 {
     private readonly LevelData _level;
     private readonly IMovementBlocker _movementBlocker;
+    private readonly IObjectCollisionRules _objectCollision;
     private const float TileSize = 4.0f;
 
-    public CollisionSystem(LevelData level, IMovementBlocker movementBlocker)
+    public CollisionSystem(
+        LevelData level,
+        IMovementBlocker movementBlocker,
+        IObjectCollisionRules objectCollision)
     {
         _level = level;
         _movementBlocker = movementBlocker;
+        _objectCollision = objectCollision;
     }
 
     public bool CheckCollisionAtPosition(Vector3 position, float radius)
@@ -75,7 +80,7 @@ public class CollisionSystem
     private bool IsObjectBlockingAt(float worldX, float worldZ, float entityRadius)
     {
         var (entityTileX, entityTileY) = LevelData.GetEntityTileFromWorld(worldX, worldZ);
-        float minDist = entityRadius + ObjectSprites.CollisionRadius;
+        float minDist = entityRadius + _objectCollision.CollisionRadius;
         float minDistSq = minDist * minDist;
 
         for (int dy = -1; dy <= 1; dy++)
@@ -87,7 +92,7 @@ public class CollisionSystem
                 if (tileX < 0 || tileX >= _level.Width || tileY < 0 || tileY >= _level.Height)
                     continue;
                 uint objectId = _level.GetObjectTile(tileX, tileY);
-                if (!ObjectSprites.BlocksMovement(objectId))
+                if (!_objectCollision.BlocksMovement(objectId))
                     continue;
 
                 var anchor = LevelData.GetTileAnchorWorld(tileX, tileY);

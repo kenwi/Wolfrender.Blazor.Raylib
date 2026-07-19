@@ -1,7 +1,7 @@
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 
-namespace Game.Engine.Rendering;
+namespace Game.Features.Combat;
 
 /// <summary>Timed full-screen and HUD visual feedback (damage flash, reticle pulse).</summary>
 public class EffectSystem

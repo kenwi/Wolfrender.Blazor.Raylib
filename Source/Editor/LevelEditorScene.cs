@@ -4,6 +4,7 @@ using Game.Features.Doors;
 using Game.Features.Enemies;
 using Game.Features.LevelProgress;
 using Game.Features.Players;
+using Game.Features.WorldObjects;
 using ImGuiNET;
 using Raylib_cs;
 using rlImGui_cs;
@@ -32,7 +33,8 @@ public class LevelEditorScene : IScene
         _gui = new EditorGui(mapData);
         _collisionSystem = new CollisionSystem(
             new LevelData(mapData),
-            new CompositeMovementBlocker(doorSystem, secretSystem));
+            new CompositeMovementBlocker(doorSystem, secretSystem),
+            ObjectCollisionRules.Instance);
     }
 
     public void OnEnter()

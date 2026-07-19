@@ -1,3 +1,4 @@
+using Game.Engine.Rendering;
 
 namespace Game.Features.Doors;
 
@@ -14,6 +15,9 @@ public enum DoorLockKind
 /// </summary>
 public static class DoorTileEncoding
 {
+    /// <summary>Engine-facing encoding probe (avoids rendering importing this feature type graph).</summary>
+    public static readonly IDoorTileEncoding ForEngine = new EngineEncoding();
+
     public const int LightDoorTextureIndex = TileSpriteSheet.DoorIndex;
     public const int DarkDoorTextureIndex = TileSpriteSheet.DoorDarkIndex;
 
@@ -146,5 +150,10 @@ public static class DoorTileEncoding
                 return entry.Description;
         }
         return $"Tile ID {tileId}";
+    }
+
+    private sealed class EngineEncoding : IDoorTileEncoding
+    {
+        public bool IsDoorTile(uint doorLayerValue) => DoorTileEncoding.IsDoorTile(doorLayerValue);
     }
 }

@@ -8,6 +8,7 @@ using Game.Features.LevelProgress;
 using Game.Features.Pickups;
 using Game.Features.Players;
 using Game.Features.SoundPropagation;
+using Game.Features.WorldObjects;
 
 namespace Game.Editor;
 
@@ -977,7 +978,7 @@ public class EditorState
 
     public void RebuildRoomMap()
     {
-        RoomMap = LevelRoomMap.Build(MapData);
+        RoomMap = LevelRoomMap.Build(MapData, DoorTileEncoding.ForEngine);
     }
 
     public void SetStatus(string message, float duration = 4f)

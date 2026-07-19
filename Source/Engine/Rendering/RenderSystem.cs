@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Numerics;
 using Game.Core.Level;
-using Game.Features.Doors;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 
@@ -12,6 +11,7 @@ public class RenderSystem : IDisposable
     private readonly LevelData _level;
     private readonly MapData _mapData;
     private readonly List<Texture2D> _textures;
+    private readonly IDoorTileEncoding _doorTiles;
     private readonly float _drawDistance;
     private readonly StaticLevelMeshes _staticMeshes = new();
     private LevelRoomMap _roomMap;
@@ -33,29 +33,35 @@ public class RenderSystem : IDisposable
 
     public int BakedQuadCount => _staticMeshes.BakedQuadCount;
 
-    public HashSet<int> ComputeVisibleRooms(Vector3 playerPosition, IReadOnlyList<Door> doors)
+    public HashSet<int> ComputeVisibleRooms(Vector3 playerPosition, IDoorPortalState portals)
     {
         var (playerTileX, playerTileY) = LevelData.GetEntityTileFromWorld(playerPosition.X, playerPosition.Z);
-        return _roomMap.ComputeVisibleRooms(playerTileX, playerTileY, doors);
+        return _roomMap.ComputeVisibleRooms(playerTileX, playerTileY, portals);
     }
 
     public LevelRoomMap RoomMap => _roomMap;
 
-    public RenderSystem(LevelData level, MapData mapData, List<Texture2D> textures, float drawDistance = 15.0f)
+    public RenderSystem(
+        LevelData level,
+        MapData mapData,
+        List<Texture2D> textures,
+        IDoorTileEncoding doorTiles,
+        float drawDistance = 15.0f)
     {
         _level = level;
         _mapData = mapData;
         _textures = textures;
+        _doorTiles = doorTiles;
         _drawDistance = drawDistance;
-        _roomMap = LevelRoomMap.Build(mapData);
-        _staticMeshes.Rebuild(mapData, textures);
+        _roomMap = LevelRoomMap.Build(mapData, doorTiles);
+        _staticMeshes.Rebuild(mapData, textures, doorTiles);
         RebuildSecretTileSet();
     }
 
     public void RebuildMeshes()
     {
-        _roomMap = LevelRoomMap.Build(_mapData);
-        _staticMeshes.Rebuild(_mapData, _textures);
+        _roomMap = LevelRoomMap.Build(_mapData, _doorTiles);
+        _staticMeshes.Rebuild(_mapData, _textures, _doorTiles);
         RebuildSecretTileSet();
     }
 
@@ -66,30 +72,30 @@ public class RenderSystem : IDisposable
             _secretTiles.Add((secret.TileX, secret.TileY));
     }
 
-    public void Render(Camera3D camera, int viewportWidth, int viewportHeight, IReadOnlyList<Door> doors)
+    public void Render(Camera3D camera, int viewportWidth, int viewportHeight, IDoorPortalState portals)
     {
         LevelData.DrawedQuads = 0;
         _renderedTiles.Clear();
 
-        _staticMeshes.RebuildIfNeeded(_mapData, _textures);
+        _staticMeshes.RebuildIfNeeded(_mapData, _textures, _doorTiles);
 
         if (UseStaticMeshes && _staticMeshes.HasMeshes)
         {
-            DrawStaticMeshes(camera, doors);
+            DrawStaticMeshes(camera, portals);
             return;
         }
 
         RenderLegacyTiles(camera, viewportWidth, viewportHeight);
     }
 
-    private void DrawStaticMeshes(Camera3D camera, IReadOnlyList<Door> doors)
+    private void DrawStaticMeshes(Camera3D camera, IDoorPortalState portals)
     {
         var lightingShader = PrimitiveRenderer.GetLightingShader();
         if (!lightingShader.HasValue)
             return;
 
         var (playerTileX, playerTileY) = LevelData.GetEntityTileFromWorld(camera.Position.X, camera.Position.Z);
-        var visibleRooms = _roomMap.ComputeVisibleRooms(playerTileX, playerTileY, doors);
+        var visibleRooms = _roomMap.ComputeVisibleRooms(playerTileX, playerTileY, portals);
         TrackVisibleRoomTiles(visibleRooms);
 
         _staticMeshes.Draw(_textures, lightingShader.Value, visibleRooms: visibleRooms);
@@ -114,7 +120,7 @@ public class RenderSystem : IDisposable
     private void RenderFloorAndCeiling(int x, int y, Vector3 worldPos)
     {
         int index = LevelData.GetIndex(x, y, _mapData.Width);
-        bool hasDoor = _mapData.Doors[index] != 0 && DoorTileEncoding.IsDoorTile(_mapData.Doors[index]);
+        bool hasDoor = _mapData.Doors[index] != 0 && _doorTiles.IsDoorTile(_mapData.Doors[index]);
         if (!LevelMeshBuilder.ShouldEmitFloorOrCeiling(_mapData, x, y, hasDoor, _secretTiles))
             return;
 
@@ -138,52 +144,6 @@ public class RenderSystem : IDisposable
                 4.0f, 4.0f, 4.0f,
                 Color.White
             );
-        }
-    }
-
-    private void TrackVisibleTiles(Camera3D camera, int viewportWidth, int viewportHeight)
-    {
-        float aspect = viewportHeight > 0 ? viewportWidth / (float)viewportHeight : 1f;
-        float halfHorizRad = ComputeHorizHalfFovRad(camera, aspect);
-        float baseMarginRad = FrustumEdgeMarginDegrees * (MathF.PI / 180f);
-
-        Vector3 cameraForward = Vector3.Normalize(camera.Target - camera.Position);
-        Vector3 cameraForwardXZ = new Vector3(cameraForward.X, 0f, cameraForward.Z);
-        if (cameraForwardXZ.LengthSquared() > 0.0001f)
-            cameraForwardXZ = Vector3.Normalize(cameraForwardXZ);
-        else
-            cameraForwardXZ = new Vector3(0f, 0f, 1f);
-
-        Vector3 cameraPosXZ = new Vector3(camera.Position.X, 0, camera.Position.Z);
-        float drawDistanceWorld = _drawDistance * TileSize;
-
-        int cameraTileX = (int)(camera.Position.X / TileSize + 0.5f);
-        int cameraTileY = (int)(camera.Position.Z / TileSize + 0.5f);
-        int minX = Math.Max(0, cameraTileX - (int)_drawDistance);
-        int maxX = Math.Min(_level.Width - 1, cameraTileX + (int)_drawDistance);
-        int minY = Math.Max(0, cameraTileY - (int)_drawDistance);
-        int maxY = Math.Min(_level.Height - 1, cameraTileY + (int)_drawDistance);
-
-        for (int x = minX; x <= maxX; x++)
-        {
-            for (int y = minY; y <= maxY; y++)
-            {
-                Vector3 tilePos = new Vector3(x * TileSize, 0, y * TileSize);
-                Vector3 toTile = tilePos - cameraPosXZ;
-                float distance = toTile.Length();
-
-                if (distance > drawDistanceWorld)
-                    continue;
-
-                Vector3 toTileNormalized = Vector3.Normalize(toTile);
-                float dot = Vector3.Dot(cameraForwardXZ, toTileNormalized);
-
-                float tileExtentRad = MathF.Atan(TileSize / MathF.Max(distance, TileSize));
-                float cullHalfAngle = halfHorizRad + baseMarginRad + tileExtentRad;
-
-                if (dot > MathF.Cos(cullHalfAngle) || distance < 10)
-                    _renderedTiles.Add((x, y));
-            }
         }
     }
 

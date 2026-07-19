@@ -1,5 +1,4 @@
 using Game.Core.Level;
-using Game.Features.Doors;
 
 namespace Game.Engine.Rendering;
 
@@ -30,7 +29,7 @@ public sealed class LevelRoomMap
         RoomCount = roomCount;
     }
 
-    public static LevelRoomMap Build(MapData mapData)
+    public static LevelRoomMap Build(MapData mapData, IDoorTileEncoding doorTiles)
     {
         int width = mapData.Width;
         int height = mapData.Height;
@@ -49,15 +48,15 @@ public sealed class LevelRoomMap
                 if (tileRoomId[index] >= 0)
                     continue;
 
-                if (!IsInteriorRoomCell(mapData, x, y, secretTiles))
+                if (!IsInteriorRoomCell(mapData, x, y, secretTiles, doorTiles))
                     continue;
 
-                FloodFillRoom(mapData, x, y, secretTiles, nextRoomId, tileRoomId);
+                FloodFillRoom(mapData, x, y, secretTiles, doorTiles, nextRoomId, tileRoomId);
                 nextRoomId++;
             }
         }
 
-        var doorLinks = BuildDoorLinks(mapData, tileRoomId);
+        var doorLinks = BuildDoorLinks(mapData, tileRoomId, doorTiles);
         return new LevelRoomMap(width, height, tileRoomId, doorLinks, nextRoomId);
     }
 
@@ -110,7 +109,7 @@ public sealed class LevelRoomMap
     /// On door tiles (no single room id), seeds visibility with every adjacent room so orientation
     /// does not hide the interior when the door is closed.
     /// </summary>
-    public HashSet<int> ComputeVisibleRooms(int playerTileX, int playerTileY, IReadOnlyList<Door> doors)
+    public HashSet<int> ComputeVisibleRooms(int playerTileX, int playerTileY, IDoorPortalState portals)
     {
         var visible = new HashSet<int>();
         if (playerTileX < 0 || playerTileX >= Width || playerTileY < 0 || playerTileY >= Height)
@@ -139,7 +138,7 @@ public sealed class LevelRoomMap
                 if (link.RoomA != roomId && link.RoomB != roomId)
                     continue;
 
-                if (!IsDoorPassable(doors, link.DoorTileX, link.DoorTileY))
+                if (!portals.IsPassableAt(link.DoorTileX, link.DoorTileY))
                     continue;
 
                 int otherRoom = link.RoomA == roomId ? link.RoomB : link.RoomA;
@@ -189,6 +188,7 @@ public sealed class LevelRoomMap
         int startX,
         int startY,
         HashSet<(int x, int y)> secretTiles,
+        IDoorTileEncoding doorTiles,
         int roomId,
         int[] tileRoomId)
     {
@@ -208,7 +208,7 @@ public sealed class LevelRoomMap
                 if (index < 0 || index >= tileRoomId.Length || tileRoomId[index] >= 0)
                     continue;
 
-                if (!IsInteriorRoomCell(mapData, nx, ny, secretTiles))
+                if (!IsInteriorRoomCell(mapData, nx, ny, secretTiles, doorTiles))
                     continue;
 
                 tileRoomId[index] = roomId;
@@ -217,7 +217,10 @@ public sealed class LevelRoomMap
         }
     }
 
-    private static List<RoomDoorLink> BuildDoorLinks(MapData mapData, int[] tileRoomId)
+    private static List<RoomDoorLink> BuildDoorLinks(
+        MapData mapData,
+        int[] tileRoomId,
+        IDoorTileEncoding doorTiles)
     {
         var links = new List<RoomDoorLink>();
         int width = mapData.Width;
@@ -228,7 +231,7 @@ public sealed class LevelRoomMap
             {
                 int index = LevelData.GetIndex(x, y, width);
                 uint doorValue = mapData.Doors[index];
-                if (!DoorTileEncoding.IsDoorTile(doorValue))
+                if (!doorTiles.IsDoorTile(doorValue))
                     continue;
 
                 var neighborRooms = new HashSet<int>();
@@ -262,13 +265,14 @@ public sealed class LevelRoomMap
         MapData mapData,
         int x,
         int y,
-        IReadOnlySet<(int x, int y)> secretTiles)
+        IReadOnlySet<(int x, int y)> secretTiles,
+        IDoorTileEncoding doorTiles)
     {
         if (x < 0 || x >= mapData.Width || y < 0 || y >= mapData.Height)
             return false;
 
         int index = LevelData.GetIndex(x, y, mapData.Width);
-        bool hasDoor = mapData.Doors[index] != 0 && DoorTileEncoding.IsDoorTile(mapData.Doors[index]);
+        bool hasDoor = mapData.Doors[index] != 0 && doorTiles.IsDoorTile(mapData.Doors[index]);
 
         if (mapData.Walls[index] != 0)
             return false;
@@ -288,21 +292,6 @@ public sealed class LevelRoomMap
         foreach (var secret in mapData.SecretWalls)
             secretTiles.Add((secret.TileX, secret.TileY));
         return secretTiles;
-    }
-
-    private static bool IsDoorPassable(IReadOnlyList<Door> doors, int doorTileX, int doorTileY)
-    {
-        foreach (var door in doors)
-        {
-            int tileX = (int)MathF.Round(door.StartPosition.X);
-            int tileY = (int)MathF.Round(door.StartPosition.Y);
-            if (tileX != doorTileX || tileY != doorTileY)
-                continue;
-
-            return door.DoorState != DoorState.CLOSED;
-        }
-
-        return false;
     }
 }
 

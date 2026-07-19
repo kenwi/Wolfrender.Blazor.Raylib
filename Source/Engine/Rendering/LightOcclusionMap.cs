@@ -1,4 +1,3 @@
-using Game.Features.Doors;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 
@@ -119,7 +118,11 @@ public sealed class LightOcclusionMap : IDisposable
         return true;
     }
 
-    public void Update(MapData mapData, IReadOnlyList<Door> doors, LevelRoomMap roomMap)
+    public void Update(
+        MapData mapData,
+        IDoorTileEncoding doorTiles,
+        IDoorPortalState portals,
+        LevelRoomMap roomMap)
     {
         int width = mapData.Width;
         int height = mapData.Height;
@@ -140,7 +143,7 @@ public sealed class LightOcclusionMap : IDisposable
             _forceRoomUpload = true;
         }
 
-        FillOcclusionPixels(mapData, doors);
+        FillOcclusionPixels(mapData, doorTiles, portals);
         FillRoomPixels(roomMap);
 
         UploadTextureIfChanged(
@@ -200,7 +203,10 @@ public sealed class LightOcclusionMap : IDisposable
         }
     }
 
-    private void FillOcclusionPixels(MapData mapData, IReadOnlyList<Door> doors)
+    private void FillOcclusionPixels(
+        MapData mapData,
+        IDoorTileEncoding doorTiles,
+        IDoorPortalState portals)
     {
         int width = mapData.Width;
 
@@ -209,7 +215,9 @@ public sealed class LightOcclusionMap : IDisposable
             for (int x = 0; x < width; x++)
             {
                 int index = LevelData.GetIndex(x, y, width);
-                _occlusionPixels[index] = TileBlocksLight(mapData, doors, x, y) ? (byte)255 : (byte)0;
+                _occlusionPixels[index] = TileBlocksLight(mapData, doorTiles, portals, x, y)
+                    ? (byte)255
+                    : (byte)0;
             }
         }
     }
@@ -224,18 +232,23 @@ public sealed class LightOcclusionMap : IDisposable
         }
     }
 
-    private static bool TileBlocksLight(MapData mapData, IReadOnlyList<Door> doors, int x, int y)
+    private static bool TileBlocksLight(
+        MapData mapData,
+        IDoorTileEncoding doorTiles,
+        IDoorPortalState portals,
+        int x,
+        int y)
     {
         if (x < 0 || x >= mapData.Width || y < 0 || y >= mapData.Height)
             return true;
 
         int index = LevelData.GetIndex(x, y, mapData.Width);
-        bool hasDoor = mapData.Doors[index] != 0 && DoorTileEncoding.IsDoorTile(mapData.Doors[index]);
+        bool hasDoor = mapData.Doors[index] != 0 && doorTiles.IsDoorTile(mapData.Doors[index]);
 
         if (mapData.Walls[index] != 0 && !hasDoor)
             return true;
 
-        if (hasDoor && IsClosedDoor(doors, x, y))
+        if (hasDoor && portals.IsClosedAt(x, y))
             return true;
 
         if (mapData.Floor[index] != 0 || mapData.Ceiling[index] != 0)
@@ -243,21 +256,6 @@ public sealed class LightOcclusionMap : IDisposable
 
         if (hasDoor)
             return false;
-
-        return true;
-    }
-
-    private static bool IsClosedDoor(IReadOnlyList<Door> doors, int tileX, int tileY)
-    {
-        foreach (var door in doors)
-        {
-            int doorTileX = (int)MathF.Round(door.StartPosition.X);
-            int doorTileY = (int)MathF.Round(door.StartPosition.Y);
-            if (doorTileX != tileX || doorTileY != tileY)
-                continue;
-
-            return door.DoorState == DoorState.CLOSED;
-        }
 
         return true;
     }

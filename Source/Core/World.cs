@@ -101,10 +101,13 @@ public class World : IScene
         _doorSystem = new DoorSystem(mapData.Doors, mapData.Width, _tileTextures);
         _scoreSystem = new ScoreSystem();
         _secretSystem = new SecretSystem(_scoreSystem, _tileTextures);
-        _collisionSystem = new CollisionSystem(_level, new CompositeMovementBlocker(_doorSystem, _secretSystem));
+        _collisionSystem = new CollisionSystem(
+            _level,
+            new CompositeMovementBlocker(_doorSystem, _secretSystem),
+            ObjectCollisionRules.Instance);
         _soundPropagationSystem = new SoundPropagationSystem(mapData, _doorSystem);
         _cameraSystem = new CameraSystem(_collisionSystem);
-        _renderSystem = new RenderSystem(_level, _mapData, _tileTextures);
+        _renderSystem = new RenderSystem(_level, _mapData, _tileTextures, DoorTileEncoding.ForEngine);
         _minimapSystem = new MinimapSystem(_level, _renderSystem);
         _exitSystem = new ExitSystem(_scoreSystem);
         _highscoreClient = new HighscoreClient();
@@ -227,13 +230,13 @@ public class World : IScene
 
     public void SetVolume(float volume)
     {
-        _soundSystem.SetVolume(volume);
+        float level = AudioVolumeLevel.FromSliderPosition(Math.Clamp(volume, 0f, 1f));
+        float raylibVolume = AudioVolumeLevel.ToRaylibVolume(level);
+        _soundSystem.ApplySfxVolume(raylibVolume);
+        _soundSystem.ApplyMusicVolume(raylibVolume);
     }
 
-    public float GetVolume()
-    {
-        return _soundSystem.GetVolume();
-    }
+    public float GetVolume() => _soundSystem.GetSfxVolume();
 
     public void SetMouseSensitivity(float sensitivity)
     {
@@ -248,8 +251,8 @@ public class World : IScene
     public void ApplyAudioSettings()
     {
         var settings = _optionsMenu.Settings;
-        _soundSystem.SetSfxLevel(settings.AudioLevel);
-        _soundSystem.SetMusicLevel(settings.MusicLevel);
+        _soundSystem.ApplySfxVolume(AudioVolumeLevel.ToRaylibVolume(settings.AudioLevel));
+        _soundSystem.ApplyMusicVolume(AudioVolumeLevel.ToRaylibVolume(settings.MusicLevel));
     }
 
     public void ApplyWindowDisplay()
@@ -806,26 +809,29 @@ public class World : IScene
 
     private void ResetSimulationPoses()
     {
-        _previousSimulationPose = SimulationPose.FromPlayer(_player);
+        _previousSimulationPose = CapturePlayerPose();
         _currentSimulationPose = _previousSimulationPose;
     }
 
     private void AdvanceSimulationPose()
     {
         _previousSimulationPose = _currentSimulationPose;
-        _currentSimulationPose = SimulationPose.FromPlayer(_player);
+        _currentSimulationPose = CapturePlayerPose();
     }
 
     private SimulationPose GetRenderPose()
     {
         if (!_player.IsAlive || _exitSystem.IsBlockingGameplay)
-            return SimulationPose.FromPlayer(_player);
+            return CapturePlayerPose();
 
         return SimulationPose.Lerp(
             _previousSimulationPose,
             _currentSimulationPose,
             _simulationClock.InterpolationAlpha);
     }
+
+    private SimulationPose CapturePlayerPose() =>
+        SimulationPose.FromPositionAndLook(_player.Position, _player.Camera.Target);
 
     public ConsoleCommandResult ToggleTickDiagnostics()
     {
@@ -913,12 +919,16 @@ public class World : IScene
         var renderPose = GetRenderPose();
         var renderPosition = renderPose.Position;
 
-        _lightOcclusionMap.Update(_mapData, _doorSystem.Doors, _renderSystem.RoomMap);
+        _lightOcclusionMap.Update(
+            _mapData,
+            DoorTileEncoding.ForEngine,
+            _doorSystem,
+            _renderSystem.RoomMap);
         PrimitiveRenderer.SetLightOcclusionMap(_lightOcclusionMap, _mapData.Width, _mapData.Height);
         PrimitiveRenderer.SetSpriteRoomMap(_renderSystem.RoomMap);
 
         var mapLights = TileLightCollector.Collect(_mapData);
-        var visibleRooms = _renderSystem.ComputeVisibleRooms(renderPosition, _doorSystem.Doors);
+        var visibleRooms = _renderSystem.ComputeVisibleRooms(renderPosition, _doorSystem);
         var activeTileLights = TileLightCollector.SelectForVisibleRooms(
             mapLights,
             _renderSystem.RoomMap,
@@ -931,7 +941,7 @@ public class World : IScene
         var rows = LightingDiagnostics.BuildReport(
             _mapData,
             _renderSystem.RoomMap,
-            _doorSystem.Doors,
+            _doorSystem,
             renderPosition,
             _lightOcclusionMap,
             shaderState);
@@ -1019,12 +1029,16 @@ public class World : IScene
         var renderPosition = renderPose.Position;
         var renderTarget = renderCamera.Target;
 
-        _lightOcclusionMap.Update(_mapData, _doorSystem.Doors, _renderSystem.RoomMap);
+        _lightOcclusionMap.Update(
+            _mapData,
+            DoorTileEncoding.ForEngine,
+            _doorSystem,
+            _renderSystem.RoomMap);
         PrimitiveRenderer.SetLightOcclusionMap(_lightOcclusionMap, _mapData.Width, _mapData.Height);
         PrimitiveRenderer.SetSpriteRoomMap(_renderSystem.RoomMap);
 
         var mapLights = TileLightCollector.Collect(_mapData);
-        var visibleRooms = _renderSystem.ComputeVisibleRooms(renderPosition, _doorSystem.Doors);
+        var visibleRooms = _renderSystem.ComputeVisibleRooms(renderPosition, _doorSystem);
         var activeTileLights = TileLightCollector.SelectForVisibleRooms(
             mapLights,
             _renderSystem.RoomMap,
@@ -1049,7 +1063,7 @@ public class World : IScene
             renderCamera,
             _sceneRenderTexture.Texture.Width,
             _sceneRenderTexture.Texture.Height,
-            _doorSystem.Doors);
+            _doorSystem);
         _secretSystem.Render(renderPosition);
         _doorSystem.Render();
         _animationSystem.Render();

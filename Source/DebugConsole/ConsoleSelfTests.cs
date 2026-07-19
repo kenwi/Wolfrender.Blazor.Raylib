@@ -4,6 +4,7 @@ using Game.Engine.Rendering;
 using Game.Features.Doors;
 using Game.Features.LevelProgress;
 using Game.Features.Recording;
+using Game.Features.WorldObjects;
 
 namespace Game.DebugConsole;
 
@@ -443,21 +444,14 @@ public static class ConsoleSelfTests
         const int doorX = 2;
         const int doorY = 3;
         var map = CreateTwoRoomDoorMap(doorX, doorY);
-        var roomMap = LevelRoomMap.Build(map);
+        var roomMap = LevelRoomMap.Build(map, DoorTileEncoding.ForEngine);
 
         if (roomMap.RoomCount != 2)
             throw new InvalidOperationException($"Two-room test map should flood-fill into 2 rooms, got {roomMap.RoomCount}.");
 
-        var closedDoors = new List<Door>
-        {
-            new()
-            {
-                StartPosition = new Vector2(doorX, doorY),
-                DoorState = DoorState.CLOSED
-            }
-        };
+        var closedPortals = new FixedPortalState(doorX, doorY, passable: false);
 
-        var visible = roomMap.ComputeVisibleRooms(doorX, doorY, closedDoors);
+        var visible = roomMap.ComputeVisibleRooms(doorX, doorY, closedPortals);
         if (visible.Count < 2)
             throw new InvalidOperationException("Closed door tile should seed visibility for both adjacent rooms.");
 
@@ -513,6 +507,26 @@ public static class ConsoleSelfTests
         map.Walls[doorIndex] = 0;
         map.Doors[doorIndex] = DoorTileEncoding.LightHorizontal;
         return map;
+    }
+
+    private sealed class FixedPortalState : IDoorPortalState
+    {
+        private readonly int _tileX;
+        private readonly int _tileY;
+        private readonly bool _passable;
+
+        public FixedPortalState(int tileX, int tileY, bool passable)
+        {
+            _tileX = tileX;
+            _tileY = tileY;
+            _passable = passable;
+        }
+
+        public bool IsClosedAt(int tileX, int tileY) =>
+            tileX == _tileX && tileY == _tileY ? !_passable : true;
+
+        public bool IsPassableAt(int tileX, int tileY) =>
+            tileX == _tileX && tileY == _tileY && _passable;
     }
 
     private sealed class TestTarget

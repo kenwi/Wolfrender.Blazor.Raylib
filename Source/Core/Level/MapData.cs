@@ -17,7 +17,7 @@ public class MapData
     public uint[] Walls { get; set; } = Array.Empty<uint>();
     public uint[] Ceiling { get; set; } = Array.Empty<uint>();
     public uint[] Doors { get; set; } = Array.Empty<uint>();
-    /// <summary>Placed blocking objects. 0 = empty; 1..20 = sprite ID (see <see cref="Rendering.ObjectSprites"/>).</summary>
+    /// <summary>Placed blocking objects. 0 = empty; 1..20 = sprite ID (see <see cref="Game.Features.WorldObjects.ObjectSprites"/>).</summary>
     public uint[] Objects { get; set; } = Array.Empty<uint>();
     public List<EnemyPlacement> Enemies { get; set; } = new();
     public List<PickupPlacement> Pickups { get; set; } = new();

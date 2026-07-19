@@ -4,6 +4,7 @@ using Game.Features.Doors;
 using Game.Features.Enemies;
 using Game.Features.LevelProgress;
 using Game.Features.Players;
+using Game.Features.WorldObjects;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 using Color = Raylib_cs.Color;
@@ -28,7 +29,8 @@ public class WebEditorScene : IScene
         _mapRenderer = new EditorMapRenderer(mapData);
         _collisionSystem = new CollisionSystem(
             new LevelData(mapData),
-            new CompositeMovementBlocker(doorSystem, secretSystem));
+            new CompositeMovementBlocker(doorSystem, secretSystem),
+            ObjectCollisionRules.Instance);
     }
 
     public void OnEnter()

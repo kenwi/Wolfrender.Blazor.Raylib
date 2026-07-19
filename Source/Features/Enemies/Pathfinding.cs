@@ -1,5 +1,6 @@
 using System.Numerics;
 using Game.Features.Doors;
+using Game.Features.WorldObjects;
 
 namespace Game.Features.Enemies;
 

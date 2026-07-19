@@ -1,5 +1,6 @@
 using Game.Engine.Rendering;
 using Game.Features.Doors;
+using Game.Features.WorldObjects;
 
 namespace Game.Editor;
 

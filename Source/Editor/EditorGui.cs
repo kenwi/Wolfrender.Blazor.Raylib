@@ -4,6 +4,7 @@ using Game.Features.Doors;
 using Game.Features.Enemies;
 using Game.Features.LevelProgress;
 using Game.Features.Pickups;
+using Game.Features.WorldObjects;
 using ImGuiNET;
 using Raylib_cs;
 using static Raylib_cs.Raylib;

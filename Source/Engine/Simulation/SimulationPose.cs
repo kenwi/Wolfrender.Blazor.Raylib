@@ -1,5 +1,4 @@
 using System.Numerics;
-using Game.Features.Players;
 using Raylib_cs;
 
 namespace Game.Engine.Simulation;
@@ -11,9 +10,9 @@ public readonly struct SimulationPose
     public Vector3 Position { get; init; }
     public Vector3 Forward { get; init; }
 
-    public static SimulationPose FromPlayer(Player player)
+    public static SimulationPose FromPositionAndLook(Vector3 position, Vector3 lookTarget)
     {
-        Vector3 forward = player.Camera.Target - player.Camera.Position;
+        Vector3 forward = lookTarget - position;
         if (forward.LengthSquared() > 0.0001f)
             forward = Vector3.Normalize(forward);
         else
@@ -21,7 +20,7 @@ public readonly struct SimulationPose
 
         return new SimulationPose
         {
-            Position = player.Position,
+            Position = position,
             Forward = forward
         };
     }
