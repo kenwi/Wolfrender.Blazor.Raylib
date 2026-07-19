@@ -37,16 +37,9 @@ public class EditorState
     public int ActiveLayerIndex;
     public uint SelectedTileId = 1;
     public EditorToolMode ToolMode = EditorToolMode.Paint;
-    public int SelectedWallTileX = -1;
-    public int SelectedWallTileY = -1;
 
     // Cursor info
     public bool CursorInfoFollowsMouse;
-
-    // Enemy editing
-    public int HoveredEnemyIndex = -1;
-    public int SelectedEnemyIndex = -1;
-    public bool IsDraggingEnemy;
 
     // Pickup editing
     public PickupType SelectedPickupType = PickupType.Health;
@@ -59,16 +52,35 @@ public class EditorState
     public bool IsPlayerSelected;
     public bool IsDraggingPlayer;
 
-    // Patrol path editing
-    public bool IsEditingPatrolPath;
-    public int PatrolEditEnemyIndex = -1;
-    public List<PatrolWaypoint> PatrolPathInProgress = new();
-
     // Simulation
     public bool IsSimulating;
 
     public PathfindingEditorTool PathfindingTool { get; }
     public SoundPropagationEditorTool SoundPropagationTool { get; }
+    public SecretWallEditorTool SecretWallTool { get; }
+    public EnemyEditorTool EnemyTool { get; }
+
+    public int HoveredEnemyIndex
+    {
+        get => EnemyTool.HoveredIndex;
+        set => EnemyTool.HoveredIndex = value;
+    }
+
+    public int SelectedEnemyIndex
+    {
+        get => EnemyTool.SelectedIndex;
+        set => EnemyTool.SelectedIndex = value;
+    }
+
+    public bool IsDraggingEnemy
+    {
+        get => EnemyTool.IsDragging;
+        set => EnemyTool.IsDragging = value;
+    }
+
+    public bool IsEditingPatrolPath => EnemyTool.IsEditingPatrolPath;
+    public int PatrolEditEnemyIndex => EnemyTool.PatrolEditEnemyIndex;
+    public List<PatrolWaypoint> PatrolPathInProgress => EnemyTool.PatrolPathInProgress;
 
     /// <summary>When true, draw translucent room regions over the map.</summary>
     public bool ShowRoomOverlay;
@@ -100,9 +112,6 @@ public class EditorState
 
     // Undo batching for paint strokes and entity drags
     private List<TileChange>? _paintStroke;
-    private int _enemyDragIndex = -1;
-    private int _enemyDragStartX;
-    private int _enemyDragStartY;
     private int _pickupDragIndex = -1;
     private int _pickupDragStartX;
     private int _pickupDragStartY;
@@ -148,6 +157,27 @@ public class EditorState
             () => pathTool!.CancelPickingSilent());
         PathfindingTool = pathTool;
         SoundPropagationTool = soundTool;
+        EnemyTool = new EnemyEditorTool(
+            mapData,
+            UndoStack,
+            NotifyStateChanged,
+            OnEnemyPlacementEdited,
+            () =>
+            {
+                DeselectPickup();
+                DeselectPlayer();
+            });
+        SecretWallTool = new SecretWallEditorTool(
+            mapData,
+            UndoStack,
+            NotifyStateChanged,
+            RebuildRoomMap,
+            () =>
+            {
+                EnemyTool.Deselect();
+                DeselectPickup();
+                DeselectPlayer();
+            });
 
         Layers = new List<EditorLayer>
         {
@@ -182,7 +212,7 @@ public class EditorState
     public bool IsOnObjectLayer => Layers[ActiveLayerIndex].Name == ObjectsLayerName;
     public bool IsOnWallsLayer => Layers[ActiveLayerIndex].Name == WallsLayerName;
     public bool IsOnTileLayer => !IsOnEnemyLayer && !IsOnPickupLayer;
-    public bool HasSelectedWall => SelectedWallTileX >= 0 && SelectedWallTileY >= 0;
+    public bool HasSelectedWall => SecretWallTool.HasSelection;
     public bool IsWallSelectMode => ToolMode == EditorToolMode.Select && IsOnWallsLayer;
 
     public const string DoorsLayerName = "Doors";
@@ -324,90 +354,35 @@ public class EditorState
         if (ToolMode == mode) return;
         ToolMode = mode;
         if (mode == EditorToolMode.Paint)
-            ClearWallSelection();
+            SecretWallTool.ClearSelection();
         SetStatus(mode == EditorToolMode.Paint ? "Paint mode" : "Select mode (Walls layer)");
         NotifyStateChanged();
     }
 
-    public void SelectWallTile(int tileX, int tileY)
-    {
-        if (GetWallTileAt(tileX, tileY) == 0) return;
+    public void SelectWallTile(int tileX, int tileY) =>
+        SecretWallTool.SelectTile(tileX, tileY, GetWallTileAt);
 
-        DeselectEnemy();
-        DeselectPickup();
-        DeselectPlayer();
-        SelectedWallTileX = tileX;
-        SelectedWallTileY = tileY;
-        NotifyStateChanged();
-    }
-
-    public void ClearWallSelection()
-    {
-        if (SelectedWallTileX < 0) return;
-        SelectedWallTileX = -1;
-        SelectedWallTileY = -1;
-        NotifyStateChanged();
-    }
+    public void ClearWallSelection() => SecretWallTool.ClearSelection();
 
     public SecretWallPlacement? FindSecretWallAt(int tileX, int tileY) =>
-        MapData.SecretWalls.FirstOrDefault(s => s.TileX == tileX && s.TileY == tileY);
+        SecretWallTool.FindAt(tileX, tileY);
 
     public SecretWallPlacement? GetSelectedSecretPlacement() =>
-        HasSelectedWall ? FindSecretWallAt(SelectedWallTileX, SelectedWallTileY) : null;
+        SecretWallTool.GetSelectedPlacement();
 
-    public bool IsSelectedWallSecret => GetSelectedSecretPlacement() != null;
+    public bool IsSelectedWallSecret => SecretWallTool.IsSelectedSecret;
 
-    public void SetWallSecret(bool isSecret, SecretWallDirection direction, int travelTiles)
-    {
-        if (!HasSelectedWall) return;
+    public void SetWallSecret(bool isSecret, SecretWallDirection direction, int travelTiles) =>
+        SecretWallTool.SetSecret(isSecret, direction, travelTiles);
 
-        var before = CloneSecretPlacement(FindSecretWallAt(SelectedWallTileX, SelectedWallTileY));
-        RemoveSecretWallAt(SelectedWallTileX, SelectedWallTileY);
-        SecretWallPlacement? after = null;
-        if (isSecret)
-        {
-            after = new SecretWallPlacement
-            {
-                TileX = SelectedWallTileX,
-                TileY = SelectedWallTileY,
-                Direction = direction,
-                TravelTiles = ClampSecretTravelTiles(SelectedWallTileX, SelectedWallTileY, direction, travelTiles)
-            };
-            MapData.SecretWalls.Add(after);
-        }
+    public void RemoveSecretWallAt(int tileX, int tileY) =>
+        SecretWallTool.RemoveAt(tileX, tileY);
 
-        if (!SecretPlacementsEqual(before, after))
-            UndoStack.Push(new SetSecretWallCommand(SelectedWallTileX, SelectedWallTileY, before, after));
-
-        RebuildRoomMap();
-        NotifyStateChanged();
-    }
-
-    public void RemoveSecretWallAt(int tileX, int tileY)
-    {
-        int index = MapData.SecretWalls.FindIndex(s => s.TileX == tileX && s.TileY == tileY);
-        if (index >= 0)
-            MapData.SecretWalls.RemoveAt(index);
-    }
-
-    public int GetMaxSecretTravelTiles(int tileX, int tileY, SecretWallDirection direction)
-    {
-        var (dx, dy) = SecretWallDirectionHelper.ToTileDelta(direction);
-        int count = 0;
-        int x = tileX + dx;
-        int y = tileY + dy;
-        while (x >= 0 && x < MapData.Width && y >= 0 && y < MapData.Height)
-        {
-            count++;
-            x += dx;
-            y += dy;
-        }
-
-        return Math.Max(1, count);
-    }
+    public int GetMaxSecretTravelTiles(int tileX, int tileY, SecretWallDirection direction) =>
+        SecretWallTool.GetMaxTravelTiles(tileX, tileY, direction);
 
     public int ClampSecretTravelTiles(int tileX, int tileY, SecretWallDirection direction, int travelTiles) =>
-        Math.Clamp(travelTiles, 1, GetMaxSecretTravelTiles(tileX, tileY, direction));
+        SecretWallTool.ClampTravelTiles(tileX, tileY, direction, travelTiles);
 
     public void BeginPaintStroke()
     {
@@ -458,9 +433,17 @@ public class EditorState
             SecretWallPlacement? removedSecret = null;
             if (IsOnWallsLayer && SelectedTileId == 0)
             {
-                var secret = FindSecretWallAt(x, y);
+                var secret = SecretWallTool.FindAt(x, y);
                 if (secret != null)
-                    removedSecret = CloneSecretPlacement(secret);
+                {
+                    removedSecret = new SecretWallPlacement
+                    {
+                        TileX = secret.TileX,
+                        TileY = secret.TileY,
+                        Direction = secret.Direction,
+                        TravelTiles = secret.TravelTiles
+                    };
+                }
             }
 
             _paintStroke.Add(new TileChange(ActiveLayerIndex, x, y, oldTile, SelectedTileId, removedSecret));
@@ -469,35 +452,15 @@ public class EditorState
         layer.Tiles[idx] = SelectedTileId;
 
         if (IsOnWallsLayer && SelectedTileId == 0)
-            RemoveSecretWallAt(x, y);
+            SecretWallTool.RemoveAt(x, y);
 
         if (!IsOnEnemyLayer && !IsOnPickupLayer && !IsOnObjectLayer)
             RebuildRoomMap();
     }
 
-    public void PlaceEnemy(int x, int y)
-    {
-        if (x < 0 || x >= MapData.Width || y < 0 || y >= MapData.Height) return;
-        var placement = new EnemyPlacement
-        {
-            TileX = x, TileY = y, Rotation = 0, EnemyType = "Guard"
-        };
-        MapData.Enemies.Add(placement);
-        int index = MapData.Enemies.Count - 1;
-        UndoStack.Push(new AddEnemyCommand(index, EnemyPlacementData.FromPlacement(placement)));
-        DeselectPickup();
-        DeselectPlayer();
-        SelectedEnemyIndex = index;
-        IsDraggingEnemy = true;
-        BeginEnemyDrag();
-        NotifyStateChanged();
-    }
+    public void PlaceEnemy(int x, int y) => EnemyTool.Place(x, y);
 
-    public void DeselectEnemy()
-    {
-        SelectedEnemyIndex = -1;
-        IsDraggingEnemy = false;
-    }
+    public void DeselectEnemy() => EnemyTool.Deselect();
 
     public void DeselectPickup()
     {
@@ -543,127 +506,35 @@ public class EditorState
         !HoveredPlayer && HoveredEnemyIndex < 0 && HoveredPickupIndex < 0
         && !IsDraggingPlayer && !IsDraggingEnemy && !IsDraggingPickup;
 
-    public void SelectEnemy(int index)
-    {
-        DeselectPickup();
-        DeselectPlayer();
-        SelectedEnemyIndex = index;
-        IsDraggingEnemy = true;
-        BeginEnemyDrag();
-        NotifyStateChanged();
-    }
+    public void SelectEnemy(int index) => EnemyTool.Select(index);
 
-    public void BeginEnemyDrag()
-    {
-        if (SelectedEnemyIndex < 0 || SelectedEnemyIndex >= MapData.Enemies.Count) return;
-        var enemy = MapData.Enemies[SelectedEnemyIndex];
-        _enemyDragIndex = SelectedEnemyIndex;
-        _enemyDragStartX = enemy.TileX;
-        _enemyDragStartY = enemy.TileY;
-    }
+    public void BeginEnemyDrag() => EnemyTool.BeginDrag();
 
-    public void EndEnemyDrag()
-    {
-        if (_enemyDragIndex < 0 || _enemyDragIndex >= MapData.Enemies.Count)
-        {
-            _enemyDragIndex = -1;
-            return;
-        }
+    public void EndEnemyDrag() => EnemyTool.EndDrag();
 
-        var enemy = MapData.Enemies[_enemyDragIndex];
-        if (enemy.TileX != _enemyDragStartX || enemy.TileY != _enemyDragStartY)
-        {
-            UndoStack.Push(new MoveEnemyCommand(
-                _enemyDragIndex, _enemyDragStartX, _enemyDragStartY, enemy.TileX, enemy.TileY));
-            NotifyStateChanged();
-        }
+    public void MoveEnemy(int x, int y) => EnemyTool.MoveSelected(x, y);
 
-        _enemyDragIndex = -1;
-    }
+    public void DeleteSelectedEnemy() => EnemyTool.DeleteSelected();
 
-    public void MoveEnemy(int x, int y)
-    {
-        if (SelectedEnemyIndex < 0 || SelectedEnemyIndex >= MapData.Enemies.Count) return;
-        if (x < 0 || x >= MapData.Width || y < 0 || y >= MapData.Height) return;
-        MapData.Enemies[SelectedEnemyIndex].TileX = x;
-        MapData.Enemies[SelectedEnemyIndex].TileY = y;
-    }
+    public void DeleteEnemyAt(int index) => EnemyTool.DeleteAt(index);
 
-    public void DeleteSelectedEnemy()
-    {
-        if (SelectedEnemyIndex < 0 || SelectedEnemyIndex >= MapData.Enemies.Count) return;
-        int index = SelectedEnemyIndex;
-        var data = EnemyPlacementData.FromPlacement(MapData.Enemies[index]);
-        MapData.Enemies.RemoveAt(index);
-        UndoStack.Push(new RemoveEnemyCommand(index, data));
-        SelectedEnemyIndex = -1;
-        NotifyStateChanged();
-    }
+    public void SetEnemyTilePosition(int index, int tileX, int tileY) =>
+        EnemyTool.SetTilePosition(index, tileX, tileY);
 
-    public void DeleteEnemyAt(int index)
-    {
-        if (index < 0 || index >= MapData.Enemies.Count) return;
-        var data = EnemyPlacementData.FromPlacement(MapData.Enemies[index]);
-        MapData.Enemies.RemoveAt(index);
-        UndoStack.Push(new RemoveEnemyCommand(index, data));
-        if (SelectedEnemyIndex == index)
-            SelectedEnemyIndex = -1;
-        else if (SelectedEnemyIndex > index)
-            SelectedEnemyIndex--;
-        NotifyStateChanged();
-    }
+    public void SetEnemyRotation(int index, float rotation) =>
+        EnemyTool.SetRotation(index, rotation);
 
-    public void SetEnemyTilePosition(int index, int tileX, int tileY)
-    {
-        if (index < 0 || index >= MapData.Enemies.Count) return;
-        tileX = Math.Clamp(tileX, 0, MapData.Width - 1);
-        tileY = Math.Clamp(tileY, 0, MapData.Height - 1);
-        RecordEnemyChange(index, enemy =>
-        {
-            enemy.TileX = tileX;
-            enemy.TileY = tileY;
-        });
-    }
+    public void SetEnemyType(int index, string enemyType) =>
+        EnemyTool.SetType(index, enemyType);
 
-    public void SetEnemyRotation(int index, float rotation)
-    {
-        if (index < 0 || index >= MapData.Enemies.Count) return;
-        RecordEnemyChange(index, enemy => enemy.Rotation = rotation);
-    }
+    public void SetEnemyStartsAsCorpse(int index, bool value) =>
+        EnemyTool.SetStartsAsCorpse(index, value);
 
-    public void SetEnemyType(int index, string enemyType)
-    {
-        if (index < 0 || index >= MapData.Enemies.Count) return;
-        RecordEnemyChange(index, enemy => enemy.EnemyType = enemyType);
-    }
+    public void SetEnemyDropsAmmo(int index, bool value) =>
+        EnemyTool.SetDropsAmmo(index, value);
 
-    public void SetEnemyStartsAsCorpse(int index, bool value)
-    {
-        if (index < 0 || index >= MapData.Enemies.Count) return;
-        RecordEnemyChange(index, enemy => enemy.StartsAsCorpse = value);
-    }
-
-    public void SetEnemyDropsAmmo(int index, bool value)
-    {
-        if (index < 0 || index >= MapData.Enemies.Count) return;
-        RecordEnemyChange(index, enemy => enemy.DropsAmmo = value);
-    }
-
-    public void ClearEnemyPatrolPath(int index)
-    {
-        if (index < 0 || index >= MapData.Enemies.Count) return;
-        if (MapData.Enemies[index].PatrolPath.Count == 0) return;
-        RecordEnemyChange(index, enemy => enemy.PatrolPath.Clear());
-    }
-
-    private void RecordEnemyChange(int index, Action<EnemyPlacement> apply)
-    {
-        var before = EnemyPlacementData.FromPlacement(MapData.Enemies[index]);
-        apply(MapData.Enemies[index]);
-        var after = EnemyPlacementData.FromPlacement(MapData.Enemies[index]);
-        UndoStack.Push(new ModifyEnemyCommand(index, before, after));
-        OnEnemyPlacementEdited();
-    }
+    public void ClearEnemyPatrolPath(int index) =>
+        EnemyTool.ClearPatrolPath(index);
 
     public int FindPickupIndexAt(int tileX, int tileY) =>
         MapData.Pickups.FindIndex(p => p.TileX == tileX && p.TileY == tileY);
@@ -851,44 +722,13 @@ public class EditorState
         NotifyStateChanged();
     }
 
-    public void AddPatrolWaypoint(int x, int y)
-    {
-        if (x < 0 || x >= MapData.Width || y < 0 || y >= MapData.Height) return;
-        PatrolPathInProgress.Add(new PatrolWaypoint { TileX = x, TileY = y });
-    }
+    public void AddPatrolWaypoint(int x, int y) => EnemyTool.AddPatrolWaypoint(x, y);
 
-    public void ConfirmPatrolPath()
-    {
-        if (PatrolEditEnemyIndex >= 0 && PatrolEditEnemyIndex < MapData.Enemies.Count)
-        {
-            var enemy = MapData.Enemies[PatrolEditEnemyIndex];
-            var before = enemy.PatrolPath.Select(w => new PatrolWaypoint { TileX = w.TileX, TileY = w.TileY }).ToList();
-            var after = PatrolPathInProgress.Select(w => new PatrolWaypoint { TileX = w.TileX, TileY = w.TileY }).ToList();
-            enemy.PatrolPath = new List<PatrolWaypoint>(after);
-            UndoStack.Push(new SetPatrolPathCommand(PatrolEditEnemyIndex, before, after));
-        }
-        IsEditingPatrolPath = false;
-        PatrolPathInProgress.Clear();
-        PatrolEditEnemyIndex = -1;
-        NotifyStateChanged();
-    }
+    public void ConfirmPatrolPath() => EnemyTool.ConfirmPatrolPath();
 
-    public void CancelPatrolPath()
-    {
-        IsEditingPatrolPath = false;
-        PatrolPathInProgress.Clear();
-        PatrolEditEnemyIndex = -1;
-        NotifyStateChanged();
-    }
+    public void CancelPatrolPath() => EnemyTool.CancelPatrolPath();
 
-    public void StartEditingPatrolPath()
-    {
-        if (SelectedEnemyIndex < 0) return;
-        IsEditingPatrolPath = true;
-        PatrolEditEnemyIndex = SelectedEnemyIndex;
-        PatrolPathInProgress.Clear();
-        NotifyStateChanged();
-    }
+    public void StartEditingPatrolPath() => EnemyTool.StartEditingPatrolPath();
 
     public void ToggleSimulation()
     {
@@ -949,8 +789,7 @@ public class EditorState
         MapData.SecretWalls.Clear();
         MapData.Spawn = new PlayerSpawnPlacement();
         DeselectPlayer();
-        SelectedEnemyIndex = -1;
-        HoveredEnemyIndex = -1;
+        EnemyTool.ClearSelectionAndHover();
         SelectedPickupIndex = -1;
         HoveredPickupIndex = -1;
         ClearWallSelection();
@@ -958,8 +797,7 @@ public class EditorState
 
     public void RefreshLayerReferences()
     {
-        SelectedEnemyIndex = -1;
-        HoveredEnemyIndex = -1;
+        EnemyTool.ClearSelectionAndHover();
         SelectedPickupIndex = -1;
         HoveredPickupIndex = -1;
         ClearWallSelection();
@@ -1215,22 +1053,4 @@ public class EditorState
         NotifyStateChanged();
     }
 
-    private static SecretWallPlacement? CloneSecretPlacement(SecretWallPlacement? secret) =>
-        secret == null ? null : new SecretWallPlacement
-        {
-            TileX = secret.TileX,
-            TileY = secret.TileY,
-            Direction = secret.Direction,
-            TravelTiles = secret.TravelTiles
-        };
-
-    private static bool SecretPlacementsEqual(SecretWallPlacement? a, SecretWallPlacement? b)
-    {
-        if (a == null && b == null) return true;
-        if (a == null || b == null) return false;
-        return a.TileX == b.TileX
-            && a.TileY == b.TileY
-            && a.Direction == b.Direction
-            && a.TravelTiles == b.TravelTiles;
-    }
 }

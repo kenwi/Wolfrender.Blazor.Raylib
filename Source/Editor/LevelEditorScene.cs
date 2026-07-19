@@ -199,11 +199,13 @@ public class LevelEditorScene : IScene
 
             if (layer.Name == EditorState.EnemiesLayerName)
             {
+                int hoveredEnemy = _state.HoveredEnemyIndex;
                 _mapRenderer.RenderEnemyLayer(
                     _state.Camera, _state.EnemySystem, _state.IsMouseOverUI,
                     _state.IsSimulating, _state.DrawEnemyLineOfSight, _state.ShowPatrolPaths,
-                    ref _state.HoveredEnemyIndex, _state.SelectedEnemyIndex,
+                    ref hoveredEnemy, _state.SelectedEnemyIndex,
                     _state.IsEditingPatrolPath, _state.PatrolEditEnemyIndex, _state.PatrolPathInProgress);
+                _state.HoveredEnemyIndex = hoveredEnemy;
             }
             else if (layer.Name == EditorState.PickupsLayerName)
             {
@@ -261,7 +263,10 @@ public class LevelEditorScene : IScene
 
         if (_state.HasSelectedWall)
         {
-            _mapRenderer.DrawSelectedWallHighlight(_state.SelectedWallTileX, _state.SelectedWallTileY, _state.Camera);
+            _mapRenderer.DrawSelectedWallHighlight(
+                _state.SecretWallTool.SelectedTileX,
+                _state.SecretWallTool.SelectedTileY,
+                _state.Camera);
             var secret = _state.GetSelectedSecretPlacement();
             if (secret != null)
                 _mapRenderer.DrawSecretWallPreview(secret, _state.Camera);
@@ -276,7 +281,7 @@ public class LevelEditorScene : IScene
         _gui.RenderTilePalette(_state.Layers, _state.ActiveLayerIndex, _state, ref _state.SelectedTileId, ref _state.SelectedPickupType);
         _gui.RenderPickupPalette(_state);
         _gui.RenderInfoPanel(tileX, tileY, worldPos, tileInBounds, _state.CursorInfoFollowsMouse, _state.Layers);
-        _gui.RenderEntityPropertiesPanel(_state, ref _state.SelectedEnemyIndex, ref _state.IsEditingPatrolPath, ref _state.PatrolEditEnemyIndex, _state.PatrolPathInProgress);
+        _gui.RenderEntityPropertiesPanel(_state);
         _gui.RenderPickupPropertiesPanel(_state, ref _state.SelectedPickupIndex);
         _gui.RenderWallPropertiesPanel(_state);
         _gui.RenderDebugLogPanel();

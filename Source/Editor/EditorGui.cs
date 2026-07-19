@@ -830,7 +830,9 @@ public class EditorGui
         if (!state.ShouldShowWallPropertiesPanel(_showWallProperties))
             return;
 
-        uint wallTileId = state.GetWallTileAt(state.SelectedWallTileX, state.SelectedWallTileY);
+        int wallX = state.SecretWallTool.SelectedTileX;
+        int wallY = state.SecretWallTool.SelectedTileY;
+        uint wallTileId = state.GetWallTileAt(wallX, wallY);
         var secret = state.GetSelectedSecretPlacement();
         bool isSecret = secret != null;
         SecretWallDirection direction = secret?.Direction ?? SecretWallDirection.North;
@@ -840,7 +842,7 @@ public class EditorGui
         ImGui.Begin("Wall Properties", ref _showWallProperties, ImGuiWindowFlags.AlwaysAutoResize);
         ImGui.SetWindowFontScale(_guiScale);
 
-        ImGui.Text($"Wall ({state.SelectedWallTileX}, {state.SelectedWallTileY})");
+        ImGui.Text($"Wall ({wallX}, {wallY})");
         ImGui.Text($"Sprite ID: {wallTileId}");
         ImGui.Separator();
 
@@ -862,18 +864,15 @@ public class EditorGui
                 if (ImGui.RadioButton(value.ToString(), direction == value))
                 {
                     direction = value;
-                    travelTiles = state.ClampSecretTravelTiles(
-                        state.SelectedWallTileX, state.SelectedWallTileY, direction, travelTiles);
+                    travelTiles = state.ClampSecretTravelTiles(wallX, wallY, direction, travelTiles);
                     state.SetWallSecret(true, direction, travelTiles);
                 }
             }
 
-            int maxTravel = state.GetMaxSecretTravelTiles(
-                state.SelectedWallTileX, state.SelectedWallTileY, direction);
+            int maxTravel = state.GetMaxSecretTravelTiles(wallX, wallY, direction);
             if (ImGui.InputInt("Travel tiles", ref travelTiles))
             {
-                travelTiles = state.ClampSecretTravelTiles(
-                    state.SelectedWallTileX, state.SelectedWallTileY, direction, travelTiles);
+                travelTiles = state.ClampSecretTravelTiles(wallX, wallY, direction, travelTiles);
                 state.SetWallSecret(true, direction, travelTiles);
             }
 
@@ -883,11 +882,7 @@ public class EditorGui
         ImGui.End();
     }
 
-    public void RenderEntityPropertiesPanel(
-        EditorState state,
-        ref int selectedEnemyIndex,
-        ref bool isEditingPatrolPath, ref int patrolEditEnemyIndex,
-        List<PatrolWaypoint> patrolPathInProgress)
+    public void RenderEntityPropertiesPanel(EditorState state)
     {
         bool showPlayer = state.ShouldShowPlayerPropertiesPanel(_showPlayerProperties);
         bool showEnemy = state.ShouldShowEnemyPropertiesPanel(_showEnemyProperties);
@@ -901,8 +896,7 @@ public class EditorGui
         if (showPlayer)
             RenderPlayerPropertiesPanel(state);
         else
-            RenderEnemyPropertiesPanel(state, ref selectedEnemyIndex, ref isEditingPatrolPath,
-                ref patrolEditEnemyIndex, patrolPathInProgress);
+            RenderEnemyPropertiesPanel(state);
     }
 
     private void BeginSyncedEntityPropertiesWindow(string title, ref bool open, EditorState state)
@@ -961,12 +955,9 @@ public class EditorGui
 
     // ─── Enemy Properties Panel ──────────────────────────────────────────────────
 
-    private void RenderEnemyPropertiesPanel(
-        EditorState state,
-        ref int selectedEnemyIndex,
-        ref bool isEditingPatrolPath, ref int patrolEditEnemyIndex,
-        List<PatrolWaypoint> patrolPathInProgress)
+    private void RenderEnemyPropertiesPanel(EditorState state)
     {
+        int selectedEnemyIndex = state.SelectedEnemyIndex;
         var enemy = _mapData.Enemies[selectedEnemyIndex];
 
         BeginSyncedEntityPropertiesWindow("Enemy Properties", ref _showEnemyProperties, state);
@@ -1031,20 +1022,16 @@ public class EditorGui
             enemy.ShowPatrolPath = showPath;
         }
 
-        if (isEditingPatrolPath && patrolEditEnemyIndex == selectedEnemyIndex)
+        if (state.IsEditingPatrolPath && state.PatrolEditEnemyIndex == selectedEnemyIndex)
         {
             ImGui.TextColored(new Vector4(1f, 0.8f, 0f, 1f),
-                $"Editing... ({patrolPathInProgress.Count} waypoints)");
+                $"Editing... ({state.PatrolPathInProgress.Count} waypoints)");
             ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "LMB: Add waypoint");
             ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Enter: Confirm path");
             ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Escape: Cancel");
 
             if (ImGui.Button("Cancel Editing"))
-            {
-                isEditingPatrolPath = false;
-                patrolPathInProgress.Clear();
-                patrolEditEnemyIndex = -1;
-            }
+                state.CancelPatrolPath();
         }
         else
         {
@@ -1066,11 +1053,7 @@ public class EditorGui
             }
 
             if (ImGui.Button("Add Path"))
-            {
-                isEditingPatrolPath = true;
-                patrolEditEnemyIndex = selectedEnemyIndex;
-                patrolPathInProgress.Clear();
-            }
+                state.StartEditingPatrolPath();
         }
 
         ImGui.Spacing();
@@ -1079,10 +1062,7 @@ public class EditorGui
         ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.8f, 0.2f, 0.2f, 1f));
         ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.9f, 0.3f, 0.3f, 1f));
         if (ImGui.Button("Delete Enemy", new Vector2(-1, 0)))
-        {
             state.DeleteEnemyAt(selectedEnemyIndex);
-            selectedEnemyIndex = -1;
-        }
         ImGui.PopStyleColor(2);
 
         EndSyncedEntityPropertiesWindow(state);

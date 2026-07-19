@@ -111,11 +111,13 @@ public class WebEditorScene : IScene
 
             if (layer.Name == EditorState.EnemiesLayerName)
             {
+                int hoveredEnemy = State.HoveredEnemyIndex;
                 _mapRenderer.RenderEnemyLayer(
                     State.Camera, State.EnemySystem, State.IsMouseOverUI,
                     State.IsSimulating, State.DrawEnemyLineOfSight, State.ShowPatrolPaths,
-                    ref State.HoveredEnemyIndex, State.SelectedEnemyIndex,
+                    ref hoveredEnemy, State.SelectedEnemyIndex,
                     State.IsEditingPatrolPath, State.PatrolEditEnemyIndex, State.PatrolPathInProgress);
+                State.HoveredEnemyIndex = hoveredEnemy;
             }
             else if (layer.Name == EditorState.PickupsLayerName)
             {
