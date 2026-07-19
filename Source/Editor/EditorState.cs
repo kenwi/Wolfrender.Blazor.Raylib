@@ -41,11 +41,6 @@ public class EditorState
     // Cursor info
     public bool CursorInfoFollowsMouse;
 
-    // Player spawn editing
-    public bool HoveredPlayer;
-    public bool IsPlayerSelected;
-    public bool IsDraggingPlayer;
-
     // Simulation
     public bool IsSimulating;
 
@@ -54,6 +49,25 @@ public class EditorState
     public SecretWallEditorTool SecretWallTool { get; }
     public EnemyEditorTool EnemyTool { get; }
     public PickupEditorTool PickupTool { get; }
+    public PlayerSpawnEditorTool PlayerSpawnTool { get; }
+
+    public bool HoveredPlayer
+    {
+        get => PlayerSpawnTool.IsHovered;
+        set => PlayerSpawnTool.IsHovered = value;
+    }
+
+    public bool IsPlayerSelected
+    {
+        get => PlayerSpawnTool.IsSelected;
+        set => PlayerSpawnTool.IsSelected = value;
+    }
+
+    public bool IsDraggingPlayer
+    {
+        get => PlayerSpawnTool.IsDragging;
+        set => PlayerSpawnTool.IsDragging = value;
+    }
 
     public int HoveredEnemyIndex
     {
@@ -129,11 +143,8 @@ public class EditorState
     private int _entityPropsDragStartTop;
     private int _entityPropsDragStartRight;
 
-    // Undo batching for paint strokes and entity drags
+    // Undo batching for paint strokes
     private List<TileChange>? _paintStroke;
-    private int _playerDragStartX;
-    private int _playerDragStartY;
-    private float _playerDragStartRotation;
 
     // Status message
     public string StatusMessage = "";
@@ -174,6 +185,7 @@ public class EditorState
 
         EnemyEditorTool? enemyTool = null;
         PickupEditorTool? pickupTool = null;
+        PlayerSpawnEditorTool? playerSpawnTool = null;
         enemyTool = new EnemyEditorTool(
             mapData,
             UndoStack,
@@ -182,7 +194,7 @@ public class EditorState
             () =>
             {
                 pickupTool!.Deselect();
-                DeselectPlayer();
+                playerSpawnTool!.Deselect();
             });
         pickupTool = new PickupEditorTool(
             mapData,
@@ -193,10 +205,21 @@ public class EditorState
             () =>
             {
                 enemyTool!.Deselect();
-                DeselectPlayer();
+                playerSpawnTool!.Deselect();
+            });
+        playerSpawnTool = new PlayerSpawnEditorTool(
+            mapData,
+            player,
+            UndoStack,
+            NotifyStateChanged,
+            () =>
+            {
+                enemyTool!.Deselect();
+                pickupTool!.Deselect();
             });
         EnemyTool = enemyTool;
         PickupTool = pickupTool;
+        PlayerSpawnTool = playerSpawnTool;
 
         SecretWallTool = new SecretWallEditorTool(
             mapData,
@@ -207,7 +230,7 @@ public class EditorState
             {
                 EnemyTool.Deselect();
                 PickupTool.Deselect();
-                DeselectPlayer();
+                PlayerSpawnTool.Deselect();
             });
 
         Layers = new List<EditorLayer>
@@ -495,38 +518,11 @@ public class EditorState
 
     public void DeselectPickup() => PickupTool.Deselect();
 
-    public void DeselectPlayer()
-    {
-        IsPlayerSelected = false;
-        IsDraggingPlayer = false;
-    }
+    public void DeselectPlayer() => PlayerSpawnTool.Deselect();
 
-    public void SelectPlayer()
-    {
-        DeselectEnemy();
-        DeselectPickup();
-        IsPlayerSelected = true;
-        IsDraggingPlayer = true;
-        _playerDragStartX = MapData.Spawn.TileX;
-        _playerDragStartY = MapData.Spawn.TileY;
-        _playerDragStartRotation = MapData.Spawn.Rotation;
-        NotifyStateChanged();
-    }
+    public void SelectPlayer() => PlayerSpawnTool.Select();
 
-    public void EndPlayerDrag()
-    {
-        if (!IsPlayerSelected) return;
-
-        if (MapData.Spawn.TileX != _playerDragStartX
-            || MapData.Spawn.TileY != _playerDragStartY
-            || MapData.Spawn.Rotation != _playerDragStartRotation)
-        {
-            UndoStack.Push(new SetPlayerSpawnCommand(
-                _playerDragStartX, _playerDragStartY, _playerDragStartRotation,
-                MapData.Spawn.TileX, MapData.Spawn.TileY, MapData.Spawn.Rotation));
-            NotifyStateChanged();
-        }
-    }
+    public void EndPlayerDrag() => PlayerSpawnTool.EndDrag();
 
     /// <summary>Hide the yellow tile-under-cursor highlight when pointing at or dragging an entity.</summary>
     public bool ShouldShowTileHighlight() =>
@@ -811,78 +807,21 @@ public class EditorState
     /// When the pickups layer is active, clicking a door or wall tile switches to that layer.
     /// Returns true if the click was handled (layer switched).
     /// </summary>
-    public void ApplyPlayerSpawnFromMap()
-    {
-        PlayerSpawn.ApplyFromMap(Player, MapData, PlayerSpawnApplyMode.PositionAndCameraOnly);
-        NotifyStateChanged();
-    }
+    public void ApplyPlayerSpawnFromMap() => PlayerSpawnTool.ApplyFromMap();
 
-    public void SyncPlayerToSpawnTile(int tileX, int tileY)
-    {
-        if (tileX < 0 || tileX >= MapData.Width || tileY < 0 || tileY >= MapData.Height)
-            return;
+    public void SyncPlayerToSpawnTile(int tileX, int tileY) =>
+        PlayerSpawnTool.SyncToSpawnTile(tileX, tileY);
 
-        int oldX = MapData.Spawn.TileX;
-        int oldY = MapData.Spawn.TileY;
-        float oldRotation = MapData.Spawn.Rotation;
-        if (oldX == tileX && oldY == tileY)
-            return;
+    public void SetPlayerSpawnRotationIndex(int rotIndex) =>
+        PlayerSpawnTool.SetRotationIndex(rotIndex);
 
-        MapData.Spawn.TileX = tileX;
-        MapData.Spawn.TileY = tileY;
-        PlayerSpawn.ApplyFromMap(Player, MapData, PlayerSpawnApplyMode.PositionAndCameraOnly);
+    public void ApplyPlayerSpawnRotation() => PlayerSpawnTool.ApplyRotation();
 
-        if (!IsDraggingPlayer)
-        {
-            UndoStack.Push(new SetPlayerSpawnCommand(
-                oldX, oldY, oldRotation, tileX, tileY, MapData.Spawn.Rotation));
-        }
+    public static int GetSpawnRotationIndex(float rotationRadians) =>
+        PlayerSpawnEditorTool.GetRotationIndex(rotationRadians);
 
-        NotifyStateChanged();
-    }
-
-    public void SetPlayerSpawnRotationIndex(int rotIndex)
-    {
-        const float step = MathF.PI / 4f;
-        int oldX = MapData.Spawn.TileX;
-        int oldY = MapData.Spawn.TileY;
-        float oldRotation = MapData.Spawn.Rotation;
-        float newRotation = Math.Clamp(rotIndex, 0, 7) * step;
-        if (MathF.Abs(oldRotation - newRotation) < 0.0001f)
-            return;
-
-        MapData.Spawn.Rotation = newRotation;
-        PlayerSpawn.ApplyCameraFromMap(Player, MapData);
-        UndoStack.Push(new SetPlayerSpawnCommand(
-            oldX, oldY, oldRotation, oldX, oldY, newRotation));
-        NotifyStateChanged();
-    }
-
-    public void ApplyPlayerSpawnRotation() =>
-        PlayerSpawn.ApplyCameraFromMap(Player, MapData);
-
-    public static int GetSpawnRotationIndex(float rotationRadians)
-    {
-        const float step = MathF.PI / 4f;
-        return Math.Clamp((int)MathF.Round(rotationRadians / step), 0, 7);
-    }
-
-    public void UpdatePlayerHover(EditorCamera camera, Vector2 mouseScreen, bool isMouseOverUI)
-    {
-        HoveredPlayer = false;
-        if (isMouseOverUI) return;
-
-        float tileSize = camera.TileSize;
-        float quadSize = LevelData.QuadSize;
-        float tileX = Player.Position.X / quadSize;
-        float tileY = Player.Position.Z / quadSize;
-        float centerX = (tileX + 0.5f) * tileSize + camera.Offset.X;
-        float centerY = (tileY + 0.5f) * tileSize + camera.Offset.Y;
-        float radius = tileSize * 0.35f;
-        float dx = mouseScreen.X - centerX;
-        float dy = mouseScreen.Y - centerY;
-        HoveredPlayer = dx * dx + dy * dy <= radius * radius;
-    }
+    public void UpdatePlayerHover(EditorCamera camera, Vector2 mouseScreen, bool isMouseOverUI) =>
+        PlayerSpawnTool.UpdateHover(camera, mouseScreen, isMouseOverUI);
 
     public bool TrySwitchLayerFromPickupClick(int tileX, int tileY)
     {
