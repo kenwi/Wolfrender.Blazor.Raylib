@@ -516,23 +516,14 @@ public class World : IScene
         var renderPosition = renderPose.Position;
         var renderTarget = renderCamera.Target;
 
-        _lightOcclusionMap.Update(
+        SceneLightingSetup.ApplyForView(
             _mapData,
+            _lightOcclusionMap,
+            _renderSystem.RoomMap,
             DoorTileEncoding.ForEngine,
             _doorSystem,
-            _renderSystem.RoomMap);
-        PrimitiveRenderer.SetLightOcclusionMap(_lightOcclusionMap, _mapData.Width, _mapData.Height);
-        PrimitiveRenderer.SetSpriteRoomMap(_renderSystem.RoomMap);
-
-        var mapLights = TileLightCollector.Collect(_mapData);
-        var visibleRooms = _renderSystem.ComputeVisibleRooms(renderPosition, _doorSystem);
-        var activeTileLights = TileLightCollector.SelectForVisibleRooms(
-            mapLights,
-            _renderSystem.RoomMap,
-            visibleRooms,
             renderPosition,
-            LightObjectEncoding.MaxShaderLights);
-        PrimitiveRenderer.SetLightingParameters(renderPosition, tileLights: activeTileLights);
+            _renderSystem.ComputeVisibleRooms);
         var lightingShader = PrimitiveRenderer.GetLightingShader();
 
         var sceneRt = _playOptions.SceneRenderTexture;

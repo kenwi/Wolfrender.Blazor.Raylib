@@ -129,23 +129,14 @@ public sealed class PlayConsoleCommands
     {
         var renderPosition = _getRenderPosition();
 
-        _lightOcclusionMap.Update(
+        SceneLightingSetup.ApplyForView(
             _mapData,
+            _lightOcclusionMap,
+            _renderSystem.RoomMap,
             DoorTileEncoding.ForEngine,
             _doorSystem,
-            _renderSystem.RoomMap);
-        PrimitiveRenderer.SetLightOcclusionMap(_lightOcclusionMap, _mapData.Width, _mapData.Height);
-        PrimitiveRenderer.SetSpriteRoomMap(_renderSystem.RoomMap);
-
-        var mapLights = TileLightCollector.Collect(_mapData);
-        var visibleRooms = _renderSystem.ComputeVisibleRooms(renderPosition, _doorSystem);
-        var activeTileLights = TileLightCollector.SelectForVisibleRooms(
-            mapLights,
-            _renderSystem.RoomMap,
-            visibleRooms,
             renderPosition,
-            LightObjectEncoding.MaxShaderLights);
-        PrimitiveRenderer.SetLightingParameters(renderPosition, tileLights: activeTileLights);
+            _renderSystem.ComputeVisibleRooms);
 
         var shaderState = PrimitiveRenderer.GetLightingDebugSnapshot();
         var rows = LightingDiagnostics.BuildReport(
