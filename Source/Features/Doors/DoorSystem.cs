@@ -1,11 +1,12 @@
 using System.Numerics;
+using Game.Engine.Rendering;
 using Game.Features.Enemies;
 using Game.Features.Players;
 using Raylib_cs;
 
 namespace Game.Features.Doors;
 
-public class DoorSystem : IMovementBlocker
+public class DoorSystem : IMovementBlocker, IDoorPortalState
 {
     private readonly List<Texture2D> _textures;
     private readonly List<Door> _doors;
@@ -300,6 +301,36 @@ public class DoorSystem : IMovementBlocker
                     break;                   
             }
         }
+    }
+
+    public bool IsClosedAt(int tileX, int tileY)
+    {
+        foreach (var door in _doors)
+        {
+            int doorTileX = (int)MathF.Round(door.StartPosition.X);
+            int doorTileY = (int)MathF.Round(door.StartPosition.Y);
+            if (doorTileX != tileX || doorTileY != tileY)
+                continue;
+
+            return door.DoorState == DoorState.CLOSED;
+        }
+
+        return true;
+    }
+
+    public bool IsPassableAt(int tileX, int tileY)
+    {
+        foreach (var door in _doors)
+        {
+            int doorTileX = (int)MathF.Round(door.StartPosition.X);
+            int doorTileY = (int)MathF.Round(door.StartPosition.Y);
+            if (doorTileX != tileX || doorTileY != tileY)
+                continue;
+
+            return door.DoorState != DoorState.CLOSED;
+        }
+
+        return false;
     }
 }
 

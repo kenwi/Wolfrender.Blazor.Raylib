@@ -2,7 +2,6 @@ using System.Numerics;
 using Game.Core.Level;
 using Game.Features.Doors;
 using Game.Features.Enemies;
-using Game.Features.LevelProgress;
 using Game.Features.Pickups;
 using ImGuiNET;
 using Raylib_cs;
@@ -36,14 +35,14 @@ public class EditorGui
     private string _statusMessage = "";
     private float _statusTimer;
 
-    // Pickup palette icons (color-keyed on black)
-    private Dictionary<PickupType, RenderTexture2D>? _pickupPaletteIcons;
-
-    // Door palette icons (door texture + optional lock badge)
-    private Dictionary<uint, RenderTexture2D>? _doorPaletteIcons;
-
-    // Blocking object palette icons (Objects.png upper grid)
-    private RenderTexture2D[]? _objectPaletteIcons;
+    private readonly ImGuiDoorPalette _doorPalette = new();
+    private readonly ImGuiObjectPalette _objectPalette = new();
+    private readonly ImGuiPickupPalette _pickupPalette = new();
+    private readonly ImGuiPickupProperties _pickupProperties = new();
+    private readonly ImGuiWallProperties _wallProperties = new();
+    private readonly ImGuiEntityProperties _entityProperties = new();
+    private readonly ImGuiPathfindingPanel _pathfindingPanel = new();
+    private readonly ImGuiSoundPropagationPanel _soundPropagationPanel = new();
 
     // Window visibility toggles
     private bool _showLayers = true;
@@ -57,8 +56,6 @@ public class EditorGui
     private bool _showDebugLog = false;
     private bool _showPathfinding;
     private bool _showSoundPropagation;
-
-    private string? _entityPropertiesActiveWindowTitle;
 
     public float GuiScale => _guiScale;
     public string StatusMessage => _statusMessage;
@@ -566,7 +563,7 @@ public class EditorGui
 
     // ─── Tile Palette ────────────────────────────────────────────────────────────
 
-    public void RenderTilePalette(List<EditorLayer> layers, int activeLayerIndex, EditorState editorState, ref uint selectedTileId, ref PickupType selectedPickupType)
+    public void RenderTilePalette(List<EditorLayer> layers, int activeLayerIndex, EditorState editorState, ref uint selectedTileId)
     {
         if (!_showTilePalette) return;
 
@@ -620,7 +617,7 @@ public class EditorGui
 
         if (layers[activeLayerIndex].Name == EditorState.ObjectsLayerName)
         {
-            RenderObjectPaletteButtons(editorState, ref selectedTileId, buttonSize);
+            _objectPalette.RenderButtons(editorState, ref selectedTileId, buttonSize);
             ImGui.Separator();
             ImGui.Text($"Selected: {(selectedTileId == 0 ? "Eraser" : $"Object {selectedTileId}")}");
             ImGui.End();
@@ -629,7 +626,7 @@ public class EditorGui
 
         if (layers[activeLayerIndex].Name == EditorState.DoorsLayerName)
         {
-            RenderDoorPaletteButtons(editorState, ref selectedTileId, buttonSize);
+            _doorPalette.RenderButtons(editorState, ref selectedTileId, buttonSize);
             ImGui.Separator();
             ImGui.Text($"Selected: {(selectedTileId == 0 ? "Eraser" : DoorTileEncoding.GetPaletteLabel(selectedTileId))}");
             ImGui.End();
@@ -692,315 +689,10 @@ public class EditorGui
         ImGui.End();
     }
 
-    private void EnsureDoorPaletteIcons()
-    {
-        if (_doorPaletteIcons != null) return;
-        int size = PickupSprites.PaletteIconSize;
-        _doorPaletteIcons = new Dictionary<uint, RenderTexture2D>();
-        foreach (var entry in DoorTileEncoding.PaletteEntries)
-        {
-            if (entry.TextureIndex < 0 || entry.TextureIndex >= _mapData.TileTextures.Count)
-                continue;
-
-            var doorTex = _mapData.TileTextures[entry.TextureIndex];
-            if (doorTex.Id == 0) continue;
-
-            var rt = LoadRenderTexture(size, size);
-            BeginTextureMode(rt);
-            ClearBackground(Color.Black);
-            DrawDoorPaletteIcon(doorTex, size, entry.Vertical, entry.LockKind);
-            EndTextureMode();
-            _doorPaletteIcons[entry.Id] = rt;
-        }
-    }
-
-    private static void DrawDoorPaletteIcon(Texture2D doorTex, int size, bool vertical, DoorLockKind lockKind)
-    {
-        float half = size / 2f;
-        if (vertical)
-        {
-            DrawTexturePro(
-                doorTex,
-                new Rectangle(0, 0, doorTex.Width, doorTex.Height),
-                new Rectangle(half, half, size, size),
-                new Vector2(half, half),
-                90f,
-                Color.White);
-        }
-        else
-        {
-            DrawTexturePro(
-                doorTex,
-                new Rectangle(0, 0, doorTex.Width, doorTex.Height),
-                new Rectangle(0, 0, size, size),
-                Vector2.Zero,
-                0f,
-                Color.White);
-        }
-
-        if (lockKind != DoorLockKind.None)
-            DrawDoorLockBadge(size, lockKind);
-    }
-
-    private static void DrawDoorLockBadge(int tileSize, DoorLockKind lockKind)
-    {
-        var lockColor = lockKind == DoorLockKind.Gold
-            ? new Color(255, 210, 40, 255)
-            : new Color(200, 220, 255, 255);
-        string label = lockKind == DoorLockKind.Gold ? "G" : "S";
-        float cx = tileSize * 0.75f;
-        float cy = tileSize * 0.25f;
-        float radius = tileSize * 0.2f;
-        DrawCircle((int)cx, (int)cy, radius, lockColor);
-        int fontSize = (int)(tileSize * 0.35f);
-        DrawText(label, (int)(tileSize * 0.65f), (int)(tileSize * 0.12f), fontSize, Color.Black);
-    }
-
-    private void EnsureObjectPaletteIcons()
-    {
-        if (_objectPaletteIcons != null) return;
-        if (_mapData.GameTextures.Count <= PickupSprites.ObjectsTextureIndex) return;
-
-        var objectsTex = _mapData.GameTextures[PickupSprites.ObjectsTextureIndex];
-        if (objectsTex.Id == 0) return;
-
-        int size = ObjectSprites.PaletteIconSize;
-        _objectPaletteIcons = new RenderTexture2D[ObjectSprites.ObjectCount];
-        for (int i = 0; i < ObjectSprites.ObjectCount; i++)
-        {
-            var rt = LoadRenderTexture(size, size);
-            BeginTextureMode(rt);
-            ClearBackground(Color.Black);
-            PrimitiveRenderer.DrawScreenSprite(
-                objectsTex,
-                ObjectSprites.GetFrameRect(i),
-                new Rectangle(0, 0, size, size),
-                Color.White);
-            EndTextureMode();
-            _objectPaletteIcons[i] = rt;
-        }
-    }
-
-    private void RenderObjectPaletteButtons(EditorState editorState, ref uint selectedTileId, float buttonSize)
-    {
-        EnsureObjectPaletteIcons();
-        bool hasIcons = _objectPaletteIcons != null;
-        int columns = ObjectSprites.PaletteColumns;
-
-        for (int i = 0; i < ObjectSprites.ObjectCount; i++)
-        {
-            if (i % columns != 0)
-                ImGui.SameLine();
-
-            uint objectId = (uint)(i + 1);
-            ImGui.PushID(i + 700);
-
-            bool selected = selectedTileId == objectId;
-            if (selected)
-            {
-                ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.2f, 0.5f, 0.8f, 1f));
-                ImGui.PushStyleColor(ImGuiCol.Border, new Vector4(1f, 1f, 0f, 1f));
-                ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 3f);
-            }
-
-            bool picked = false;
-            if (hasIcons && _objectPaletteIcons![i].Texture.Id != 0)
-            {
-                var texId = new IntPtr(_objectPaletteIcons[i].Texture.Id);
-                if (ImGui.ImageButton($"object_{objectId}", texId, new Vector2(buttonSize, buttonSize),
-                        new Vector2(0, 1), new Vector2(1, 0)))
-                    picked = true;
-            }
-            else if (ImGui.Button($"Obj {objectId}", new Vector2(buttonSize, buttonSize)))
-            {
-                picked = true;
-            }
-
-            if (picked)
-            {
-                selectedTileId = objectId;
-                editorState.SwitchToObjectLayer();
-            }
-
-            if (selected)
-            {
-                ImGui.PopStyleVar();
-                ImGui.PopStyleColor(2);
-            }
-
-            if (ImGui.IsItemHovered())
-                ImGui.SetTooltip($"Object ID: {objectId}");
-
-            ImGui.PopID();
-        }
-    }
-
-    private void RenderDoorPaletteButtons(EditorState editorState, ref uint selectedTileId, float buttonSize)
-    {
-        EnsureDoorPaletteIcons();
-        bool hasIcons = _doorPaletteIcons is { Count: > 0 };
-        int columns = DoorTileEncoding.PaletteColumns;
-
-        int index = 0;
-        foreach (var entry in DoorTileEncoding.PaletteEntries)
-        {
-            if (index % columns != 0)
-                ImGui.SameLine();
-
-            ImGui.PushID(index + 600);
-
-            bool selected = selectedTileId == entry.Id;
-            if (selected)
-            {
-                ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.2f, 0.5f, 0.8f, 1f));
-                ImGui.PushStyleColor(ImGuiCol.Border, new Vector4(1f, 1f, 0f, 1f));
-                ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 3f);
-            }
-
-            bool picked = false;
-            if (hasIcons && _doorPaletteIcons!.TryGetValue(entry.Id, out var icon))
-            {
-                var texId = new IntPtr(icon.Texture.Id);
-                if (ImGui.ImageButton($"{entry.Id}_door", texId, new Vector2(buttonSize, buttonSize),
-                        new Vector2(0, 1), new Vector2(1, 0)))
-                    picked = true;
-            }
-            else if (ImGui.Button($"{entry.ShortLabel}", new Vector2(buttonSize, buttonSize)))
-            {
-                picked = true;
-            }
-
-            if (picked)
-            {
-                selectedTileId = entry.Id;
-                editorState.SwitchToDoorLayer();
-            }
-
-            if (selected)
-            {
-                ImGui.PopStyleVar();
-                ImGui.PopStyleColor(2);
-            }
-
-            if (ImGui.IsItemHovered())
-                ImGui.SetTooltip($"{entry.ShortLabel}\n{entry.Description}\nTile ID: {entry.Id}");
-
-            ImGui.PopID();
-            index++;
-        }
-    }
-
-    public void RenderPickupPalette(EditorState editorState)
-    {
-        if (!_showPickupPalette) return;
-
-        float buttonSize = PickupSprites.PaletteIconSize;
-        int columns = PickupSprites.PaletteColumns;
-        float gridWidth = columns * buttonSize + (columns - 1) * ImGui.GetStyle().ItemSpacing.X;
-        float windowWidth = gridWidth + ImGui.GetStyle().WindowPadding.X * 2f;
-
-        ImGui.SetNextWindowPos(new Vector2(10, 280), ImGuiCond.FirstUseEver);
-        ImGui.SetNextWindowSize(new Vector2(windowWidth, 0), ImGuiCond.FirstUseEver);
-        ImGui.Begin("Pickup Palette", ref _showPickupPalette, ImGuiWindowFlags.AlwaysAutoResize);
-        ImGui.SetWindowFontScale(_guiScale);
-
-        ImGui.Text($"Active Layer: {editorState.ActiveLayer.Name}");
-        ImGui.Separator();
-        ImGui.Text("Pickups:");
-
-        RenderPickupPaletteButtons(editorState, buttonSize, columns);
-
-        ImGui.Separator();
-        ImGui.Text($"Selected: {editorState.SelectedPickupType}");
-
-        ImGui.End();
-    }
+    public void RenderPickupPalette(EditorState editorState) =>
+        _pickupPalette.RenderWindow(editorState, ref _showPickupPalette, _guiScale);
 
     // ─── Cursor Info Panel ───────────────────────────────────────────────────────
-
-    private void EnsurePickupPaletteIcons()
-    {
-        if (_pickupPaletteIcons != null) return;
-        if (_mapData.GameTextures.Count <= PickupSprites.ObjectsTextureIndex) return;
-
-        var objectsTex = _mapData.GameTextures[PickupSprites.ObjectsTextureIndex];
-        if (objectsTex.Id == 0) return;
-
-        _pickupPaletteIcons = new Dictionary<PickupType, RenderTexture2D>();
-        foreach (PickupType type in Enum.GetValues<PickupType>())
-        {
-            var rt = LoadRenderTexture(PickupSprites.FrameSize, PickupSprites.FrameSize);
-            BeginTextureMode(rt);
-            ClearBackground(Color.Black);
-            var src = PickupSprites.GetFrameRect(type);
-            PrimitiveRenderer.DrawScreenSprite(
-                objectsTex,
-                src,
-                new Rectangle(0, 0, PickupSprites.FrameSize, PickupSprites.FrameSize),
-                Color.White);
-            EndTextureMode();
-            _pickupPaletteIcons[type] = rt;
-        }
-    }
-
-    private void RenderPickupPaletteButtons(EditorState editorState, float buttonSize, int columns)
-    {
-        EnsurePickupPaletteIcons();
-        bool hasIcons = _pickupPaletteIcons is { Count: > 0 };
-
-        int index = 0;
-        foreach (PickupType type in Enum.GetValues<PickupType>())
-        {
-            if (index % columns != 0)
-                ImGui.SameLine();
-
-            ImGui.PushID(index + 500);
-
-            bool selected = editorState.SelectedPickupType == type;
-            if (selected)
-            {
-                ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.2f, 0.5f, 0.8f, 1f));
-                ImGui.PushStyleColor(ImGuiCol.Border, new Vector4(1f, 1f, 0f, 1f));
-                ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 3f);
-            }
-
-            bool picked = false;
-            if (hasIcons && _pickupPaletteIcons!.TryGetValue(type, out var icon))
-            {
-                var texId = new IntPtr(icon.Texture.Id);
-                if (ImGui.ImageButton($"{type}_pickup", texId, new Vector2(buttonSize, buttonSize),
-                        new Vector2(0, 1), new Vector2(1, 0)))
-                    picked = true;
-            }
-            else
-            {
-                var color = PickupVisuals.GetColor(type);
-                var imguiColor = new Vector4(color.R / 255f, color.G / 255f, color.B / 255f, 0.85f);
-                ImGui.PushStyleColor(ImGuiCol.Button, imguiColor);
-                if (ImGui.Button($"{type}", new Vector2(buttonSize, buttonSize)))
-                    picked = true;
-                ImGui.PopStyleColor();
-            }
-
-            if (picked)
-            {
-                editorState.SelectedPickupType = type;
-                editorState.SwitchToPickupLayer();
-            }
-
-            if (selected)
-            {
-                ImGui.PopStyleVar();
-                ImGui.PopStyleColor(2);
-            }
-
-            if (ImGui.IsItemHovered())
-                ImGui.SetTooltip($"{type}");
-
-            ImGui.PopID();
-            index++;
-        }
-    }
 
     public void RenderInfoPanel(
         int tileX, int tileY, Vector2 worldPos, bool tileInBounds,
@@ -1088,315 +780,14 @@ public class EditorGui
         ImGui.End();
     }
 
-    // ─── Pickup Properties Panel ───────────────────────────────────────────────────
+    public void RenderPickupPropertiesPanel(EditorState state) =>
+        _pickupProperties.Render(state, ref _showPickupProperties, _guiScale);
 
-    public void RenderPickupPropertiesPanel(EditorState state, ref int selectedPickupIndex)
-    {
-        if (!_showPickupProperties) return;
-        if (selectedPickupIndex < 0 || selectedPickupIndex >= _mapData.Pickups.Count)
-            return;
+    public void RenderWallPropertiesPanel(EditorState state) =>
+        _wallProperties.Render(state, ref _showWallProperties, _guiScale);
 
-        var pickup = _mapData.Pickups[selectedPickupIndex];
-
-        ImGui.SetNextWindowPos(new Vector2(GetScreenWidth() - 300, 620), ImGuiCond.FirstUseEver);
-        ImGui.Begin("Pickup Properties", ref _showPickupProperties, ImGuiWindowFlags.AlwaysAutoResize);
-        ImGui.SetWindowFontScale(_guiScale);
-
-        ImGui.Text($"Pickup #{selectedPickupIndex}");
-        ImGui.Separator();
-
-        int tileX = pickup.TileX;
-        int tileY = pickup.TileY;
-        if (ImGui.InputInt("Tile X", ref tileX))
-            state.SetPickupTilePosition(selectedPickupIndex, tileX, pickup.TileY);
-        if (ImGui.InputInt("Tile Y", ref tileY))
-            state.SetPickupTilePosition(selectedPickupIndex, pickup.TileX, tileY);
-
-        int amount = pickup.Amount;
-        if (ImGui.InputInt("Amount (0=default)", ref amount))
-            state.SetPickupAmount(selectedPickupIndex, amount);
-
-        ImGui.Spacing();
-        ImGui.Text("Type:");
-        foreach (PickupType type in Enum.GetValues<PickupType>())
-        {
-            if (ImGui.RadioButton(type.ToString(), pickup.Type == type))
-                state.SetPickupType(selectedPickupIndex, type);
-        }
-
-        if (ImGui.Button("Delete Pickup"))
-        {
-            state.DeletePickupAt(selectedPickupIndex);
-            selectedPickupIndex = -1;
-        }
-
-        ImGui.End();
-    }
-
-    // ─── Wall Properties Panel ─────────────────────────────────────────────────────
-
-    public void RenderWallPropertiesPanel(EditorState state)
-    {
-        if (!state.ShouldShowWallPropertiesPanel(_showWallProperties))
-            return;
-
-        uint wallTileId = state.GetWallTileAt(state.SelectedWallTileX, state.SelectedWallTileY);
-        var secret = state.GetSelectedSecretPlacement();
-        bool isSecret = secret != null;
-        SecretWallDirection direction = secret?.Direction ?? SecretWallDirection.North;
-        int travelTiles = secret?.TravelTiles ?? 1;
-
-        ImGui.SetNextWindowPos(new Vector2(GetScreenWidth() - 300, 420), ImGuiCond.FirstUseEver);
-        ImGui.Begin("Wall Properties", ref _showWallProperties, ImGuiWindowFlags.AlwaysAutoResize);
-        ImGui.SetWindowFontScale(_guiScale);
-
-        ImGui.Text($"Wall ({state.SelectedWallTileX}, {state.SelectedWallTileY})");
-        ImGui.Text($"Sprite ID: {wallTileId}");
-        ImGui.Separator();
-
-        if (ImGui.Checkbox("Secret wall", ref isSecret))
-        {
-            state.SetWallSecret(isSecret, direction, travelTiles);
-            secret = state.GetSelectedSecretPlacement();
-            isSecret = secret != null;
-            direction = secret?.Direction ?? SecretWallDirection.North;
-            travelTiles = secret?.TravelTiles ?? 1;
-        }
-
-        if (isSecret)
-        {
-            ImGui.Spacing();
-            ImGui.Text("Travel direction:");
-            foreach (SecretWallDirection value in Enum.GetValues<SecretWallDirection>())
-            {
-                if (ImGui.RadioButton(value.ToString(), direction == value))
-                {
-                    direction = value;
-                    travelTiles = state.ClampSecretTravelTiles(
-                        state.SelectedWallTileX, state.SelectedWallTileY, direction, travelTiles);
-                    state.SetWallSecret(true, direction, travelTiles);
-                }
-            }
-
-            int maxTravel = state.GetMaxSecretTravelTiles(
-                state.SelectedWallTileX, state.SelectedWallTileY, direction);
-            if (ImGui.InputInt("Travel tiles", ref travelTiles))
-            {
-                travelTiles = state.ClampSecretTravelTiles(
-                    state.SelectedWallTileX, state.SelectedWallTileY, direction, travelTiles);
-                state.SetWallSecret(true, direction, travelTiles);
-            }
-
-            ImGui.TextDisabled($"Max in direction: {maxTravel}");
-        }
-
-        ImGui.End();
-    }
-
-    public void RenderEntityPropertiesPanel(
-        EditorState state,
-        ref int selectedEnemyIndex,
-        ref bool isEditingPatrolPath, ref int patrolEditEnemyIndex,
-        List<PatrolWaypoint> patrolPathInProgress)
-    {
-        bool showPlayer = state.ShouldShowPlayerPropertiesPanel(_showPlayerProperties);
-        bool showEnemy = state.ShouldShowEnemyPropertiesPanel(_showEnemyProperties);
-
-        if (!showPlayer && !showEnemy)
-        {
-            _entityPropertiesActiveWindowTitle = null;
-            return;
-        }
-
-        if (showPlayer)
-            RenderPlayerPropertiesPanel(state);
-        else
-            RenderEnemyPropertiesPanel(state, ref selectedEnemyIndex, ref isEditingPatrolPath,
-                ref patrolEditEnemyIndex, patrolPathInProgress);
-    }
-
-    private void BeginSyncedEntityPropertiesWindow(string title, ref bool open, EditorState state)
-    {
-        if (_entityPropertiesActiveWindowTitle != title)
-            ImGui.SetNextWindowPos(state.GetEntityPropertiesImGuiPos(GetScreenWidth()), ImGuiCond.Appearing);
-        _entityPropertiesActiveWindowTitle = title;
-        ImGui.Begin(title, ref open, ImGuiWindowFlags.AlwaysAutoResize);
-    }
-
-    private void EndSyncedEntityPropertiesWindow(EditorState state)
-    {
-        state.SetEntityPropertiesFromImGuiPos(ImGui.GetWindowPos(), GetScreenWidth());
-        ImGui.End();
-    }
-
-    // ─── Player Properties Panel ─────────────────────────────────────────────────
-
-    private void RenderPlayerPropertiesPanel(EditorState state)
-    {
-        BeginSyncedEntityPropertiesWindow("Player Properties", ref _showPlayerProperties, state);
-        ImGui.SetWindowFontScale(_guiScale);
-
-        ImGui.Text("Player Spawn");
-        ImGui.Separator();
-
-        int tileX = state.MapData.Spawn.TileX;
-        int tileY = state.MapData.Spawn.TileY;
-        if (ImGui.InputInt("Tile X", ref tileX))
-        {
-            tileX = Math.Clamp(tileX, 0, _mapData.Width - 1);
-            state.SyncPlayerToSpawnTile(tileX, state.MapData.Spawn.TileY);
-        }
-        if (ImGui.InputInt("Tile Y", ref tileY))
-        {
-            tileY = Math.Clamp(tileY, 0, _mapData.Height - 1);
-            state.SyncPlayerToSpawnTile(state.MapData.Spawn.TileX, tileY);
-        }
-
-        ImGui.Spacing();
-
-        float worldX = state.MapData.Spawn.TileX * LevelData.QuadSize;
-        float worldZ = state.MapData.Spawn.TileY * LevelData.QuadSize;
-        ImGui.Text("World Position");
-        ImGui.Text($"  X: {worldX:F1}  Y: {state.MapData.Spawn.WorldY:F1}  Z: {worldZ:F1}");
-
-        ImGui.Spacing();
-
-        int rotIndex = EditorState.GetSpawnRotationIndex(state.MapData.Spawn.Rotation);
-        string[] labels = { "0°", "45°", "90°", "135°", "180°", "225°", "270°", "315°" };
-        if (ImGui.SliderInt("Rotation", ref rotIndex, 0, 7, labels[rotIndex]))
-            state.SetPlayerSpawnRotationIndex(rotIndex);
-
-        EndSyncedEntityPropertiesWindow(state);
-    }
-
-    // ─── Enemy Properties Panel ──────────────────────────────────────────────────
-
-    private void RenderEnemyPropertiesPanel(
-        EditorState state,
-        ref int selectedEnemyIndex,
-        ref bool isEditingPatrolPath, ref int patrolEditEnemyIndex,
-        List<PatrolWaypoint> patrolPathInProgress)
-    {
-        var enemy = _mapData.Enemies[selectedEnemyIndex];
-
-        BeginSyncedEntityPropertiesWindow("Enemy Properties", ref _showEnemyProperties, state);
-        ImGui.SetWindowFontScale(_guiScale);
-
-        ImGui.Text($"Enemy #{selectedEnemyIndex}");
-        ImGui.Separator();
-
-        int tileX = enemy.TileX;
-        int tileY = enemy.TileY;
-        if (ImGui.InputInt("Tile X", ref tileX))
-        {
-            state.SetEnemyTilePosition(selectedEnemyIndex, tileX, enemy.TileY);
-        }
-        if (ImGui.InputInt("Tile Y", ref tileY))
-        {
-            state.SetEnemyTilePosition(selectedEnemyIndex, enemy.TileX, tileY);
-        }
-
-        ImGui.Spacing();
-
-        float worldX = enemy.TileX * LevelData.QuadSize;
-        float worldZ = enemy.TileY * LevelData.QuadSize;
-        ImGui.Text("World Position");
-        ImGui.Text($"  X: {worldX:F1}  Y: 2.0  Z: {worldZ:F1}");
-
-        ImGui.Spacing();
-
-        const float step = MathF.PI / 4f;
-        int rotIndex = (int)MathF.Round(enemy.Rotation / step);
-        rotIndex = Math.Clamp(rotIndex, 0, 7);
-        string[] labels = { "0°", "45°", "90°", "135°", "180°", "225°", "270°", "315°" };
-        if (ImGui.SliderInt("Rotation", ref rotIndex, 0, 7, labels[rotIndex]))
-        {
-            state.SetEnemyRotation(selectedEnemyIndex, rotIndex * step);
-        }
-
-        ImGui.Spacing();
-
-        ImGui.Text($"Type: {enemy.EnemyType}");
-        if (ImGui.Button("Guard")) state.SetEnemyType(selectedEnemyIndex, "Guard");
-
-        ImGui.Spacing();
-
-        bool startsAsCorpse = enemy.StartsAsCorpse;
-        if (ImGui.Checkbox("Corpse (dead on spawn)", ref startsAsCorpse))
-            state.SetEnemyStartsAsCorpse(selectedEnemyIndex, startsAsCorpse);
-
-        bool dropsAmmo = enemy.DropsAmmo;
-        if (ImGui.Checkbox("Drops ammo on death", ref dropsAmmo))
-            state.SetEnemyDropsAmmo(selectedEnemyIndex, dropsAmmo);
-
-        ImGui.Spacing();
-        ImGui.Separator();
-
-        // Patrol path
-        ImGui.Text("Patrol Path");
-
-        bool showPath = enemy.ShowPatrolPath;
-        if (ImGui.Checkbox("Show Path", ref showPath))
-        {
-            enemy.ShowPatrolPath = showPath;
-        }
-
-        if (isEditingPatrolPath && patrolEditEnemyIndex == selectedEnemyIndex)
-        {
-            ImGui.TextColored(new Vector4(1f, 0.8f, 0f, 1f),
-                $"Editing... ({patrolPathInProgress.Count} waypoints)");
-            ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "LMB: Add waypoint");
-            ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Enter: Confirm path");
-            ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Escape: Cancel");
-
-            if (ImGui.Button("Cancel Editing"))
-            {
-                isEditingPatrolPath = false;
-                patrolPathInProgress.Clear();
-                patrolEditEnemyIndex = -1;
-            }
-        }
-        else
-        {
-            if (enemy.PatrolPath.Count > 0)
-            {
-                ImGui.Text($"{enemy.PatrolPath.Count} waypoints");
-                for (int w = 0; w < enemy.PatrolPath.Count; w++)
-                {
-                    var wp = enemy.PatrolPath[w];
-                    ImGui.TextColored(new Vector4(0, 0.8f, 1f, 1f),
-                        $"  {w + 1}: ({wp.TileX}, {wp.TileY})");
-                }
-
-                if (ImGui.Button("Clear Path"))
-                {
-                    state.ClearEnemyPatrolPath(selectedEnemyIndex);
-                }
-                ImGui.SameLine();
-            }
-
-            if (ImGui.Button("Add Path"))
-            {
-                isEditingPatrolPath = true;
-                patrolEditEnemyIndex = selectedEnemyIndex;
-                patrolPathInProgress.Clear();
-            }
-        }
-
-        ImGui.Spacing();
-        ImGui.Separator();
-
-        ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.8f, 0.2f, 0.2f, 1f));
-        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.9f, 0.3f, 0.3f, 1f));
-        if (ImGui.Button("Delete Enemy", new Vector2(-1, 0)))
-        {
-            state.DeleteEnemyAt(selectedEnemyIndex);
-            selectedEnemyIndex = -1;
-        }
-        ImGui.PopStyleColor(2);
-
-        EndSyncedEntityPropertiesWindow(state);
-    }
+    public void RenderEntityPropertiesPanel(EditorState state) =>
+        _entityProperties.Render(state, ref _showPlayerProperties, ref _showEnemyProperties, _guiScale);
 
     // ─── Debug Log Panel ────────────────────────────────────────────────────────
 
@@ -1406,167 +797,11 @@ public class EditorGui
         Debug.RenderLogWindow(_guiScale);
     }
 
-    // ─── Pathfinding Visualizer Panel ───────────────────────────────────────────
+    public void RenderPathfindingPanel(EditorState state) =>
+        _pathfindingPanel.Render(state, ref _showPathfinding, _guiScale);
 
-    /// <summary>
-    /// Tool window for visualizing A* paths in the editor: pick a start and end tile,
-    /// and the path is recomputed and drawn over the map.
-    /// </summary>
-    public void RenderPathfindingPanel(EditorState state)
-    {
-        if (!_showPathfinding) return;
-
-        ImGui.SetNextWindowPos(new Vector2(10, GetScreenHeight() - 280), ImGuiCond.FirstUseEver);
-        ImGui.Begin("Pathfinding Visualizer", ref _showPathfinding, ImGuiWindowFlags.AlwaysAutoResize);
-        ImGui.SetWindowFontScale(_guiScale);
-
-        switch (state.PathPickingMode)
-        {
-            case EditorState.PathPickMode.Start:
-                ImGui.TextColored(new Vector4(1f, 0.85f, 0.2f, 1f),
-                    "Click a tile to set START  (Esc: cancel)");
-                break;
-            case EditorState.PathPickMode.End:
-                ImGui.TextColored(new Vector4(1f, 0.85f, 0.2f, 1f),
-                    "Click a tile to set END  (Esc: cancel)");
-                break;
-            default:
-                ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Ready");
-                break;
-        }
-
-        ImGui.Separator();
-
-        DrawEndpointRow(
-            label: "Start",
-            point: state.PathStart,
-            assignedColor: new Vector4(0.3f, 1f, 0.4f, 1f),
-            buttonLabel: "Pick Start",
-            onClick: state.StartPickingPathStart);
-
-        DrawEndpointRow(
-            label: "End",
-            point: state.PathEnd,
-            assignedColor: new Vector4(1f, 0.4f, 0.4f, 1f),
-            buttonLabel: "Pick End",
-            onClick: state.StartPickingPathEnd);
-
-        ImGui.Separator();
-
-        if (state.PathResult != null && state.PathResult.Count > 0)
-        {
-            ImGui.TextColored(new Vector4(0.3f, 0.8f, 1f, 1f),
-                $"Path: {state.PathResult.Count} tiles");
-        }
-        else if (state.PathStart.HasValue && state.PathEnd.HasValue)
-        {
-            ImGui.TextColored(new Vector4(1f, 0.3f, 0.3f, 1f), "No path found");
-        }
-        else
-        {
-            ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1f),
-                "Pick both endpoints to compute a path");
-        }
-
-        ImGui.Spacing();
-
-        if (ImGui.Button("Recompute", new Vector2(120, 0)))
-            state.RecomputePath();
-        ImGui.SameLine();
-        if (ImGui.Button("Clear", new Vector2(120, 0)))
-            state.ClearPath();
-
-        ImGui.Separator();
-
-        ImGui.Text("While simulating");
-        ImGui.Separator();
-
-        bool drawEnemyPaths = state.DrawEnemyPaths;
-        if (ImGui.Checkbox("Draw paths for enemies", ref drawEnemyPaths))
-            state.DrawEnemyPaths = drawEnemyPaths;
-
-        bool drawEnemyFov = state.DrawEnemyLineOfSight;
-        if (ImGui.Checkbox("Draw enemy line of sight", ref drawEnemyFov))
-            state.DrawEnemyLineOfSight = drawEnemyFov;
-
-        ImGui.End();
-    }
-
-    // ─── Sound Propagation Panel ──────────────────────────────────────────────────
-
-    /// <summary>
-    /// Tool window for testing tile-based sound propagation in the editor.
-    /// </summary>
-    public void RenderSoundPropagationPanel(EditorState state)
-    {
-        if (!_showSoundPropagation) return;
-
-        ImGui.SetNextWindowPos(new Vector2(10, GetScreenHeight() - 420), ImGuiCond.FirstUseEver);
-        ImGui.Begin("Sound Propagation", ref _showSoundPropagation, ImGuiWindowFlags.AlwaysAutoResize);
-        ImGui.SetWindowFontScale(_guiScale);
-
-        if (state.SoundPropagationPicking)
-        {
-            ImGui.TextColored(new Vector4(1f, 0.85f, 0.2f, 1f),
-                "Click a tile to test propagation  (Esc: cancel)");
-        }
-        else
-        {
-            ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Ready");
-        }
-
-        ImGui.Separator();
-
-        if (state.IsSimulating)
-        {
-            ImGui.TextColored(new Vector4(0.4f, 0.9f, 0.5f, 1f), "Using live door states");
-        }
-        else
-        {
-            ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "All doors treated as closed");
-        }
-
-        ImGui.Separator();
-
-        if (state.SoundPropagationTiles is { Count: > 0 })
-        {
-            ImGui.TextColored(new Vector4(1f, 0.65f, 0.2f, 1f),
-                $"Reached {state.SoundPropagationTiles.Count} tiles");
-        }
-        else
-        {
-            ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1f),
-                "Pick an origin tile to test propagation");
-        }
-
-        ImGui.Spacing();
-
-        if (ImGui.Button("Test at tile", new Vector2(120, 0)))
-            state.StartSoundPropagationPick();
-        ImGui.SameLine();
-        if (ImGui.Button("Clear", new Vector2(120, 0)))
-            state.ClearSoundPropagation();
-
-        ImGui.End();
-    }
-
-    private static void DrawEndpointRow(
-        string label, Vector2? point, Vector4 assignedColor,
-        string buttonLabel, Action onClick)
-    {
-        if (point.HasValue)
-        {
-            ImGui.TextColored(assignedColor,
-                $"{label}: ({(int)point.Value.X}, {(int)point.Value.Y})");
-        }
-        else
-        {
-            ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1f), $"{label}: not set");
-        }
-
-        if (ImGui.Button(buttonLabel, new Vector2(120, 0)))
-            onClick();
-    }
+    public void RenderSoundPropagationPanel(EditorState state) =>
+        _soundPropagationPanel.Render(state, ref _showSoundPropagation, _guiScale);
 
     /// <summary>
     /// Draw the status message bar at the top center of the screen.

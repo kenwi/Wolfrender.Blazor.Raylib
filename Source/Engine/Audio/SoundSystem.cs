@@ -1,22 +1,27 @@
-using Game.Features.Options;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 
 namespace Game.Engine.Audio;
 
+/// <summary>
+/// Music and one-shot SFX. Volumes are Raylib gains in 0–1; Options converts UI levels before calling in.
+/// </summary>
 public class SoundSystem
 {
+    /// <summary>Matches Options default level 1 of 3 when no settings have been applied yet.</summary>
+    private const float DefaultRaylibVolume = 1f / 3f;
+
     private Music _music;
-    private float _musicLevel = AudioVolumeLevel.Default;
-    private float _sfxLevel = AudioVolumeLevel.Default;
+    private float _musicVolume = DefaultRaylibVolume;
+    private float _sfxVolume = DefaultRaylibVolume;
     private readonly Dictionary<string, Sound> _soundsByPath = new();
 
     public SoundSystem(string musicPath)
     {
         _music = LoadMusicStream(musicPath);
         PlayMusicStream(_music);
-        SetMusicLevel(_musicLevel);
-        SetSfxLevel(_sfxLevel);
+        ApplyMusicVolume(_musicVolume);
+        ApplySfxVolume(_sfxVolume);
     }
 
     public void Update()
@@ -24,31 +29,21 @@ public class SoundSystem
         UpdateMusicStream(_music);
     }
 
-    public void SetMusicLevel(float level)
+    public void ApplyMusicVolume(float raylibVolume)
     {
-        _musicLevel = AudioVolumeLevel.Clamp(level);
-        SetMusicVolume(_music, AudioVolumeLevel.ToRaylibVolume(_musicLevel));
+        _musicVolume = Math.Clamp(raylibVolume, 0f, 1f);
+        SetMusicVolume(_music, _musicVolume);
     }
 
-    public void SetSfxLevel(float level)
+    public void ApplySfxVolume(float raylibVolume)
     {
-        _sfxLevel = AudioVolumeLevel.Clamp(level);
-        float volume = AudioVolumeLevel.ToRaylibVolume(_sfxLevel);
+        _sfxVolume = Math.Clamp(raylibVolume, 0f, 1f);
         foreach (var sound in _soundsByPath.Values)
-            SetSoundVolume(sound, volume);
+            SetSoundVolume(sound, _sfxVolume);
     }
 
-    public float GetMusicLevel() => _musicLevel;
-    public float GetSfxLevel() => _sfxLevel;
-
-    public void SetVolume(float volume)
-    {
-        float level = AudioVolumeLevel.FromSliderPosition(Math.Clamp(volume, 0f, 1f));
-        SetMusicLevel(level);
-        SetSfxLevel(level);
-    }
-
-    public float GetVolume() => AudioVolumeLevel.ToRaylibVolume(_sfxLevel);
+    public float GetMusicVolume() => _musicVolume;
+    public float GetSfxVolume() => _sfxVolume;
 
     /// <summary>Play a one-shot SFX by resource path, loading and caching it on first use.</summary>
     public void PlaySfx(string path)
@@ -59,7 +54,7 @@ public class SoundSystem
         if (!_soundsByPath.TryGetValue(path, out var sound))
         {
             sound = LoadSound(Res.Path(path));
-            SetSoundVolume(sound, AudioVolumeLevel.ToRaylibVolume(_sfxLevel));
+            SetSoundVolume(sound, _sfxVolume);
             _soundsByPath[path] = sound;
         }
 

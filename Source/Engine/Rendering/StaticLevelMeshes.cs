@@ -19,21 +19,21 @@ public sealed class StaticLevelMeshes : IDisposable
     public int BakedQuadCount => _bakedQuadCount;
     public bool HasMeshes => _batches.Count > 0;
 
-    public void RebuildIfNeeded(MapData mapData, IReadOnlyList<Texture2D> textures)
+    public void RebuildIfNeeded(MapData mapData, IReadOnlyList<Texture2D> textures, IDoorTileEncoding doorTiles)
     {
         if (mapData.GeometryVersion == _trackedGeometryVersion)
             return;
 
-        Rebuild(mapData, textures);
+        Rebuild(mapData, textures, doorTiles);
     }
 
-    public void Rebuild(MapData mapData, IReadOnlyList<Texture2D> textures)
+    public void Rebuild(MapData mapData, IReadOnlyList<Texture2D> textures, IDoorTileEncoding doorTiles)
     {
         UnloadMeshes();
         _batches.Clear();
         _bakedQuadCount = 0;
 
-        foreach (var batch in LevelMeshBuilder.Build(mapData))
+        foreach (var batch in LevelMeshBuilder.Build(mapData, doorTiles))
         {
             if (batch.TextureIndex < 0 || batch.TextureIndex >= textures.Count)
             {

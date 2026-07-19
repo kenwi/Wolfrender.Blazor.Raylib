@@ -1,4 +1,5 @@
 using Game.Features.Doors;
+using Game.Features.WorldObjects;
 
 namespace Game.Features.SoundPropagation;
 

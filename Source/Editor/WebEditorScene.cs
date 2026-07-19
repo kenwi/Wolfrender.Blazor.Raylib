@@ -1,9 +1,9 @@
-using System.Numerics;
 using Game.Engine.Movement;
 using Game.Features.Doors;
 using Game.Features.Enemies;
 using Game.Features.LevelProgress;
 using Game.Features.Players;
+using Game.Features.WorldObjects;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 using Color = Raylib_cs.Color;
@@ -19,16 +19,18 @@ public class WebEditorScene : IScene
 {
     public readonly EditorState State;
     private readonly EditorMapRenderer _mapRenderer;
-    private readonly CollisionSystem _collisionSystem;
+    private readonly EditorMapInteractionController _mapInteraction;
 
     public WebEditorScene(MapData mapData, EnemySystem enemySystem,
         DoorSystem doorSystem, SecretSystem secretSystem, Player player)
     {
         State = new EditorState(mapData, enemySystem, doorSystem, secretSystem, player);
         _mapRenderer = new EditorMapRenderer(mapData);
-        _collisionSystem = new CollisionSystem(
+        var collisionSystem = new CollisionSystem(
             new LevelData(mapData),
-            new CompositeMovementBlocker(doorSystem, secretSystem));
+            new CompositeMovementBlocker(doorSystem, secretSystem),
+            ObjectCollisionRules.Instance);
+        _mapInteraction = new EditorMapInteractionController(State, collisionSystem);
     }
 
     public void OnEnter()
@@ -66,13 +68,7 @@ public class WebEditorScene : IScene
         }
 
         if (IsMouseButtonReleased(MouseButton.Left))
-        {
-            State.EndPaintStroke();
-            State.EndEnemyDrag();
-            State.EndPickupDrag();
-            State.EndPlayerDrag();
-            State.IsDraggingPlayer = false;
-        }
+            _mapInteraction.EndLeftMouseGesture();
 
         if (IsKeyPressed(KeyboardKey.Z) && ctrlHeld)
             State.Undo();
@@ -88,7 +84,7 @@ public class WebEditorScene : IScene
 
         if (State.IsSimulating)
         {
-            UpdatePlayerMovement(deltaTime);
+            _mapInteraction.UpdatePlayerMovement(deltaTime);
             State.EnemySystem.Update(deltaTime);
             State.UpdateInteractablesDuringSimulation(deltaTime, IsKeyPressed(KeyboardKey.E));
         }
@@ -96,13 +92,9 @@ public class WebEditorScene : IScene
         State.Camera.HandleInput(deltaTime, ctrlHeld, State.IsMouseOverUI, disableKeyboardPan: State.IsSimulating);
 
         if (State.IsEditingPatrolPath)
-        {
-            HandlePatrolPathInput();
-        }
+            _mapInteraction.HandlePatrolPathInput(State.IsMouseOverUI);
         else
-        {
-            HandleTileAndEnemyInput();
-        }
+            _mapInteraction.HandleMapInput(State.IsMouseOverUI, supportsWallSelect: false);
     }
 
     public void Render()
@@ -119,17 +111,21 @@ public class WebEditorScene : IScene
 
             if (layer.Name == EditorState.EnemiesLayerName)
             {
+                int hoveredEnemy = State.HoveredEnemyIndex;
                 _mapRenderer.RenderEnemyLayer(
                     State.Camera, State.EnemySystem, State.IsMouseOverUI,
                     State.IsSimulating, State.DrawEnemyLineOfSight, State.ShowPatrolPaths,
-                    ref State.HoveredEnemyIndex, State.SelectedEnemyIndex,
+                    ref hoveredEnemy, State.SelectedEnemyIndex,
                     State.IsEditingPatrolPath, State.PatrolEditEnemyIndex, State.PatrolPathInProgress);
+                State.HoveredEnemyIndex = hoveredEnemy;
             }
             else if (layer.Name == EditorState.PickupsLayerName)
             {
+                int hoveredPickup = State.HoveredPickupIndex;
                 _mapRenderer.RenderPickupLayer(
                     State.Camera, State.IsMouseOverUI,
-                    ref State.HoveredPickupIndex, State.SelectedPickupIndex);
+                    ref hoveredPickup, State.SelectedPickupIndex);
+                State.HoveredPickupIndex = hoveredPickup;
             }
             else if (layer.Name == EditorState.ObjectsLayerName)
             {
@@ -181,242 +177,5 @@ public class WebEditorScene : IScene
         }
 
         EndDrawing();
-    }
-
-    private void HandlePatrolPathInput()
-    {
-        if (!State.IsMouseOverUI && IsMouseButtonPressed(MouseButton.Left))
-        {
-            var paintPos = State.Camera.ScreenToWorld(GetMousePosition());
-            int px = (int)MathF.Floor(paintPos.X);
-            int py = (int)MathF.Floor(paintPos.Y);
-            State.AddPatrolWaypoint(px, py);
-        }
-
-        if (IsKeyPressed(KeyboardKey.Enter) || IsKeyPressed(KeyboardKey.KpEnter))
-            State.ConfirmPatrolPath();
-
-        if (IsKeyPressed(KeyboardKey.Escape))
-            State.CancelPatrolPath();
-    }
-
-    private void HandlePlayerInput()
-    {
-        if (State.IsSimulating) return;
-
-        var mouseScreen = GetMousePosition();
-        State.UpdatePlayerHover(State.Camera, mouseScreen, State.IsMouseOverUI);
-
-        if (!State.IsMouseOverUI && IsMouseButtonPressed(MouseButton.Left) && State.HoveredPlayer)
-            State.SelectPlayer();
-
-        if (State.IsDraggingPlayer && IsMouseButtonDown(MouseButton.Left))
-        {
-            var dragPos = State.Camera.ScreenToWorld(GetMousePosition());
-            int tx = (int)MathF.Floor(dragPos.X);
-            int ty = (int)MathF.Floor(dragPos.Y);
-            if (tx >= 0 && tx < State.MapData.Width && ty >= 0 && ty < State.MapData.Height
-                && State.CanPlacePickupAt(tx, ty))
-            {
-                State.SyncPlayerToSpawnTile(tx, ty);
-            }
-        }
-
-        if (IsMouseButtonReleased(MouseButton.Left))
-            State.IsDraggingPlayer = false;
-    }
-
-    private void HandleTileAndEnemyInput()
-    {
-        if (!State.IsSimulating)
-            HandlePlayerInput();
-
-        bool isEnemyLayer = State.IsOnEnemyLayer;
-        bool isPickupLayer = State.IsOnPickupLayer;
-
-        if (!State.IsMouseOverUI && !isEnemyLayer && State.HoveredEnemyIndex >= 0 && IsMouseButtonPressed(MouseButton.Left))
-        {
-            State.SwitchToEnemyLayer();
-            isEnemyLayer = true;
-            State.SelectEnemy(State.HoveredEnemyIndex);
-        }
-
-        if (!State.IsMouseOverUI && !isPickupLayer && State.HoveredPickupIndex >= 0 && IsMouseButtonPressed(MouseButton.Left))
-        {
-            State.SwitchToPickupLayer();
-            isPickupLayer = true;
-            State.SelectPickup(State.HoveredPickupIndex);
-        }
-
-        if (!State.IsMouseOverUI && isEnemyLayer && IsMouseButtonPressed(MouseButton.Left))
-        {
-            if (State.HoveredPickupIndex >= 0)
-            {
-                State.SwitchToPickupLayer();
-                isEnemyLayer = false;
-                isPickupLayer = true;
-                State.SelectPickup(State.HoveredPickupIndex);
-            }
-            else
-            {
-                var clickPos = State.Camera.ScreenToWorld(GetMousePosition());
-                int cx = (int)MathF.Floor(clickPos.X);
-                int cy = (int)MathF.Floor(clickPos.Y);
-                uint doorTile = State.GetDoorTileAt(cx, cy);
-                if (doorTile != 0)
-                {
-                    State.SwitchToDoorLayer();
-                    State.SelectedTileId = doorTile;
-                    isEnemyLayer = false;
-                }
-            }
-        }
-
-        if (!State.IsMouseOverUI && isEnemyLayer && !State.IsDraggingPlayer)
-        {
-            HandleEnemyInput();
-        }
-        else if (!State.IsMouseOverUI && isPickupLayer && !State.IsDraggingPlayer)
-        {
-            HandlePickupInput();
-        }
-        else if (!State.IsMouseOverUI && !State.IsDraggingPlayer && !isEnemyLayer && !isPickupLayer)
-        {
-            if (IsMouseButtonPressed(MouseButton.Left))
-            {
-                State.BeginPaintStroke();
-                var paintPos = State.Camera.ScreenToWorld(GetMousePosition());
-                int px = (int)MathF.Floor(paintPos.X);
-                int py = (int)MathF.Floor(paintPos.Y);
-                State.PaintTile(px, py);
-            }
-            else if (IsMouseButtonDown(MouseButton.Left))
-            {
-                var paintPos = State.Camera.ScreenToWorld(GetMousePosition());
-                int px = (int)MathF.Floor(paintPos.X);
-                int py = (int)MathF.Floor(paintPos.Y);
-                State.PaintTile(px, py);
-            }
-        }
-
-        if (isEnemyLayer && State.SelectedEnemyIndex >= 0 && State.SelectedEnemyIndex < State.MapData.Enemies.Count
-            && IsKeyPressed(KeyboardKey.Delete))
-        {
-            State.DeleteSelectedEnemy();
-        }
-
-        if (isPickupLayer && State.SelectedPickupIndex >= 0 && State.SelectedPickupIndex < State.MapData.Pickups.Count
-            && IsKeyPressed(KeyboardKey.Delete))
-        {
-            State.DeleteSelectedPickup();
-        }
-    }
-
-    private void HandlePickupInput()
-    {
-        if (IsMouseButtonPressed(MouseButton.Left))
-        {
-            if (State.HoveredPickupIndex >= 0)
-                State.SelectPickup(State.HoveredPickupIndex);
-            else
-            {
-                var paintPos = State.Camera.ScreenToWorld(GetMousePosition());
-                int px = (int)MathF.Floor(paintPos.X);
-                int py = (int)MathF.Floor(paintPos.Y);
-                if (!State.TrySwitchLayerFromPickupClick(px, py))
-                    State.PlacePickup(px, py);
-            }
-        }
-
-        if (State.IsDraggingPickup && IsMouseButtonDown(MouseButton.Left)
-            && State.SelectedPickupIndex >= 0 && State.SelectedPickupIndex < State.MapData.Pickups.Count)
-        {
-            var dragPos = State.Camera.ScreenToWorld(GetMousePosition());
-            int dx = (int)MathF.Floor(dragPos.X);
-            int dy = (int)MathF.Floor(dragPos.Y);
-            State.MovePickup(dx, dy);
-        }
-
-        if (IsMouseButtonReleased(MouseButton.Left))
-            State.IsDraggingPickup = false;
-    }
-
-    private void HandleEnemyInput()
-    {
-        if (IsMouseButtonPressed(MouseButton.Left))
-        {
-            if (State.HoveredEnemyIndex >= 0)
-                State.SelectEnemy(State.HoveredEnemyIndex);
-            else
-            {
-                var paintPos = State.Camera.ScreenToWorld(GetMousePosition());
-                int px = (int)MathF.Floor(paintPos.X);
-                int py = (int)MathF.Floor(paintPos.Y);
-                State.PlaceEnemy(px, py);
-            }
-        }
-
-        if (State.IsDraggingEnemy && IsMouseButtonDown(MouseButton.Left)
-            && State.SelectedEnemyIndex >= 0 && State.SelectedEnemyIndex < State.MapData.Enemies.Count)
-        {
-            var dragPos = State.Camera.ScreenToWorld(GetMousePosition());
-            int dx = (int)MathF.Floor(dragPos.X);
-            int dy = (int)MathF.Floor(dragPos.Y);
-            State.MoveEnemy(dx, dy);
-        }
-
-        if (IsMouseButtonReleased(MouseButton.Left))
-            State.IsDraggingEnemy = false;
-    }
-
-    private void UpdatePlayerMovement(float deltaTime)
-    {
-        const float rotationSpeed = 2.5f;
-
-        var camera = State.Player.Camera;
-        Vector3 forward = Vector3.Normalize(camera.Target - camera.Position);
-
-        float yawDelta = 0;
-        if (IsKeyDown(KeyboardKey.Left))  yawDelta += rotationSpeed * deltaTime;
-        if (IsKeyDown(KeyboardKey.Right)) yawDelta -= rotationSpeed * deltaTime;
-
-        if (MathF.Abs(yawDelta) > 0.0001f)
-        {
-            var rotMatrix = Matrix4x4.CreateFromAxisAngle(Vector3.UnitY, yawDelta);
-            forward = Vector3.Transform(forward, rotMatrix);
-        }
-
-        Vector3 forwardXZ = new Vector3(forward.X, 0, forward.Z);
-        float forwardLen = forwardXZ.Length();
-        if (forwardLen > 0.001f)
-            forwardXZ /= forwardLen;
-        else
-            forwardXZ = Vector3.UnitZ;
-
-        Vector3 right = Vector3.Cross(forwardXZ, -Vector3.UnitY);
-        float rightLen = right.Length();
-        if (rightLen > 0.001f)
-            right /= rightLen;
-
-        Vector3 moveDir = Vector3.Zero;
-        if (IsKeyDown(KeyboardKey.W)) moveDir += forwardXZ;
-        if (IsKeyDown(KeyboardKey.S)) moveDir -= forwardXZ;
-        if (IsKeyDown(KeyboardKey.A)) moveDir += right;
-        if (IsKeyDown(KeyboardKey.D)) moveDir -= right;
-
-        float moveDirLen = moveDir.Length();
-        if (moveDirLen > 0.001f)
-        {
-            moveDir /= moveDirLen;
-            var oldPosition = State.Player.Position;
-            var desired = oldPosition + moveDir * State.Player.MoveSpeed * deltaTime;
-            State.Player.OldPosition = oldPosition;
-            State.Player.Position = _collisionSystem.ResolveMovement(
-                oldPosition, desired, State.Player.CollisionRadius);
-        }
-
-        camera.Position = State.Player.Position;
-        camera.Target = camera.Position + forward;
-        State.Player.Camera = camera;
     }
 }

@@ -1,11 +1,12 @@
 using System.Numerics;
 using Raylib_cs;
 
-namespace Game.Engine.Rendering;
+namespace Game.Features.WorldObjects;
 
 /// <summary>
-/// Sprite sheet layout for blocking placed objects on <c>Objects.png</c>
+/// Objects-layer catalog and sprite sheet layout for <c>Objects.png</c>
 /// (4×5 grid of 64×64 frames starting at 1, 309).
+/// Owns object IDs, light-fixture IDs, movement blocking, and editor palette CSS.
 /// Pickup frames on the same sheet are defined in <c>Game.Features.Pickups.PickupSprites</c>.
 /// </summary>
 public static class ObjectSprites

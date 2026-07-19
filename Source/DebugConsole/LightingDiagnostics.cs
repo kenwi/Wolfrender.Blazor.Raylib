@@ -1,9 +1,9 @@
 using System.Numerics;
 using Game.Core.Level;
-using Game.Features.Doors;
+using Game.Engine.Rendering;
 using Game.Features.WorldObjects;
 
-namespace Game.Engine.Rendering;
+namespace Game.DebugConsole;
 
 /// <summary>CPU-side lighting pipeline report for the <c>lightcheck</c> console command.</summary>
 public static class LightingDiagnostics
@@ -11,7 +11,7 @@ public static class LightingDiagnostics
     public static List<string> BuildReport(
         MapData mapData,
         LevelRoomMap roomMap,
-        IReadOnlyList<Door> doors,
+        IDoorPortalState portals,
         Vector3 playerPosition,
         LightOcclusionMap occlusionMap,
         LightingDebugSnapshot shaderState)
@@ -24,7 +24,7 @@ public static class LightingDiagnostics
         int textureRoomId = occlusionMap.DecodeRoomId(entityTileX, entityTileY);
         byte roomPixel = occlusionMap.GetRoomPixel(entityTileX, entityTileY);
 
-        var visibleRooms = roomMap.ComputeVisibleRooms(entityTileX, entityTileY, doors);
+        var visibleRooms = roomMap.ComputeVisibleRooms(entityTileX, entityTileY, portals);
         var mapLights = TileLightCollector.Collect(mapData);
         var activeLights = TileLightCollector.SelectForVisibleRooms(
             mapLights,
@@ -262,27 +262,3 @@ public static class LightingDiagnostics
         return false;
     }
 }
-
-public readonly record struct LightingDebugSnapshot(
-    bool LightingShaderValid,
-    int LightingShaderProgramId,
-    bool SpriteLitShaderValid,
-    int SpriteLitShaderProgramId,
-    int ActiveUploadedLightCount,
-    Vector3 PlayerPosition,
-    float MaxLightDistance,
-    float MinBrightness,
-    float TileLightRadius,
-    int TileLightCountLoc,
-    int OcclusionMapLoc,
-    int RoomMapLoc,
-    int MapSizeLoc,
-    int TileSizeLoc,
-    int ApplySurfaceLightingLoc,
-    int MeshRoomIdLoc,
-    int[] TileLightLocs,
-    int[] TileLightRoomLocs,
-    Vector3[] ActiveLights,
-    Vector2[] ActiveLightRooms,
-    int OcclusionTextureId,
-    int RoomTextureId);

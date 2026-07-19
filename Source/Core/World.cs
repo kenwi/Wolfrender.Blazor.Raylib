@@ -1,6 +1,5 @@
 using System.Numerics;
 using Game.DebugConsole;
-using Game.Editor;
 using Game.Engine.Movement;
 using Game.Engine.Simulation;
 using Game.Features.Animation;
@@ -17,7 +16,6 @@ using Game.Features.Recording;
 using Game.Features.WorldObjects;
 using Game.Features.SoundPropagation;
 using Game.Engine.Rendering;
-using ImGuiNET;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 
@@ -25,8 +23,6 @@ namespace Game.Core;
 
 public class World : IScene
 {
-    private string _currentLevelPath = LevelCatalog.DefaultLevelPath;
-
     private readonly Player _player;
     private readonly SoundSystem _soundSystem;
     private readonly EffectSystem _effectSystem;
@@ -62,18 +58,16 @@ public class World : IScene
     private readonly HighscoreBoardOverlay _highscoreBoardOverlay;
     private readonly OptionsMenuSystem _optionsMenu = new();
     private readonly ControlsIntroSystem _controlsIntroSystem = new();
-    private bool _highscoreIntermissionStarted;
+    private readonly PlayOptionsFacade _playOptions;
+    private readonly PlayOverlayInputController _overlayInput;
+    private readonly PlayConsoleCommands _consoleCommands;
+    private readonly PlayHudComposer _hudComposer;
+    private readonly PlayLevelSession _levelSession;
     private bool _suppressLevelCompleteClickRestart;
 
-    private RenderTexture2D _sceneRenderTexture;
-    private RenderTexture2D _hudRenderTexture;
-    private bool _hasSceneRenderTexture;
-    private bool _hasHudRenderTexture;
     private InputState _inputState = new();
     private SimulationPose _previousSimulationPose;
     private SimulationPose _currentSimulationPose;
-    private int _currentRngSeed;
-    private int? _rngSeedOverride;
 
     public Player Player => _player;
     public PlayerSystem PlayerSystem => _playerSystem;
@@ -83,7 +77,7 @@ public class World : IScene
     public ScoreSystem ScoreSystem => _scoreSystem;
     public ExitSystem ExitSystem => _exitSystem;
     public SecretSystem SecretSystem => _secretSystem;
-    public string CurrentLevelPath => _currentLevelPath;
+    public string CurrentLevelPath => _levelSession.CurrentLevelPath;
 
     public World(MapData mapData)
     {
@@ -101,10 +95,14 @@ public class World : IScene
         _doorSystem = new DoorSystem(mapData.Doors, mapData.Width, _tileTextures);
         _scoreSystem = new ScoreSystem();
         _secretSystem = new SecretSystem(_scoreSystem, _tileTextures);
-        _collisionSystem = new CollisionSystem(_level, new CompositeMovementBlocker(_doorSystem, _secretSystem));
+        _collisionSystem = new CollisionSystem(
+            _level,
+            new CompositeMovementBlocker(_doorSystem, _secretSystem),
+            ObjectCollisionRules.Instance);
         _soundPropagationSystem = new SoundPropagationSystem(mapData, _doorSystem);
         _cameraSystem = new CameraSystem(_collisionSystem);
-        _renderSystem = new RenderSystem(_level, _mapData, _tileTextures);
+        _playOptions = new PlayOptionsFacade(_optionsMenu, _soundSystem, _cameraSystem);
+        _renderSystem = new RenderSystem(_level, _mapData, _tileTextures, DoorTileEncoding.ForEngine);
         _minimapSystem = new MinimapSystem(_level, _renderSystem);
         _exitSystem = new ExitSystem(_scoreSystem);
         _highscoreClient = new HighscoreClient();
@@ -146,6 +144,19 @@ public class World : IScene
             _secretSystem);
 
         _consoleOverlay = new ConsoleOverlay();
+        _consoleCommands = new PlayConsoleCommands(
+            _tickDiagnostics,
+            _renderSystem,
+            _player,
+            _mapData,
+            _doorSystem,
+            _lightOcclusionMap,
+            _recordingSystem,
+            _consoleOverlay,
+            _inputSystem,
+            _controlsIntroSystem,
+            () => GetRenderPose().Position,
+            () => CurrentLevelPath);
         _runtimeConsole = WorldConsoleBindings.CreateConsole(
             this,
             _player,
@@ -163,17 +174,39 @@ public class World : IScene
             result => _runtimeConsole.WriteFeedback(result));
         _highscoreBoardOverlay = new HighscoreBoardOverlay(
             _highscoreClient,
-            () => _currentLevelPath,
+            () => CurrentLevelPath,
             StartReplayRemote,
             result => _runtimeConsole.WriteFeedback(result));
+        _levelSession = new PlayLevelSession(
+            _mapData,
+            _playerSystem,
+            _doorSystem,
+            _enemySystem,
+            _pickupSystem,
+            _placedObjectSystem,
+            _scoreSystem,
+            _exitSystem,
+            _secretSystem,
+            _renderSystem,
+            _soundPropagationSystem,
+            _highscoreIntermission,
+            _highscoreClient,
+            _effectSystem,
+            _recordingSystem,
+            _simulationClock,
+            _tickDiagnostics,
+            _inputSystem,
+            _controlsIntroSystem,
+            _optionsMenu,
+            ResetSimulationPoses);
         _recordingSystem.Configure(
-            LoadLevel,
-            RestartCurrentLevel,
-            () => _currentLevelPath,
-            SetMouseSensitivity,
+            _levelSession.LoadLevel,
+            _levelSession.RestartCurrentLevel,
+            () => _levelSession.CurrentLevelPath,
+            sensitivity => _playOptions.SetMouseSensitivity(sensitivity),
             () =>
             {
-                ApplyControlSettings();
+                _playOptions.ApplyControlSettings();
                 _inputSystem.RestoreGameplayMouse();
             },
             () => PlayerSnapshotApplication.From(_player),
@@ -186,8 +219,8 @@ public class World : IScene
             tickHz => _simulationClock.SetTickHz(tickHz),
             tick => SimulationChecksum.Capture(
                 tick, _player, _enemySystem.Enemies, _doorSystem.Doors, _scoreSystem),
-            () => _currentRngSeed,
-            seed => _rngSeedOverride = seed,
+            () => _levelSession.CurrentRngSeed,
+            seed => _levelSession.SetRngSeedOverride(seed),
             result => _runtimeConsole.WriteFeedback(result),
             () =>
             {
@@ -196,7 +229,7 @@ public class World : IScene
             });
         _playerSystem.ConfigureLifecycle(
             () => _consoleOverlay.IsOpen,
-            () => _ = RestartCurrentLevel(),
+            () => _ = _levelSession.RestartCurrentLevel(),
             () => _highscoreIntermission.IsBlockingRestart,
             () => _recordingSystem.IsReplaying,
             () => _suppressLevelCompleteClickRestart);
@@ -206,362 +239,103 @@ public class World : IScene
         _secretSystem.Rebuild(_mapData);
         _renderSystem.RebuildMeshes();
 
-        WindowDisplayMode.SyncRenderDataFromWindow();
-        GameRenderResolution.Apply(
-            _optionsMenu.Settings,
-            ResolveWindowWidth(),
-            ResolveWindowHeight());
-        _sceneRenderTexture = LoadRenderTexture(RenderData.InternalWidth, RenderData.InternalHeight);
-        _hudRenderTexture = LoadRenderTexture(GameRenderSpace.HudTextureWidth, GameRenderSpace.HudTextureHeight);
-        _hasSceneRenderTexture = true;
-        _hasHudRenderTexture = true;
+        _overlayInput = new PlayOverlayInputController(
+            _controlsIntroSystem,
+            _consoleOverlay,
+            _optionsMenu,
+            _highscoreBoardOverlay,
+            _highscoreIntermission,
+            _recordingSystem,
+            _player,
+            _exitSystem,
+            _inputSystem,
+            _playOptions,
+            _runtimeConsole,
+            ExecuteConsoleLine,
+            _levelSession.RestartCurrentLevel);
+        _hudComposer = new PlayHudComposer(
+            _player,
+            _consoleOverlay,
+            _optionsMenu,
+            _controlsIntroSystem,
+            _exitSystem,
+            _doorSystem,
+            _weaponSystem,
+            _effectSystem,
+            _scoreSystem,
+            _animationSystem,
+            _highscoreBoardOverlay,
+            _highscoreIntermission,
+            _recordingSystem,
+            _tickDiagnostics,
+            _minimapSystem,
+            () => _inputState,
+            () => _player.Camera);
+
         Debug.Setup(_doorSystem.Doors, _player, _animationSystem, _enemySystem);
-        ApplyGraphicsSettings();
-        ApplyControlSettings();
-        ApplyAudioSettings();
-        EnsureStartupDisplay();
+        _playOptions.InitializeRenderTargets();
 #if DEBUG
         ConsoleSelfTests.RunOnce();
 #endif
     }
 
-    public void SetVolume(float volume)
-    {
-        _soundSystem.SetVolume(volume);
-    }
+    public void SetVolume(float volume) => _playOptions.SetVolume(volume);
 
-    public float GetVolume()
-    {
-        return _soundSystem.GetVolume();
-    }
+    public float GetVolume() => _playOptions.GetVolume();
 
-    public void SetMouseSensitivity(float sensitivity)
-    {
-        _cameraSystem.SetMouseSensitivity(sensitivity);
-    }
+    public void SetMouseSensitivity(float sensitivity) =>
+        _playOptions.SetMouseSensitivity(sensitivity);
 
-    public void ApplyControlSettings()
-    {
-        SetMouseSensitivity(_optionsMenu.Settings.MouseSensitivity);
-    }
+    public void ApplyControlSettings() => _playOptions.ApplyControlSettings();
 
-    public void ApplyAudioSettings()
-    {
-        var settings = _optionsMenu.Settings;
-        _soundSystem.SetSfxLevel(settings.AudioLevel);
-        _soundSystem.SetMusicLevel(settings.MusicLevel);
-    }
+    public void ApplyAudioSettings() => _playOptions.ApplyAudioSettings();
 
-    public void ApplyWindowDisplay()
-    {
-        WindowDisplayMode.Apply(_optionsMenu.Settings);
-    }
+    public void ApplyWindowDisplay() => _playOptions.ApplyWindowDisplay();
 
-    public void ApplyGameResolution()
-    {
-        GameRenderResolution.Apply(
-            _optionsMenu.Settings,
-            ResolveWindowWidth(),
-            ResolveWindowHeight());
-        RecreateRenderTextures();
-    }
+    public void ApplyGameResolution() => _playOptions.ApplyGameResolution();
 
-    public bool GetFullscreenEnabled() => _optionsMenu.Settings.FullscreenEnabled;
+    public bool GetFullscreenEnabled() => _playOptions.GetFullscreenEnabled();
 
-    public void SetFullscreenEnabled(bool enabled)
-    {
-        _optionsMenu.Settings.FullscreenEnabled = enabled;
-        ApplyWindowDisplay();
-        ApplyGameResolution();
-    }
+    public void SetFullscreenEnabled(bool enabled) =>
+        _playOptions.SetFullscreenEnabled(enabled);
 
-    public string GetWindowResolutionPresetId() => _optionsMenu.Settings.WindowResolutionPresetId;
+    public string GetWindowResolutionPresetId() =>
+        _playOptions.GetWindowResolutionPresetId();
 
-    public void SetWindowResolutionPresetId(string presetId)
-    {
-        _optionsMenu.Settings.WindowResolutionPresetId = presetId;
-        ApplyWindowDisplay();
-        ApplyGameResolution();
-    }
+    public void SetWindowResolutionPresetId(string presetId) =>
+        _playOptions.SetWindowResolutionPresetId(presetId);
 
-    public string GetGameResolutionPresetId() => _optionsMenu.Settings.GameResolutionPresetId;
+    public string GetGameResolutionPresetId() =>
+        _playOptions.GetGameResolutionPresetId();
 
-    public void SetGameResolutionPresetId(string presetId)
-    {
-        _optionsMenu.Settings.GameResolutionPresetId = presetId;
-        ApplyGameResolution();
-    }
+    public void SetGameResolutionPresetId(string presetId) =>
+        _playOptions.SetGameResolutionPresetId(presetId);
 
-    public bool GetVSyncEnabled() => _optionsMenu.Settings.VSyncEnabled;
+    public bool GetVSyncEnabled() => _playOptions.GetVSyncEnabled();
 
-    public void SetVSyncEnabled(bool enabled)
-    {
-        _optionsMenu.Settings.VSyncEnabled = enabled;
-        ApplyGraphicsSettings();
-    }
+    public void SetVSyncEnabled(bool enabled) =>
+        _playOptions.SetVSyncEnabled(enabled);
 
-    public int GetTargetFps() => _optionsMenu.Settings.TargetFps;
+    public int GetTargetFps() => _playOptions.GetTargetFps();
 
-    public void SetTargetFps(int fps)
-    {
-        _optionsMenu.Settings.TargetFps = GraphicsFramePacing.ClampTargetFps(fps);
-        ApplyGraphicsSettings();
-    }
+    public void SetTargetFps(int fps) => _playOptions.SetTargetFps(fps);
 
-    public void ApplyGraphicsSettings() => GraphicsFramePacing.Apply(_optionsMenu.Settings);
+    public void ApplyGraphicsSettings() => _playOptions.ApplyGraphicsSettings();
 
-    public void EnsureStartupDisplay()
-    {
-        WindowDisplayMode.ReapplyFullscreenIfNeeded(_optionsMenu.Settings);
-        WindowDisplayMode.SyncRenderDataFromWindow();
+    public void EnsureStartupDisplay() => _playOptions.EnsureStartupDisplay();
 
-        if (KnownResolutions.FindById(_optionsMenu.Settings.GameResolutionPresetId).IsNative)
-            ApplyGameResolution();
-    }
+    public void OnWindowResize() => _playOptions.OnWindowResize();
 
-    public void OnWindowResize()
-    {
-        WindowDisplayMode.SyncRenderDataFromWindow();
-        if (KnownResolutions.FindById(_optionsMenu.Settings.GameResolutionPresetId).IsNative)
-            ApplyGameResolution();
-    }
+    public void OnEnter() => _levelSession.OnEnter();
 
-    private static int ResolveWindowWidth()
-    {
-        int width = (int)RenderData.Resolution.X;
-        return width > 0 ? width : GetScreenWidth();
-    }
+    public ConsoleCommandResult LoadLevel(string pathOrName) =>
+        _levelSession.LoadLevel(pathOrName);
 
-    private static int ResolveWindowHeight()
-    {
-        int height = (int)RenderData.Resolution.Y;
-        return height > 0 ? height : GetScreenHeight();
-    }
+    public ConsoleCommandResult RestartCurrentLevel() =>
+        _levelSession.RestartCurrentLevel();
 
-    private void RecreateRenderTextures()
-    {
-        int sceneWidth = RenderData.InternalWidth;
-        int sceneHeight = RenderData.InternalHeight;
-
-        if (!_hasSceneRenderTexture ||
-            _sceneRenderTexture.Texture.Width != sceneWidth ||
-            _sceneRenderTexture.Texture.Height != sceneHeight)
-        {
-            if (_hasSceneRenderTexture)
-                UnloadRenderTexture(_sceneRenderTexture);
-
-            _sceneRenderTexture = LoadRenderTexture(sceneWidth, sceneHeight);
-            _hasSceneRenderTexture = true;
-        }
-
-        if (!_hasHudRenderTexture ||
-            _hudRenderTexture.Texture.Width != GameRenderSpace.HudTextureWidth ||
-            _hudRenderTexture.Texture.Height != GameRenderSpace.HudTextureHeight)
-        {
-            if (_hasHudRenderTexture)
-                UnloadRenderTexture(_hudRenderTexture);
-
-            _hudRenderTexture = LoadRenderTexture(GameRenderSpace.HudTextureWidth, GameRenderSpace.HudTextureHeight);
-            _hasHudRenderTexture = true;
-        }
-    }
-
-    public void OnEnter()
-    {
-        _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
-        _enemySystem.Rebuild(_mapData.Enemies, _mapData);
-        _pickupSystem.Rebuild(_mapData.Pickups, _mapData);
-        _placedObjectSystem.Rebuild(_mapData);
-        _scoreSystem.ResetForLevel(_mapData);
-        _exitSystem.Rebuild(_mapData);
-        _secretSystem.Rebuild(_mapData);
-        _renderSystem.RebuildMeshes();
-
-        if (OperatingSystem.IsBrowser())
-        {
-            _highscoreClient.PrefetchLeaderboardAccess(_currentLevelPath);
-            _inputSystem.EnableMouse();
-        }
-        else if (!_controlsIntroSystem.IsVisible)
-            _inputSystem.DisableMouse();
-        else
-            _inputSystem.EnableMouse();
-
-        _recordingSystem.ResetInputLatches();
-        TryStartAutoRecording();
-    }
-
-    public ConsoleCommandResult LoadLevel(string pathOrName)
-    {
-        if (!LevelCatalog.TryResolve(pathOrName, out var resolvedPath, out var error))
-            return ConsoleCommandResult.Fail(error);
-
-        try
-        {
-            LevelSerializer.LoadFromJson(_mapData, Res.Path(resolvedPath));
-            _currentLevelPath = resolvedPath;
-            ResetLevelState();
-            return ConsoleCommandResult.Ok($"Loaded '{resolvedPath}'.");
-        }
-        catch (Exception ex)
-        {
-            return ConsoleCommandResult.Fail($"load: {ex.Message}");
-        }
-    }
-
-    public ConsoleCommandResult RestartCurrentLevel()
-    {
-        try
-        {
-            LevelSerializer.LoadFromJson(_mapData, Res.Path(_currentLevelPath));
-            ResetLevelState();
-            return ConsoleCommandResult.Ok($"Restarted from '{_currentLevelPath}'.");
-        }
-        catch (Exception ex)
-        {
-            return ConsoleCommandResult.Fail($"restart: {ex.Message}");
-        }
-    }
-
-    public ConsoleCommandResult ListPickupsForConsole()
-    {
-        var placements = _mapData.Pickups;
-        if (placements.Count == 0)
-            return ConsoleCommandResult.Ok($"No pickups in '{_currentLevelPath}'.");
-
-        var activeByTile = new HashSet<(int X, int Y)>(
-            _pickupSystem.ActivePickups.Select(p => (p.TileX, p.TileY)));
-
-        var rows = new List<string>(placements.Count);
-        for (int i = 0; i < placements.Count; i++)
-        {
-            var placement = placements[i];
-            int amount = PickupDefaults.GetAmount(placement.Type, placement.Amount);
-            string amountText = placement.Amount == 0
-                ? $"amount={amount} (default)"
-                : $"amount={amount}";
-
-            var world = LevelData.GetTileAnchorWorld(placement.TileX, placement.TileY, 1.5f);
-            string active = activeByTile.Contains((placement.TileX, placement.TileY)) ? "yes" : "no";
-
-            rows.Add(
-                $"#{i} {placement.Type} tile=({placement.TileX},{placement.TileY}) {amountText} " +
-                $"world=({world.X:F1},{world.Y:F1},{world.Z:F1}) active={active}");
-        }
-
-        int activeCount = _pickupSystem.ActivePickups.Count;
-        string summary = placements.Count == 1
-            ? $"1 pickup in '{_currentLevelPath}' ({activeCount} active):"
-            : $"{placements.Count} pickups in '{_currentLevelPath}' ({activeCount} active):";
-
-        return ConsoleCommandResult.Ok(summary, rows);
-    }
-
-    private void ResetLevelState()
-    {
-        // A level reset invalidates recording/replay tick indexing (sim clock restarts
-        // at tick 0). The recording system's own restarts happen before it flags
-        // recording/replay active, so this only fires for external resets.
-        _recordingSystem.OnLevelStateReset();
-
-        _currentRngSeed = _rngSeedOverride ?? Random.Shared.Next();
-        _enemySystem.SetRandomSeed(_currentRngSeed);
-
-        _playerSystem.ResetForLevelLoad(_mapData);
-        _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
-        _enemySystem.Rebuild(_mapData.Enemies, _mapData);
-        _pickupSystem.Rebuild(_mapData.Pickups, _mapData);
-        _placedObjectSystem.Rebuild(_mapData);
-        _scoreSystem.ResetForLevel(_mapData);
-        _exitSystem.Rebuild(_mapData);
-        _secretSystem.Rebuild(_mapData);
-        _renderSystem.RebuildMeshes();
-        _soundPropagationSystem.ClearPendingEvents();
-        _highscoreIntermission.ResetForLevel();
-        _highscoreIntermissionStarted = false;
-        _effectSystem.Clear();
-        _simulationClock.Reset();
-        _tickDiagnostics.Reset();
-        ResetSimulationPoses();
-
-        if (OperatingSystem.IsBrowser())
-            _highscoreClient.PrefetchLeaderboardAccess(_currentLevelPath);
-
-        TryStartAutoRecording();
-    }
-
-    private void TryStartAutoRecording()
-    {
-        if (_recordingSystem.ShouldAutoRecordOnLevelReset)
-            _recordingSystem.StartAutoRecording(_optionsMenu.Settings.MouseSensitivity);
-    }
-
-    private bool CanToggleControlsLayout() =>
-        !_controlsIntroSystem.IsBlockingIntro
-        && !_consoleOverlay.IsOpen
-        && !_optionsMenu.IsOpen
-        && !_highscoreBoardOverlay.IsOpen
-        && !_highscoreIntermission.IsBlockingRestart
-        && !_recordingSystem.IsReplaying
-        && _player.IsAlive
-        && !_exitSystem.IsLevelComplete;
-
-    private bool CanToggleHighscoreBoard() =>
-        !_controlsIntroSystem.IsVisible
-        && !_consoleOverlay.IsOpen
-        && !_optionsMenu.IsOpen
-        && !_highscoreIntermission.BlocksHighscoreBoardToggle;
-
-    private bool CanInstantRestartLevel() =>
-        !_controlsIntroSystem.IsVisible
-        && !_consoleOverlay.IsOpen
-        && !_optionsMenu.IsOpen
-        && !_highscoreBoardOverlay.IsOpen
-        && !_highscoreIntermission.IsBlockingRestart
-        && !_recordingSystem.IsReplaying
-        && _player.IsAlive
-        && !_exitSystem.IsLevelComplete;
-
-    private bool ShouldFreeMouseForOverlays() =>
-        _consoleOverlay.IsOpen
-        || _optionsMenu.IsOpen
-        || _highscoreBoardOverlay.IsOpen
-        || _highscoreIntermission.IsLeaderboardInteractive
-        || _controlsIntroSystem.IsVisible;
-
-    private bool ShouldCaptureGameplayMouse() =>
-        !_recordingSystem.IsReplaying
-        && _player.IsAlive
-        && !_exitSystem.IsLevelComplete
-        && !ShouldFreeMouseForOverlays();
-
-    private bool ShouldDeferGameplayMouseCapture() =>
-        ShouldFreeMouseForOverlays()
-        || _recordingSystem.IsReplaying
-        || !_player.IsAlive
-        || _exitSystem.IsLevelComplete;
-
-    private void SyncOverlayMouseCapture()
-    {
-        if (ShouldFreeMouseForOverlays())
-        {
-            if (!_inputSystem.IsMouseFree)
-                _inputSystem.EnableMouse();
-            return;
-        }
-
-        if (ShouldCaptureGameplayMouse() && _inputSystem.IsMouseFree)
-            _inputSystem.RestoreGameplayMouse();
-    }
-
-    private void ArmBrowserMovementCapture()
-    {
-        bool waitingForGameplayStart = _controlsIntroSystem.IsBlockingIntro && _inputSystem.IsMouseFree;
-        bool armed = _inputSystem.IsMouseFree
-            && (ShouldCaptureGameplayMouse() || waitingForGameplayStart);
-        BrowserPointerLockBridge.MovementCaptureArmed = armed;
-        BrowserPointerLockBridge.SetMovementCaptureArmed?.Invoke(armed);
-    }
+    public ConsoleCommandResult ListPickupsForConsole() =>
+        _levelSession.ListPickupsForConsole();
 
     public void OnExit()
     {
@@ -574,173 +348,19 @@ public class World : IScene
         _inputSystem.ToggleMouse();
     }
 
-    private void HandleBrowserPointerLockLost(bool escapeHeld)
-    {
-        _inputSystem.SyncPointerLockReleased();
-
-        if (!escapeHeld
-            || _consoleOverlay.IsOpen
-            || _optionsMenu.IsOpen
-            || _highscoreBoardOverlay.IsOpen
-            || _highscoreIntermission.CapturesEscapeKey)
-            return;
-
-        _optionsMenu.Open(_inputSystem);
-    }
-
-    private void PollBrowserPointerLockEvents()
-    {
-        if (!OperatingSystem.IsBrowser())
-            return;
-
-        switch (BrowserPointerLockBridge.PollPointerLockEvent())
-        {
-            case "acquired":
-                _inputSystem.OnBrowserPointerLockAcquired();
-                break;
-            case "failed":
-                _inputSystem.OnBrowserPointerLockFailed();
-                break;
-            case "lost":
-                HandleBrowserPointerLockLost(IsKeyDown(KeyboardKey.Escape));
-                break;
-        }
-    }
-
     public void Update(float deltaTime)
     {
         _soundSystem.Update();
         _recordingSystem.Update(deltaTime);
-        SyncOverlayMouseCapture();
 
-        if (_controlsIntroSystem.IsBlockingIntro)
-        {
-            PollBrowserPointerLockEvents();
-            ArmBrowserMovementCapture();
-            _inputSystem.Update(suppressClickToCapture: true);
-            if (_controlsIntroSystem.UpdateBlockingIntro(_inputSystem))
-                return;
-        }
-
-        if (_controlsIntroSystem.IsManualOpen)
-        {
-            PollBrowserPointerLockEvents();
-            _inputSystem.Update(suppressClickToCapture: true);
-            if (IsKeyPressed(KeyboardKey.C) || IsKeyPressed(KeyboardKey.Escape))
-                _controlsIntroSystem.CloseManual(_inputSystem);
+        if (_overlayInput.TryHandleOverlays(deltaTime))
             return;
-        }
-
-        bool toggledConsoleThisFrame = false;
-
-        if (_consoleOverlay.IsOpen && IsKeyPressed(KeyboardKey.Escape))
-        {
-            _consoleOverlay.Close();
-            if (!_optionsMenu.IsOpen)
-                _inputSystem.RestoreGameplayMouse();
-            return;
-        }
-
-        if (_optionsMenu.IsOpen)
-        {
-            var inputResult = _optionsMenu.HandleInput(GetScreenWidth(), GetScreenHeight());
-
-            if (inputResult.WindowDisplayChanged)
-            {
-                ApplyWindowDisplay();
-                ApplyGameResolution();
-            }
-
-            if (inputResult.GameResolutionChanged)
-                ApplyGameResolution();
-            if (inputResult.GraphicsChanged)
-                ApplyGraphicsSettings();
-            if (inputResult.ControlsChanged)
-                ApplyControlSettings();
-            if (inputResult.AudioChanged)
-                ApplyAudioSettings();
-
-            if (IsKeyPressed(KeyboardKey.Escape))
-                _optionsMenu.Close(_inputSystem);
-            else if (IsKeyPressed(KeyboardKey.Q))
-                CloseWindow();
-
-            return;
-        }
-
-        if (IsKeyPressed(KeyboardKey.Escape) && !_highscoreIntermission.CapturesEscapeKey)
-        {
-            if (_highscoreBoardOverlay.IsOpen)
-            {
-                _highscoreBoardOverlay.Close();
-                SyncOverlayMouseCapture();
-                return;
-            }
-
-            if (_consoleOverlay.IsOpen)
-                _consoleOverlay.Close();
-
-            // Locked pointer: browser consumes ESC to exit pointer lock; menu opens via BrowserPointerLockBridge.
-            if (OperatingSystem.IsBrowser() && !_inputSystem.IsMouseFree)
-                return;
-
-            _optionsMenu.Open(_inputSystem);
-            return;
-        }
-
-        if (!_highscoreIntermission.BlocksConsoleToggle &&
-            (IsKeyPressed(KeyboardKey.Grave) ||
-            (OperatingSystem.IsBrowser() && IsKeyPressed(KeyboardKey.Period))))
-        {
-            _consoleOverlay.Toggle();
-            toggledConsoleThisFrame = true;
-            if (_consoleOverlay.IsOpen)
-                _inputSystem.EnableMouse();
-            else
-                _inputSystem.RestoreGameplayMouse();
-        }
-
-        if (_consoleOverlay.IsOpen)
-        {
-            _consoleOverlay.UpdateInput(
-                deltaTime,
-                line => ExecuteConsoleLine(line),
-                (line, cursor) => _runtimeConsole.GetCompletions(line, cursor),
-                toggledConsoleThisFrame);
-            return;
-        }
-
-        if (_highscoreBoardOverlay.IsOpen)
-        {
-            _highscoreBoardOverlay.Update();
-            SyncOverlayMouseCapture();
-            return;
-        }
-
-        if (CanToggleControlsLayout() && IsKeyPressed(KeyboardKey.C))
-        {
-            _controlsIntroSystem.ToggleManual(_inputSystem);
-            return;
-        }
-
-        if (CanToggleHighscoreBoard() && IsKeyPressed(KeyboardKey.H))
-        {
-            _highscoreBoardOverlay.Toggle();
-            SyncOverlayMouseCapture();
-            return;
-        }
-
-        if (CanInstantRestartLevel() && IsKeyPressed(KeyboardKey.R))
-        {
-            _ = RestartCurrentLevel();
-            return;
-        }
 
         if (!_recordingSystem.IsReplaying)
         {
-            PollBrowserPointerLockEvents();
-            ArmBrowserMovementCapture();
-            _inputSystem.Update(suppressClickToCapture: ShouldDeferGameplayMouseCapture());
+            _overlayInput.PollBrowserPointerLockEvents();
+            _overlayInput.ArmBrowserMovementCapture();
+            _inputSystem.Update(suppressClickToCapture: _overlayInput.ShouldDeferGameplayMouseCapture());
         }
 
         // Sample Raylib once per render frame; ticks consume latched edges/deltas
@@ -762,11 +382,11 @@ public class World : IScene
 
         _tickDiagnostics.RecordSimulationStep(_simulationClock);
 
-        if (_exitSystem.IsLevelComplete && !_highscoreIntermissionStarted)
+        if (_exitSystem.IsLevelComplete && !_levelSession.HighscoreIntermissionStarted)
         {
-            _highscoreIntermissionStarted = true;
+            _levelSession.HighscoreIntermissionStarted = true;
             if (!_recordingSystem.IsReplaying)
-                _highscoreIntermission.Begin(_currentLevelPath, _scoreSystem);
+                _highscoreIntermission.Begin(_levelSession.CurrentLevelPath, _scoreSystem);
         }
 
         if (_exitSystem.IsLevelComplete)
@@ -806,20 +426,20 @@ public class World : IScene
 
     private void ResetSimulationPoses()
     {
-        _previousSimulationPose = SimulationPose.FromPlayer(_player);
+        _previousSimulationPose = CapturePlayerPose();
         _currentSimulationPose = _previousSimulationPose;
     }
 
     private void AdvanceSimulationPose()
     {
         _previousSimulationPose = _currentSimulationPose;
-        _currentSimulationPose = SimulationPose.FromPlayer(_player);
+        _currentSimulationPose = CapturePlayerPose();
     }
 
     private SimulationPose GetRenderPose()
     {
         if (!_player.IsAlive || _exitSystem.IsBlockingGameplay)
-            return SimulationPose.FromPlayer(_player);
+            return CapturePlayerPose();
 
         return SimulationPose.Lerp(
             _previousSimulationPose,
@@ -827,189 +447,66 @@ public class World : IScene
             _simulationClock.InterpolationAlpha);
     }
 
-    public ConsoleCommandResult ToggleTickDiagnostics()
-    {
-        _tickDiagnostics.OverlayEnabled = !_tickDiagnostics.OverlayEnabled;
-        return ConsoleCommandResult.Ok(
-            _tickDiagnostics.OverlayEnabled
-                ? "Tick diagnostics overlay enabled."
-                : "Tick diagnostics overlay disabled.");
-    }
+    private SimulationPose CapturePlayerPose() =>
+        SimulationPose.FromPositionAndLook(_player.Position, _player.Camera.Target);
 
-    public ConsoleCommandResult SetTickDiagnostics(bool enabled)
-    {
-        _tickDiagnostics.OverlayEnabled = enabled;
-        return ConsoleCommandResult.Ok(
-            enabled
-                ? "Tick diagnostics overlay enabled."
-                : "Tick diagnostics overlay disabled.");
-    }
+    public ConsoleCommandResult ToggleTickDiagnostics() => _consoleCommands.ToggleTickDiagnostics();
+
+    public ConsoleCommandResult SetTickDiagnostics(bool enabled) =>
+        _consoleCommands.SetTickDiagnostics(enabled);
 
     public ConsoleCommandResult GetTickDiagnosticsStatus() =>
-        ConsoleCommandResult.Ok(_tickDiagnostics.BuildStatusLine());
+        _consoleCommands.GetTickDiagnosticsStatus();
 
-    public ConsoleCommandResult ToggleStaticMeshes()
-    {
-        _renderSystem.UseStaticMeshes = !_renderSystem.UseStaticMeshes;
-        return ConsoleCommandResult.Ok(BuildStaticMeshesStatusMessage());
-    }
+    public ConsoleCommandResult ToggleStaticMeshes() => _consoleCommands.ToggleStaticMeshes();
 
-    public ConsoleCommandResult SetStaticMeshes(bool enabled)
-    {
-        _renderSystem.UseStaticMeshes = enabled;
-        return ConsoleCommandResult.Ok(BuildStaticMeshesStatusMessage());
-    }
+    public ConsoleCommandResult SetStaticMeshes(bool enabled) =>
+        _consoleCommands.SetStaticMeshes(enabled);
 
     public ConsoleCommandResult GetStaticMeshesStatus() =>
-        ConsoleCommandResult.Ok(BuildStaticMeshesStatusMessage());
+        _consoleCommands.GetStaticMeshesStatus();
 
-    private string BuildStaticMeshesStatusMessage()
-    {
-        string mode = _renderSystem.UseStaticMeshes ? "on (room-scoped baked meshes)" : "off (legacy quads)";
-        return $"Static meshes: {mode}. Baked wall quads: {_renderSystem.BakedQuadCount}.";
-    }
+    public ConsoleCommandResult ToggleFlying() => _consoleCommands.ToggleFlying();
 
-    public ConsoleCommandResult ToggleFlying()
-    {
-        _player.IsFlying = !_player.IsFlying;
-        if (_player.IsFlying)
-            _player.Velocity = Vector3.Zero;
-        return ConsoleCommandResult.Ok(BuildFlyingStatusMessage());
-    }
-
-    public ConsoleCommandResult SetFlying(bool enabled)
-    {
-        _player.IsFlying = enabled;
-        if (!_player.IsFlying)
-            _player.Velocity = Vector3.Zero;
-        return ConsoleCommandResult.Ok(BuildFlyingStatusMessage());
-    }
+    public ConsoleCommandResult SetFlying(bool enabled) =>
+        _consoleCommands.SetFlying(enabled);
 
     public ConsoleCommandResult GetFlyingStatus() =>
-        ConsoleCommandResult.Ok(BuildFlyingStatusMessage());
+        _consoleCommands.GetFlyingStatus();
 
-    public ConsoleCommandResult ToggleFullBright()
-    {
-        PrimitiveRenderer.SetFullBright(!PrimitiveRenderer.FullBright);
-        return ConsoleCommandResult.Ok(BuildFullBrightStatusMessage());
-    }
+    public ConsoleCommandResult ToggleFullBright() => _consoleCommands.ToggleFullBright();
 
-    public ConsoleCommandResult SetFullBright(bool enabled)
-    {
-        PrimitiveRenderer.SetFullBright(enabled);
-        return ConsoleCommandResult.Ok(BuildFullBrightStatusMessage());
-    }
+    public ConsoleCommandResult SetFullBright(bool enabled) =>
+        _consoleCommands.SetFullBright(enabled);
 
     public ConsoleCommandResult GetFullBrightStatus() =>
-        ConsoleCommandResult.Ok(BuildFullBrightStatusMessage());
+        _consoleCommands.GetFullBrightStatus();
 
-    private static string BuildFullBrightStatusMessage() =>
-        PrimitiveRenderer.FullBright
-            ? "Fullbright: on (scene drawn at 100% brightness, torch and placed lights disabled)."
-            : "Fullbright: off (normal distance and fixture lighting).";
+    public ConsoleCommandResult DumpLightingCheckForConsole() =>
+        _consoleCommands.DumpLightingCheck();
 
-    public ConsoleCommandResult DumpLightingCheckForConsole()
-    {
-        var renderPose = GetRenderPose();
-        var renderPosition = renderPose.Position;
+    public ConsoleCommandResult StartRecordingForConsole(string filename, float mouseSensitivity) =>
+        _consoleCommands.StartRecording(filename, mouseSensitivity);
 
-        _lightOcclusionMap.Update(_mapData, _doorSystem.Doors, _renderSystem.RoomMap);
-        PrimitiveRenderer.SetLightOcclusionMap(_lightOcclusionMap, _mapData.Width, _mapData.Height);
-        PrimitiveRenderer.SetSpriteRoomMap(_renderSystem.RoomMap);
+    public ConsoleCommandResult StartReplayForConsole(string filename) =>
+        _consoleCommands.StartReplay(filename);
 
-        var mapLights = TileLightCollector.Collect(_mapData);
-        var visibleRooms = _renderSystem.ComputeVisibleRooms(renderPosition, _doorSystem.Doors);
-        var activeTileLights = TileLightCollector.SelectForVisibleRooms(
-            mapLights,
-            _renderSystem.RoomMap,
-            visibleRooms,
-            renderPosition,
-            LightObjectEncoding.MaxShaderLights);
-        PrimitiveRenderer.SetLightingParameters(renderPosition, tileLights: activeTileLights);
+    public ConsoleCommandResult StartReplayRemote(int rank) =>
+        _consoleCommands.StartReplayRemote(rank);
 
-        var shaderState = PrimitiveRenderer.GetLightingDebugSnapshot();
-        var rows = LightingDiagnostics.BuildReport(
-            _mapData,
-            _renderSystem.RoomMap,
-            _doorSystem.Doors,
-            renderPosition,
-            _lightOcclusionMap,
-            shaderState);
+    public ConsoleCommandResult StartVerifyReplayForConsole(string filename) =>
+        _consoleCommands.StartVerifyReplay(filename);
 
-        string summary = $"Lighting check for '{_currentLevelPath}':";
-        string logPath = LightingReportWriter.Publish(summary, rows);
-
-        var displayRows = new List<string>(rows.Count + 1)
-        {
-            $"Saved to: {logPath}"
-        };
-        displayRows.AddRange(rows);
-
-        return ConsoleCommandResult.Ok($"{summary} (see terminal stderr or {logPath})", displayRows);
-    }
-
-    private string BuildFlyingStatusMessage()
-    {
-        if (!_player.IsFlying)
-            return "Flying: off. Use Shift/Ctrl for vertical movement when enabled.";
-
-        return $"Flying: on. Position Y={_player.Position.Y:F1}. Shift=up, Ctrl=down.";
-    }
-
-    public ConsoleCommandResult StartRecordingForConsole(string filename, float mouseSensitivity)
-    {
-        var result = _recordingSystem.StartRecording(filename, mouseSensitivity);
-        if (result.Success)
-        {
-            _consoleOverlay.Close();
-            _inputSystem.DisableMouse();
-        }
-
-        return result;
-    }
-
-    public ConsoleCommandResult StartReplayForConsole(string filename)
-    {
-        _controlsIntroSystem.Dismiss();
-        var result = _recordingSystem.StartReplay(filename);
-        if (result.Success)
-        {
-            _consoleOverlay.Close();
-            _inputSystem.DisableMouse();
-        }
-
-        return result;
-    }
-
-    public ConsoleCommandResult StartReplayRemote(int rank)
-    {
-        _controlsIntroSystem.Dismiss();
-        return _recordingSystem.ReplayRemote(rank);
-    }
-
-    public ConsoleCommandResult StartVerifyReplayForConsole(string filename)
-    {
-        _controlsIntroSystem.Dismiss();
-        var result = _recordingSystem.StartVerifyReplay(filename);
-        if (result.Success)
-        {
-            _consoleOverlay.Close();
-            _inputSystem.DisableMouse();
-        }
-
-        return result;
-    }
-
-    public ConsoleCommandResult ExecuteConsoleLine(string line)
-    {
-        return _runtimeConsole.Execute(line);
-    }
+    public ConsoleCommandResult ExecuteConsoleLine(string line) =>
+        _runtimeConsole.Execute(line);
 
     public void Render()
     {
         RenderSceneToTexture();
-        RenderHudToTexture();
-        RenderToScreen();
+        _hudComposer.RenderHudToTexture(_playOptions.HudRenderTexture);
+        _hudComposer.ComposeToScreen(
+            _playOptions.SceneRenderTexture.Texture,
+            _playOptions.HudRenderTexture.Texture);
     }
 
     private void RenderSceneToTexture()
@@ -1019,22 +516,18 @@ public class World : IScene
         var renderPosition = renderPose.Position;
         var renderTarget = renderCamera.Target;
 
-        _lightOcclusionMap.Update(_mapData, _doorSystem.Doors, _renderSystem.RoomMap);
-        PrimitiveRenderer.SetLightOcclusionMap(_lightOcclusionMap, _mapData.Width, _mapData.Height);
-        PrimitiveRenderer.SetSpriteRoomMap(_renderSystem.RoomMap);
-
-        var mapLights = TileLightCollector.Collect(_mapData);
-        var visibleRooms = _renderSystem.ComputeVisibleRooms(renderPosition, _doorSystem.Doors);
-        var activeTileLights = TileLightCollector.SelectForVisibleRooms(
-            mapLights,
+        SceneLightingSetup.ApplyForView(
+            _mapData,
+            _lightOcclusionMap,
             _renderSystem.RoomMap,
-            visibleRooms,
+            DoorTileEncoding.ForEngine,
+            _doorSystem,
             renderPosition,
-            LightObjectEncoding.MaxShaderLights);
-        PrimitiveRenderer.SetLightingParameters(renderPosition, tileLights: activeTileLights);
+            _renderSystem.ComputeVisibleRooms);
         var lightingShader = PrimitiveRenderer.GetLightingShader();
 
-        BeginTextureMode(_sceneRenderTexture);
+        var sceneRt = _playOptions.SceneRenderTexture;
+        BeginTextureMode(sceneRt);
         BeginMode3D(renderCamera);
         ClearBackground(Color.Black);
 
@@ -1047,9 +540,9 @@ public class World : IScene
 
         _renderSystem.Render(
             renderCamera,
-            _sceneRenderTexture.Texture.Width,
-            _sceneRenderTexture.Texture.Height,
-            _doorSystem.Doors);
+            sceneRt.Texture.Width,
+            sceneRt.Texture.Height,
+            _doorSystem);
         _secretSystem.Render(renderPosition);
         _doorSystem.Render();
         _animationSystem.Render();
@@ -1063,150 +556,5 @@ public class World : IScene
 
         EndMode3D();
         EndTextureMode();
-    }
-
-    private void RenderHudToTexture()
-    {
-        int renderWidth = GameRenderSpace.HudTextureWidth;
-        int renderHeight = GameRenderSpace.HudTextureHeight;
-        bool consoleOpen = _consoleOverlay.IsOpen;
-        bool optionsOpen = _optionsMenu.IsOpen;
-        bool controlsIntroVisible = _controlsIntroSystem.IsVisible;
-        bool showWeaponView = _player.IsAlive && !consoleOpen && !optionsOpen && !controlsIntroVisible && !_exitSystem.IsBlockingGameplay;
-
-        BeginTextureMode(_hudRenderTexture);
-        ClearBackground(new Color(0, 0, 0, 0));
-
-        if (controlsIntroVisible)
-        {
-            ControlsIntroHud.Draw(renderWidth, renderHeight, _controlsIntroSystem.IsBlockingIntro);
-            EndTextureMode();
-            return;
-        }
-
-        RenderNotificationOverlays(renderWidth, renderHeight, consoleOpen);
-
-        if (!consoleOpen && !_inputState.IsMouseFree && showWeaponView)
-            PlaySessionOverlayHud.DrawReticle(_effectSystem, renderWidth, renderHeight);
-
-        if (optionsOpen)
-            OptionsMenuHud.Draw(_optionsMenu.Settings, renderWidth, renderHeight);
-
-        if (!_player.IsAlive && !consoleOpen)
-            PlaySessionOverlayHud.DrawGameOver(renderWidth, renderHeight);
-
-        if (_highscoreBoardOverlay.IsOpen)
-            _highscoreBoardOverlay.Draw(renderWidth, renderHeight);
-
-        if (_highscoreIntermission.IsLeaderboardInteractive)
-            _highscoreIntermission.DrawLeaderboard(renderWidth, renderHeight);
-
-        EndTextureMode();
-    }
-
-    private void RenderToScreen()
-    {
-        int screenWidth = GetScreenWidth();
-        int screenHeight = GetScreenHeight();
-
-        BeginDrawing();
-        ClearBackground(Color.Black);
-
-        GameRenderSpace.DrawTextureToWindow(_sceneRenderTexture.Texture, screenWidth, screenHeight);
-        GameRenderSpace.DrawTextureToWindow(_hudRenderTexture.Texture, screenWidth, screenHeight);
-
-        RenderDebugLabels(screenWidth, screenHeight);
-        RenderPlayHud(screenWidth, screenHeight);
-        RenderMinimapAndDebugOverlays();
-
-        _consoleOverlay.Render();
-
-        EndDrawing();
-    }
-
-    private void RenderDebugLabels(int screenWidth, int screenHeight)
-    {
-        DrawFPS(10, screenHeight - 120);
-
-        var mouseLabel = _optionsMenu.IsOpen || _inputState.IsMouseFree ? "MOUSE: FREE" : "MOUSE: LOCKED";
-        var mouseColor = _optionsMenu.IsOpen || _inputState.IsMouseFree ? Color.Green : Color.Red;
-        int mouseLabelWidth = MeasureText(mouseLabel, 20);
-        DrawText(mouseLabel, screenWidth - mouseLabelWidth - 10, 10, 20, mouseColor);
-
-        var healthLabel = $"HEALTH: {(int)_player.Health} / {(int)_player.MaxHealth}";
-        DrawText(healthLabel, 10, 40, 20, _player.IsAlive ? Color.RayWhite : Color.Red);
-
-        if (_tickDiagnostics.OverlayEnabled)
-            TickDiagnosticsHud.Draw(_tickDiagnostics);
-
-        RecordingStatusHud.Draw(
-            _recordingSystem.IsRecording,
-            _recordingSystem.IsReplaying,
-            screenWidth);
-    }
-
-    private void RenderPlayHud(int screenWidth, int screenHeight)
-    {
-        bool consoleOpen = _consoleOverlay.IsOpen;
-        bool optionsOpen = _optionsMenu.IsOpen;
-        bool inActiveLevel = _player.IsAlive && !_exitSystem.IsLevelComplete;
-        bool showWeaponView = _player.IsAlive && !consoleOpen && !optionsOpen && !_exitSystem.IsBlockingGameplay;
-
-        if (inActiveLevel)
-        {
-            LevelProgressOverlayHud.DrawScore(_scoreSystem, screenWidth);
-            CombatOverlayHud.DrawInventory(_player);
-        }
-
-        if (showWeaponView)
-            _animationSystem.RenderWeaponOverlay(screenWidth, screenHeight);
-
-        _effectSystem.RenderScreenOverlay(screenWidth, screenHeight);
-        RenderIntermissionOverlay(screenWidth, screenHeight, consoleOpen);
-    }
-
-    /// <summary>Centered banner notifications drawn at internal resolution.</summary>
-    private void RenderNotificationOverlays(int renderWidth, int renderHeight, bool consoleOpen)
-    {
-        if (consoleOpen || _exitSystem.IsLevelComplete || !_player.IsAlive)
-            return;
-
-        if (_exitSystem.IsExitPending)
-        {
-            LevelProgressOverlayHud.DrawExitCountdown(_exitSystem.ExitCountdownRemaining, renderWidth, renderHeight);
-            return;
-        }
-
-        if (_doorSystem.HasLockedHint)
-            DoorOverlayHud.DrawLockedHint(_doorSystem, renderWidth, renderHeight);
-        else if (_weaponSystem.HasNoAmmoHint)
-            CombatOverlayHud.DrawNoAmmoHint(_weaponSystem, renderWidth, renderHeight);
-    }
-
-    /// <summary>Full-screen intermission panels remain in window space.</summary>
-    private void RenderIntermissionOverlay(int screenWidth, int screenHeight, bool consoleOpen)
-    {
-        if (consoleOpen || !_exitSystem.IsLevelComplete)
-            return;
-
-        if (_highscoreIntermission.IsActive)
-            _highscoreIntermission.Draw(_scoreSystem, screenWidth, screenHeight);
-        else
-            LevelProgressOverlayHud.DrawLevelComplete(
-                _scoreSystem,
-                screenWidth,
-                screenHeight,
-                showRestartHint: !_recordingSystem.IsReplaying);
-    }
-
-    private void RenderMinimapAndDebugOverlays()
-    {
-        if (_inputState.IsMinimapEnabled)
-            _minimapSystem.Render(_player);
-
-        int renderW = RenderData.InternalWidth;
-        int renderH = RenderData.InternalHeight;
-        Debug.DrawWorldOverlays(_inputState.IsDebugEnabled, _player.Camera, renderW, renderH);
-        Debug.Draw(_inputState.IsDebugEnabled);
     }
 }
