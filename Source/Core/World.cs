@@ -64,6 +64,7 @@ public class World : IScene
     private readonly ControlsIntroSystem _controlsIntroSystem = new();
     private readonly PlayOptionsFacade _playOptions;
     private readonly PlayOverlayInputController _overlayInput;
+    private readonly PlayConsoleCommands _consoleCommands;
     private bool _highscoreIntermissionStarted;
     private bool _suppressLevelCompleteClickRestart;
 
@@ -148,6 +149,19 @@ public class World : IScene
             _secretSystem);
 
         _consoleOverlay = new ConsoleOverlay();
+        _consoleCommands = new PlayConsoleCommands(
+            _tickDiagnostics,
+            _renderSystem,
+            _player,
+            _mapData,
+            _doorSystem,
+            _lightOcclusionMap,
+            _recordingSystem,
+            _consoleOverlay,
+            _inputSystem,
+            _controlsIntroSystem,
+            () => GetRenderPose().Position,
+            () => _currentLevelPath);
         _runtimeConsole = WorldConsoleBindings.CreateConsole(
             this,
             _player,
@@ -520,187 +534,55 @@ public class World : IScene
     private SimulationPose CapturePlayerPose() =>
         SimulationPose.FromPositionAndLook(_player.Position, _player.Camera.Target);
 
-    public ConsoleCommandResult ToggleTickDiagnostics()
-    {
-        _tickDiagnostics.OverlayEnabled = !_tickDiagnostics.OverlayEnabled;
-        return ConsoleCommandResult.Ok(
-            _tickDiagnostics.OverlayEnabled
-                ? "Tick diagnostics overlay enabled."
-                : "Tick diagnostics overlay disabled.");
-    }
+    public ConsoleCommandResult ToggleTickDiagnostics() => _consoleCommands.ToggleTickDiagnostics();
 
-    public ConsoleCommandResult SetTickDiagnostics(bool enabled)
-    {
-        _tickDiagnostics.OverlayEnabled = enabled;
-        return ConsoleCommandResult.Ok(
-            enabled
-                ? "Tick diagnostics overlay enabled."
-                : "Tick diagnostics overlay disabled.");
-    }
+    public ConsoleCommandResult SetTickDiagnostics(bool enabled) =>
+        _consoleCommands.SetTickDiagnostics(enabled);
 
     public ConsoleCommandResult GetTickDiagnosticsStatus() =>
-        ConsoleCommandResult.Ok(_tickDiagnostics.BuildStatusLine());
+        _consoleCommands.GetTickDiagnosticsStatus();
 
-    public ConsoleCommandResult ToggleStaticMeshes()
-    {
-        _renderSystem.UseStaticMeshes = !_renderSystem.UseStaticMeshes;
-        return ConsoleCommandResult.Ok(BuildStaticMeshesStatusMessage());
-    }
+    public ConsoleCommandResult ToggleStaticMeshes() => _consoleCommands.ToggleStaticMeshes();
 
-    public ConsoleCommandResult SetStaticMeshes(bool enabled)
-    {
-        _renderSystem.UseStaticMeshes = enabled;
-        return ConsoleCommandResult.Ok(BuildStaticMeshesStatusMessage());
-    }
+    public ConsoleCommandResult SetStaticMeshes(bool enabled) =>
+        _consoleCommands.SetStaticMeshes(enabled);
 
     public ConsoleCommandResult GetStaticMeshesStatus() =>
-        ConsoleCommandResult.Ok(BuildStaticMeshesStatusMessage());
+        _consoleCommands.GetStaticMeshesStatus();
 
-    private string BuildStaticMeshesStatusMessage()
-    {
-        string mode = _renderSystem.UseStaticMeshes ? "on (room-scoped baked meshes)" : "off (legacy quads)";
-        return $"Static meshes: {mode}. Baked wall quads: {_renderSystem.BakedQuadCount}.";
-    }
+    public ConsoleCommandResult ToggleFlying() => _consoleCommands.ToggleFlying();
 
-    public ConsoleCommandResult ToggleFlying()
-    {
-        _player.IsFlying = !_player.IsFlying;
-        if (_player.IsFlying)
-            _player.Velocity = Vector3.Zero;
-        return ConsoleCommandResult.Ok(BuildFlyingStatusMessage());
-    }
-
-    public ConsoleCommandResult SetFlying(bool enabled)
-    {
-        _player.IsFlying = enabled;
-        if (!_player.IsFlying)
-            _player.Velocity = Vector3.Zero;
-        return ConsoleCommandResult.Ok(BuildFlyingStatusMessage());
-    }
+    public ConsoleCommandResult SetFlying(bool enabled) =>
+        _consoleCommands.SetFlying(enabled);
 
     public ConsoleCommandResult GetFlyingStatus() =>
-        ConsoleCommandResult.Ok(BuildFlyingStatusMessage());
+        _consoleCommands.GetFlyingStatus();
 
-    public ConsoleCommandResult ToggleFullBright()
-    {
-        PrimitiveRenderer.SetFullBright(!PrimitiveRenderer.FullBright);
-        return ConsoleCommandResult.Ok(BuildFullBrightStatusMessage());
-    }
+    public ConsoleCommandResult ToggleFullBright() => _consoleCommands.ToggleFullBright();
 
-    public ConsoleCommandResult SetFullBright(bool enabled)
-    {
-        PrimitiveRenderer.SetFullBright(enabled);
-        return ConsoleCommandResult.Ok(BuildFullBrightStatusMessage());
-    }
+    public ConsoleCommandResult SetFullBright(bool enabled) =>
+        _consoleCommands.SetFullBright(enabled);
 
     public ConsoleCommandResult GetFullBrightStatus() =>
-        ConsoleCommandResult.Ok(BuildFullBrightStatusMessage());
+        _consoleCommands.GetFullBrightStatus();
 
-    private static string BuildFullBrightStatusMessage() =>
-        PrimitiveRenderer.FullBright
-            ? "Fullbright: on (scene drawn at 100% brightness, torch and placed lights disabled)."
-            : "Fullbright: off (normal distance and fixture lighting).";
+    public ConsoleCommandResult DumpLightingCheckForConsole() =>
+        _consoleCommands.DumpLightingCheck();
 
-    public ConsoleCommandResult DumpLightingCheckForConsole()
-    {
-        var renderPose = GetRenderPose();
-        var renderPosition = renderPose.Position;
+    public ConsoleCommandResult StartRecordingForConsole(string filename, float mouseSensitivity) =>
+        _consoleCommands.StartRecording(filename, mouseSensitivity);
 
-        _lightOcclusionMap.Update(
-            _mapData,
-            DoorTileEncoding.ForEngine,
-            _doorSystem,
-            _renderSystem.RoomMap);
-        PrimitiveRenderer.SetLightOcclusionMap(_lightOcclusionMap, _mapData.Width, _mapData.Height);
-        PrimitiveRenderer.SetSpriteRoomMap(_renderSystem.RoomMap);
+    public ConsoleCommandResult StartReplayForConsole(string filename) =>
+        _consoleCommands.StartReplay(filename);
 
-        var mapLights = TileLightCollector.Collect(_mapData);
-        var visibleRooms = _renderSystem.ComputeVisibleRooms(renderPosition, _doorSystem);
-        var activeTileLights = TileLightCollector.SelectForVisibleRooms(
-            mapLights,
-            _renderSystem.RoomMap,
-            visibleRooms,
-            renderPosition,
-            LightObjectEncoding.MaxShaderLights);
-        PrimitiveRenderer.SetLightingParameters(renderPosition, tileLights: activeTileLights);
+    public ConsoleCommandResult StartReplayRemote(int rank) =>
+        _consoleCommands.StartReplayRemote(rank);
 
-        var shaderState = PrimitiveRenderer.GetLightingDebugSnapshot();
-        var rows = LightingDiagnostics.BuildReport(
-            _mapData,
-            _renderSystem.RoomMap,
-            _doorSystem,
-            renderPosition,
-            _lightOcclusionMap,
-            shaderState);
+    public ConsoleCommandResult StartVerifyReplayForConsole(string filename) =>
+        _consoleCommands.StartVerifyReplay(filename);
 
-        string summary = $"Lighting check for '{_currentLevelPath}':";
-        string logPath = LightingReportWriter.Publish(summary, rows);
-
-        var displayRows = new List<string>(rows.Count + 1)
-        {
-            $"Saved to: {logPath}"
-        };
-        displayRows.AddRange(rows);
-
-        return ConsoleCommandResult.Ok($"{summary} (see terminal stderr or {logPath})", displayRows);
-    }
-
-    private string BuildFlyingStatusMessage()
-    {
-        if (!_player.IsFlying)
-            return "Flying: off. Use Shift/Ctrl for vertical movement when enabled.";
-
-        return $"Flying: on. Position Y={_player.Position.Y:F1}. Shift=up, Ctrl=down.";
-    }
-
-    public ConsoleCommandResult StartRecordingForConsole(string filename, float mouseSensitivity)
-    {
-        var result = _recordingSystem.StartRecording(filename, mouseSensitivity);
-        if (result.Success)
-        {
-            _consoleOverlay.Close();
-            _inputSystem.DisableMouse();
-        }
-
-        return result;
-    }
-
-    public ConsoleCommandResult StartReplayForConsole(string filename)
-    {
-        _controlsIntroSystem.Dismiss();
-        var result = _recordingSystem.StartReplay(filename);
-        if (result.Success)
-        {
-            _consoleOverlay.Close();
-            _inputSystem.DisableMouse();
-        }
-
-        return result;
-    }
-
-    public ConsoleCommandResult StartReplayRemote(int rank)
-    {
-        _controlsIntroSystem.Dismiss();
-        return _recordingSystem.ReplayRemote(rank);
-    }
-
-    public ConsoleCommandResult StartVerifyReplayForConsole(string filename)
-    {
-        _controlsIntroSystem.Dismiss();
-        var result = _recordingSystem.StartVerifyReplay(filename);
-        if (result.Success)
-        {
-            _consoleOverlay.Close();
-            _inputSystem.DisableMouse();
-        }
-
-        return result;
-    }
-
-    public ConsoleCommandResult ExecuteConsoleLine(string line)
-    {
-        return _runtimeConsole.Execute(line);
-    }
+    public ConsoleCommandResult ExecuteConsoleLine(string line) =>
+        _runtimeConsole.Execute(line);
 
     public void Render()
     {
