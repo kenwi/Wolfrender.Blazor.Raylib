@@ -41,6 +41,8 @@ public class EditorGui
     private readonly ImGuiPickupProperties _pickupProperties = new();
     private readonly ImGuiWallProperties _wallProperties = new();
     private readonly ImGuiEntityProperties _entityProperties = new();
+    private readonly ImGuiPathfindingPanel _pathfindingPanel = new();
+    private readonly ImGuiSoundPropagationPanel _soundPropagationPanel = new();
 
     // Window visibility toggles
     private bool _showLayers = true;
@@ -795,169 +797,11 @@ public class EditorGui
         Debug.RenderLogWindow(_guiScale);
     }
 
-    // ─── Pathfinding Visualizer Panel ───────────────────────────────────────────
+    public void RenderPathfindingPanel(EditorState state) =>
+        _pathfindingPanel.Render(state, ref _showPathfinding, _guiScale);
 
-    /// <summary>
-    /// Tool window for visualizing A* paths in the editor: pick a start and end tile,
-    /// and the path is recomputed and drawn over the map.
-    /// </summary>
-    public void RenderPathfindingPanel(EditorState state)
-    {
-        if (!_showPathfinding) return;
-
-        ImGui.SetNextWindowPos(new Vector2(10, GetScreenHeight() - 280), ImGuiCond.FirstUseEver);
-        ImGui.Begin("Pathfinding Visualizer", ref _showPathfinding, ImGuiWindowFlags.AlwaysAutoResize);
-        ImGui.SetWindowFontScale(_guiScale);
-
-        var pathTool = state.PathfindingTool;
-        switch (pathTool.PickingMode)
-        {
-            case PathfindingEditorTool.PathPickMode.Start:
-                ImGui.TextColored(new Vector4(1f, 0.85f, 0.2f, 1f),
-                    "Click a tile to set START  (Esc: cancel)");
-                break;
-            case PathfindingEditorTool.PathPickMode.End:
-                ImGui.TextColored(new Vector4(1f, 0.85f, 0.2f, 1f),
-                    "Click a tile to set END  (Esc: cancel)");
-                break;
-            default:
-                ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Ready");
-                break;
-        }
-
-        ImGui.Separator();
-
-        DrawEndpointRow(
-            label: "Start",
-            point: pathTool.PathStart,
-            assignedColor: new Vector4(0.3f, 1f, 0.4f, 1f),
-            buttonLabel: "Pick Start",
-            onClick: pathTool.StartPickingStart);
-
-        DrawEndpointRow(
-            label: "End",
-            point: pathTool.PathEnd,
-            assignedColor: new Vector4(1f, 0.4f, 0.4f, 1f),
-            buttonLabel: "Pick End",
-            onClick: pathTool.StartPickingEnd);
-
-        ImGui.Separator();
-
-        if (pathTool.PathResult != null && pathTool.PathResult.Count > 0)
-        {
-            ImGui.TextColored(new Vector4(0.3f, 0.8f, 1f, 1f),
-                $"Path: {pathTool.PathResult.Count} tiles");
-        }
-        else if (pathTool.PathStart.HasValue && pathTool.PathEnd.HasValue)
-        {
-            ImGui.TextColored(new Vector4(1f, 0.3f, 0.3f, 1f), "No path found");
-        }
-        else
-        {
-            ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1f),
-                "Pick both endpoints to compute a path");
-        }
-
-        ImGui.Spacing();
-
-        if (ImGui.Button("Recompute", new Vector2(120, 0)))
-            pathTool.Recompute();
-        ImGui.SameLine();
-        if (ImGui.Button("Clear", new Vector2(120, 0)))
-            pathTool.Clear();
-
-        ImGui.Separator();
-
-        ImGui.Text("While simulating");
-        ImGui.Separator();
-
-        bool drawEnemyPaths = state.DrawEnemyPaths;
-        if (ImGui.Checkbox("Draw paths for enemies", ref drawEnemyPaths))
-            state.DrawEnemyPaths = drawEnemyPaths;
-
-        bool drawEnemyFov = state.DrawEnemyLineOfSight;
-        if (ImGui.Checkbox("Draw enemy line of sight", ref drawEnemyFov))
-            state.DrawEnemyLineOfSight = drawEnemyFov;
-
-        ImGui.End();
-    }
-
-    // ─── Sound Propagation Panel ──────────────────────────────────────────────────
-
-    /// <summary>
-    /// Tool window for testing tile-based sound propagation in the editor.
-    /// </summary>
-    public void RenderSoundPropagationPanel(EditorState state)
-    {
-        if (!_showSoundPropagation) return;
-
-        ImGui.SetNextWindowPos(new Vector2(10, GetScreenHeight() - 420), ImGuiCond.FirstUseEver);
-        ImGui.Begin("Sound Propagation", ref _showSoundPropagation, ImGuiWindowFlags.AlwaysAutoResize);
-        ImGui.SetWindowFontScale(_guiScale);
-
-        var soundTool = state.SoundPropagationTool;
-        if (soundTool.IsPicking)
-        {
-            ImGui.TextColored(new Vector4(1f, 0.85f, 0.2f, 1f),
-                "Click a tile to test propagation  (Esc: cancel)");
-        }
-        else
-        {
-            ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Ready");
-        }
-
-        ImGui.Separator();
-
-        if (state.IsSimulating)
-        {
-            ImGui.TextColored(new Vector4(0.4f, 0.9f, 0.5f, 1f), "Using live door states");
-        }
-        else
-        {
-            ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "All doors treated as closed");
-        }
-
-        ImGui.Separator();
-
-        if (soundTool.OverlayTiles is { Count: > 0 })
-        {
-            ImGui.TextColored(new Vector4(1f, 0.65f, 0.2f, 1f),
-                $"Reached {soundTool.OverlayTiles.Count} tiles");
-        }
-        else
-        {
-            ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1f),
-                "Pick an origin tile to test propagation");
-        }
-
-        ImGui.Spacing();
-
-        if (ImGui.Button("Test at tile", new Vector2(120, 0)))
-            soundTool.StartPick();
-        ImGui.SameLine();
-        if (ImGui.Button("Clear", new Vector2(120, 0)))
-            soundTool.Clear();
-
-        ImGui.End();
-    }
-
-    private static void DrawEndpointRow(
-        string label, Vector2? point, Vector4 assignedColor,
-        string buttonLabel, Action onClick)
-    {
-        if (point.HasValue)
-        {
-            ImGui.TextColored(assignedColor,
-                $"{label}: ({(int)point.Value.X}, {(int)point.Value.Y})");
-        }
-        else
-        {
-            ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1f), $"{label}: not set");
-        }
-
-        if (ImGui.Button(buttonLabel, new Vector2(120, 0)))
-            onClick();
-    }
+    public void RenderSoundPropagationPanel(EditorState state) =>
+        _soundPropagationPanel.Render(state, ref _showSoundPropagation, _guiScale);
 
     /// <summary>
     /// Draw the status message bar at the top center of the screen.
