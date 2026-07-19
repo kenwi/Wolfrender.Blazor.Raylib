@@ -62,13 +62,10 @@ public class World : IScene
     private readonly HighscoreBoardOverlay _highscoreBoardOverlay;
     private readonly OptionsMenuSystem _optionsMenu = new();
     private readonly ControlsIntroSystem _controlsIntroSystem = new();
+    private readonly PlayOptionsFacade _playOptions;
     private bool _highscoreIntermissionStarted;
     private bool _suppressLevelCompleteClickRestart;
 
-    private RenderTexture2D _sceneRenderTexture;
-    private RenderTexture2D _hudRenderTexture;
-    private bool _hasSceneRenderTexture;
-    private bool _hasHudRenderTexture;
     private InputState _inputState = new();
     private SimulationPose _previousSimulationPose;
     private SimulationPose _currentSimulationPose;
@@ -107,6 +104,7 @@ public class World : IScene
             ObjectCollisionRules.Instance);
         _soundPropagationSystem = new SoundPropagationSystem(mapData, _doorSystem);
         _cameraSystem = new CameraSystem(_collisionSystem);
+        _playOptions = new PlayOptionsFacade(_optionsMenu, _soundSystem, _cameraSystem);
         _renderSystem = new RenderSystem(_level, _mapData, _tileTextures, DoorTileEncoding.ForEngine);
         _minimapSystem = new MinimapSystem(_level, _renderSystem);
         _exitSystem = new ExitSystem(_scoreSystem);
@@ -173,10 +171,10 @@ public class World : IScene
             LoadLevel,
             RestartCurrentLevel,
             () => _currentLevelPath,
-            SetMouseSensitivity,
+            sensitivity => _playOptions.SetMouseSensitivity(sensitivity),
             () =>
             {
-                ApplyControlSettings();
+                _playOptions.ApplyControlSettings();
                 _inputSystem.RestoreGameplayMouse();
             },
             () => PlayerSnapshotApplication.From(_player),
@@ -209,165 +207,59 @@ public class World : IScene
         _secretSystem.Rebuild(_mapData);
         _renderSystem.RebuildMeshes();
 
-        WindowDisplayMode.SyncRenderDataFromWindow();
-        GameRenderResolution.Apply(
-            _optionsMenu.Settings,
-            ResolveWindowWidth(),
-            ResolveWindowHeight());
-        _sceneRenderTexture = LoadRenderTexture(RenderData.InternalWidth, RenderData.InternalHeight);
-        _hudRenderTexture = LoadRenderTexture(GameRenderSpace.HudTextureWidth, GameRenderSpace.HudTextureHeight);
-        _hasSceneRenderTexture = true;
-        _hasHudRenderTexture = true;
         Debug.Setup(_doorSystem.Doors, _player, _animationSystem, _enemySystem);
-        ApplyGraphicsSettings();
-        ApplyControlSettings();
-        ApplyAudioSettings();
-        EnsureStartupDisplay();
+        _playOptions.InitializeRenderTargets();
 #if DEBUG
         ConsoleSelfTests.RunOnce();
 #endif
     }
 
-    public void SetVolume(float volume)
-    {
-        float level = AudioVolumeLevel.FromSliderPosition(Math.Clamp(volume, 0f, 1f));
-        float raylibVolume = AudioVolumeLevel.ToRaylibVolume(level);
-        _soundSystem.ApplySfxVolume(raylibVolume);
-        _soundSystem.ApplyMusicVolume(raylibVolume);
-    }
+    public void SetVolume(float volume) => _playOptions.SetVolume(volume);
 
-    public float GetVolume() => _soundSystem.GetSfxVolume();
+    public float GetVolume() => _playOptions.GetVolume();
 
-    public void SetMouseSensitivity(float sensitivity)
-    {
-        _cameraSystem.SetMouseSensitivity(sensitivity);
-    }
+    public void SetMouseSensitivity(float sensitivity) =>
+        _playOptions.SetMouseSensitivity(sensitivity);
 
-    public void ApplyControlSettings()
-    {
-        SetMouseSensitivity(_optionsMenu.Settings.MouseSensitivity);
-    }
+    public void ApplyControlSettings() => _playOptions.ApplyControlSettings();
 
-    public void ApplyAudioSettings()
-    {
-        var settings = _optionsMenu.Settings;
-        _soundSystem.ApplySfxVolume(AudioVolumeLevel.ToRaylibVolume(settings.AudioLevel));
-        _soundSystem.ApplyMusicVolume(AudioVolumeLevel.ToRaylibVolume(settings.MusicLevel));
-    }
+    public void ApplyAudioSettings() => _playOptions.ApplyAudioSettings();
 
-    public void ApplyWindowDisplay()
-    {
-        WindowDisplayMode.Apply(_optionsMenu.Settings);
-    }
+    public void ApplyWindowDisplay() => _playOptions.ApplyWindowDisplay();
 
-    public void ApplyGameResolution()
-    {
-        GameRenderResolution.Apply(
-            _optionsMenu.Settings,
-            ResolveWindowWidth(),
-            ResolveWindowHeight());
-        RecreateRenderTextures();
-    }
+    public void ApplyGameResolution() => _playOptions.ApplyGameResolution();
 
-    public bool GetFullscreenEnabled() => _optionsMenu.Settings.FullscreenEnabled;
+    public bool GetFullscreenEnabled() => _playOptions.GetFullscreenEnabled();
 
-    public void SetFullscreenEnabled(bool enabled)
-    {
-        _optionsMenu.Settings.FullscreenEnabled = enabled;
-        ApplyWindowDisplay();
-        ApplyGameResolution();
-    }
+    public void SetFullscreenEnabled(bool enabled) =>
+        _playOptions.SetFullscreenEnabled(enabled);
 
-    public string GetWindowResolutionPresetId() => _optionsMenu.Settings.WindowResolutionPresetId;
+    public string GetWindowResolutionPresetId() =>
+        _playOptions.GetWindowResolutionPresetId();
 
-    public void SetWindowResolutionPresetId(string presetId)
-    {
-        _optionsMenu.Settings.WindowResolutionPresetId = presetId;
-        ApplyWindowDisplay();
-        ApplyGameResolution();
-    }
+    public void SetWindowResolutionPresetId(string presetId) =>
+        _playOptions.SetWindowResolutionPresetId(presetId);
 
-    public string GetGameResolutionPresetId() => _optionsMenu.Settings.GameResolutionPresetId;
+    public string GetGameResolutionPresetId() =>
+        _playOptions.GetGameResolutionPresetId();
 
-    public void SetGameResolutionPresetId(string presetId)
-    {
-        _optionsMenu.Settings.GameResolutionPresetId = presetId;
-        ApplyGameResolution();
-    }
+    public void SetGameResolutionPresetId(string presetId) =>
+        _playOptions.SetGameResolutionPresetId(presetId);
 
-    public bool GetVSyncEnabled() => _optionsMenu.Settings.VSyncEnabled;
+    public bool GetVSyncEnabled() => _playOptions.GetVSyncEnabled();
 
-    public void SetVSyncEnabled(bool enabled)
-    {
-        _optionsMenu.Settings.VSyncEnabled = enabled;
-        ApplyGraphicsSettings();
-    }
+    public void SetVSyncEnabled(bool enabled) =>
+        _playOptions.SetVSyncEnabled(enabled);
 
-    public int GetTargetFps() => _optionsMenu.Settings.TargetFps;
+    public int GetTargetFps() => _playOptions.GetTargetFps();
 
-    public void SetTargetFps(int fps)
-    {
-        _optionsMenu.Settings.TargetFps = GraphicsFramePacing.ClampTargetFps(fps);
-        ApplyGraphicsSettings();
-    }
+    public void SetTargetFps(int fps) => _playOptions.SetTargetFps(fps);
 
-    public void ApplyGraphicsSettings() => GraphicsFramePacing.Apply(_optionsMenu.Settings);
+    public void ApplyGraphicsSettings() => _playOptions.ApplyGraphicsSettings();
 
-    public void EnsureStartupDisplay()
-    {
-        WindowDisplayMode.ReapplyFullscreenIfNeeded(_optionsMenu.Settings);
-        WindowDisplayMode.SyncRenderDataFromWindow();
+    public void EnsureStartupDisplay() => _playOptions.EnsureStartupDisplay();
 
-        if (KnownResolutions.FindById(_optionsMenu.Settings.GameResolutionPresetId).IsNative)
-            ApplyGameResolution();
-    }
-
-    public void OnWindowResize()
-    {
-        WindowDisplayMode.SyncRenderDataFromWindow();
-        if (KnownResolutions.FindById(_optionsMenu.Settings.GameResolutionPresetId).IsNative)
-            ApplyGameResolution();
-    }
-
-    private static int ResolveWindowWidth()
-    {
-        int width = (int)RenderData.Resolution.X;
-        return width > 0 ? width : GetScreenWidth();
-    }
-
-    private static int ResolveWindowHeight()
-    {
-        int height = (int)RenderData.Resolution.Y;
-        return height > 0 ? height : GetScreenHeight();
-    }
-
-    private void RecreateRenderTextures()
-    {
-        int sceneWidth = RenderData.InternalWidth;
-        int sceneHeight = RenderData.InternalHeight;
-
-        if (!_hasSceneRenderTexture ||
-            _sceneRenderTexture.Texture.Width != sceneWidth ||
-            _sceneRenderTexture.Texture.Height != sceneHeight)
-        {
-            if (_hasSceneRenderTexture)
-                UnloadRenderTexture(_sceneRenderTexture);
-
-            _sceneRenderTexture = LoadRenderTexture(sceneWidth, sceneHeight);
-            _hasSceneRenderTexture = true;
-        }
-
-        if (!_hasHudRenderTexture ||
-            _hudRenderTexture.Texture.Width != GameRenderSpace.HudTextureWidth ||
-            _hudRenderTexture.Texture.Height != GameRenderSpace.HudTextureHeight)
-        {
-            if (_hasHudRenderTexture)
-                UnloadRenderTexture(_hudRenderTexture);
-
-            _hudRenderTexture = LoadRenderTexture(GameRenderSpace.HudTextureWidth, GameRenderSpace.HudTextureHeight);
-            _hasHudRenderTexture = true;
-        }
-    }
+    public void OnWindowResize() => _playOptions.OnWindowResize();
 
     public void OnEnter()
     {
@@ -1048,7 +940,8 @@ public class World : IScene
         PrimitiveRenderer.SetLightingParameters(renderPosition, tileLights: activeTileLights);
         var lightingShader = PrimitiveRenderer.GetLightingShader();
 
-        BeginTextureMode(_sceneRenderTexture);
+        var sceneRt = _playOptions.SceneRenderTexture;
+        BeginTextureMode(sceneRt);
         BeginMode3D(renderCamera);
         ClearBackground(Color.Black);
 
@@ -1061,8 +954,8 @@ public class World : IScene
 
         _renderSystem.Render(
             renderCamera,
-            _sceneRenderTexture.Texture.Width,
-            _sceneRenderTexture.Texture.Height,
+            sceneRt.Texture.Width,
+            sceneRt.Texture.Height,
             _doorSystem);
         _secretSystem.Render(renderPosition);
         _doorSystem.Render();
@@ -1088,7 +981,7 @@ public class World : IScene
         bool controlsIntroVisible = _controlsIntroSystem.IsVisible;
         bool showWeaponView = _player.IsAlive && !consoleOpen && !optionsOpen && !controlsIntroVisible && !_exitSystem.IsBlockingGameplay;
 
-        BeginTextureMode(_hudRenderTexture);
+        BeginTextureMode(_playOptions.HudRenderTexture);
         ClearBackground(new Color(0, 0, 0, 0));
 
         if (controlsIntroVisible)
@@ -1126,8 +1019,8 @@ public class World : IScene
         BeginDrawing();
         ClearBackground(Color.Black);
 
-        GameRenderSpace.DrawTextureToWindow(_sceneRenderTexture.Texture, screenWidth, screenHeight);
-        GameRenderSpace.DrawTextureToWindow(_hudRenderTexture.Texture, screenWidth, screenHeight);
+        GameRenderSpace.DrawTextureToWindow(_playOptions.SceneRenderTexture.Texture, screenWidth, screenHeight);
+        GameRenderSpace.DrawTextureToWindow(_playOptions.HudRenderTexture.Texture, screenWidth, screenHeight);
 
         RenderDebugLabels(screenWidth, screenHeight);
         RenderPlayHud(screenWidth, screenHeight);
