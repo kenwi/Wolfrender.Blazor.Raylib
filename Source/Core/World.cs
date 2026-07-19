@@ -63,6 +63,7 @@ public class World : IScene
     private readonly OptionsMenuSystem _optionsMenu = new();
     private readonly ControlsIntroSystem _controlsIntroSystem = new();
     private readonly PlayOptionsFacade _playOptions;
+    private readonly PlayOverlayInputController _overlayInput;
     private bool _highscoreIntermissionStarted;
     private bool _suppressLevelCompleteClickRestart;
 
@@ -206,6 +207,21 @@ public class World : IScene
         _exitSystem.Rebuild(_mapData);
         _secretSystem.Rebuild(_mapData);
         _renderSystem.RebuildMeshes();
+
+        _overlayInput = new PlayOverlayInputController(
+            _controlsIntroSystem,
+            _consoleOverlay,
+            _optionsMenu,
+            _highscoreBoardOverlay,
+            _highscoreIntermission,
+            _recordingSystem,
+            _player,
+            _exitSystem,
+            _inputSystem,
+            _playOptions,
+            _runtimeConsole,
+            ExecuteConsoleLine,
+            RestartCurrentLevel);
 
         Debug.Setup(_doorSystem.Doors, _player, _animationSystem, _enemySystem);
         _playOptions.InitializeRenderTargets();
@@ -391,73 +407,6 @@ public class World : IScene
             _recordingSystem.StartAutoRecording(_optionsMenu.Settings.MouseSensitivity);
     }
 
-    private bool CanToggleControlsLayout() =>
-        !_controlsIntroSystem.IsBlockingIntro
-        && !_consoleOverlay.IsOpen
-        && !_optionsMenu.IsOpen
-        && !_highscoreBoardOverlay.IsOpen
-        && !_highscoreIntermission.IsBlockingRestart
-        && !_recordingSystem.IsReplaying
-        && _player.IsAlive
-        && !_exitSystem.IsLevelComplete;
-
-    private bool CanToggleHighscoreBoard() =>
-        !_controlsIntroSystem.IsVisible
-        && !_consoleOverlay.IsOpen
-        && !_optionsMenu.IsOpen
-        && !_highscoreIntermission.BlocksHighscoreBoardToggle;
-
-    private bool CanInstantRestartLevel() =>
-        !_controlsIntroSystem.IsVisible
-        && !_consoleOverlay.IsOpen
-        && !_optionsMenu.IsOpen
-        && !_highscoreBoardOverlay.IsOpen
-        && !_highscoreIntermission.IsBlockingRestart
-        && !_recordingSystem.IsReplaying
-        && _player.IsAlive
-        && !_exitSystem.IsLevelComplete;
-
-    private bool ShouldFreeMouseForOverlays() =>
-        _consoleOverlay.IsOpen
-        || _optionsMenu.IsOpen
-        || _highscoreBoardOverlay.IsOpen
-        || _highscoreIntermission.IsLeaderboardInteractive
-        || _controlsIntroSystem.IsVisible;
-
-    private bool ShouldCaptureGameplayMouse() =>
-        !_recordingSystem.IsReplaying
-        && _player.IsAlive
-        && !_exitSystem.IsLevelComplete
-        && !ShouldFreeMouseForOverlays();
-
-    private bool ShouldDeferGameplayMouseCapture() =>
-        ShouldFreeMouseForOverlays()
-        || _recordingSystem.IsReplaying
-        || !_player.IsAlive
-        || _exitSystem.IsLevelComplete;
-
-    private void SyncOverlayMouseCapture()
-    {
-        if (ShouldFreeMouseForOverlays())
-        {
-            if (!_inputSystem.IsMouseFree)
-                _inputSystem.EnableMouse();
-            return;
-        }
-
-        if (ShouldCaptureGameplayMouse() && _inputSystem.IsMouseFree)
-            _inputSystem.RestoreGameplayMouse();
-    }
-
-    private void ArmBrowserMovementCapture()
-    {
-        bool waitingForGameplayStart = _controlsIntroSystem.IsBlockingIntro && _inputSystem.IsMouseFree;
-        bool armed = _inputSystem.IsMouseFree
-            && (ShouldCaptureGameplayMouse() || waitingForGameplayStart);
-        BrowserPointerLockBridge.MovementCaptureArmed = armed;
-        BrowserPointerLockBridge.SetMovementCaptureArmed?.Invoke(armed);
-    }
-
     public void OnExit()
     {
         _optionsMenu.Dismiss();
@@ -469,173 +418,19 @@ public class World : IScene
         _inputSystem.ToggleMouse();
     }
 
-    private void HandleBrowserPointerLockLost(bool escapeHeld)
-    {
-        _inputSystem.SyncPointerLockReleased();
-
-        if (!escapeHeld
-            || _consoleOverlay.IsOpen
-            || _optionsMenu.IsOpen
-            || _highscoreBoardOverlay.IsOpen
-            || _highscoreIntermission.CapturesEscapeKey)
-            return;
-
-        _optionsMenu.Open(_inputSystem);
-    }
-
-    private void PollBrowserPointerLockEvents()
-    {
-        if (!OperatingSystem.IsBrowser())
-            return;
-
-        switch (BrowserPointerLockBridge.PollPointerLockEvent())
-        {
-            case "acquired":
-                _inputSystem.OnBrowserPointerLockAcquired();
-                break;
-            case "failed":
-                _inputSystem.OnBrowserPointerLockFailed();
-                break;
-            case "lost":
-                HandleBrowserPointerLockLost(IsKeyDown(KeyboardKey.Escape));
-                break;
-        }
-    }
-
     public void Update(float deltaTime)
     {
         _soundSystem.Update();
         _recordingSystem.Update(deltaTime);
-        SyncOverlayMouseCapture();
 
-        if (_controlsIntroSystem.IsBlockingIntro)
-        {
-            PollBrowserPointerLockEvents();
-            ArmBrowserMovementCapture();
-            _inputSystem.Update(suppressClickToCapture: true);
-            if (_controlsIntroSystem.UpdateBlockingIntro(_inputSystem))
-                return;
-        }
-
-        if (_controlsIntroSystem.IsManualOpen)
-        {
-            PollBrowserPointerLockEvents();
-            _inputSystem.Update(suppressClickToCapture: true);
-            if (IsKeyPressed(KeyboardKey.C) || IsKeyPressed(KeyboardKey.Escape))
-                _controlsIntroSystem.CloseManual(_inputSystem);
+        if (_overlayInput.TryHandleOverlays(deltaTime))
             return;
-        }
-
-        bool toggledConsoleThisFrame = false;
-
-        if (_consoleOverlay.IsOpen && IsKeyPressed(KeyboardKey.Escape))
-        {
-            _consoleOverlay.Close();
-            if (!_optionsMenu.IsOpen)
-                _inputSystem.RestoreGameplayMouse();
-            return;
-        }
-
-        if (_optionsMenu.IsOpen)
-        {
-            var inputResult = _optionsMenu.HandleInput(GetScreenWidth(), GetScreenHeight());
-
-            if (inputResult.WindowDisplayChanged)
-            {
-                ApplyWindowDisplay();
-                ApplyGameResolution();
-            }
-
-            if (inputResult.GameResolutionChanged)
-                ApplyGameResolution();
-            if (inputResult.GraphicsChanged)
-                ApplyGraphicsSettings();
-            if (inputResult.ControlsChanged)
-                ApplyControlSettings();
-            if (inputResult.AudioChanged)
-                ApplyAudioSettings();
-
-            if (IsKeyPressed(KeyboardKey.Escape))
-                _optionsMenu.Close(_inputSystem);
-            else if (IsKeyPressed(KeyboardKey.Q))
-                CloseWindow();
-
-            return;
-        }
-
-        if (IsKeyPressed(KeyboardKey.Escape) && !_highscoreIntermission.CapturesEscapeKey)
-        {
-            if (_highscoreBoardOverlay.IsOpen)
-            {
-                _highscoreBoardOverlay.Close();
-                SyncOverlayMouseCapture();
-                return;
-            }
-
-            if (_consoleOverlay.IsOpen)
-                _consoleOverlay.Close();
-
-            // Locked pointer: browser consumes ESC to exit pointer lock; menu opens via BrowserPointerLockBridge.
-            if (OperatingSystem.IsBrowser() && !_inputSystem.IsMouseFree)
-                return;
-
-            _optionsMenu.Open(_inputSystem);
-            return;
-        }
-
-        if (!_highscoreIntermission.BlocksConsoleToggle &&
-            (IsKeyPressed(KeyboardKey.Grave) ||
-            (OperatingSystem.IsBrowser() && IsKeyPressed(KeyboardKey.Period))))
-        {
-            _consoleOverlay.Toggle();
-            toggledConsoleThisFrame = true;
-            if (_consoleOverlay.IsOpen)
-                _inputSystem.EnableMouse();
-            else
-                _inputSystem.RestoreGameplayMouse();
-        }
-
-        if (_consoleOverlay.IsOpen)
-        {
-            _consoleOverlay.UpdateInput(
-                deltaTime,
-                line => ExecuteConsoleLine(line),
-                (line, cursor) => _runtimeConsole.GetCompletions(line, cursor),
-                toggledConsoleThisFrame);
-            return;
-        }
-
-        if (_highscoreBoardOverlay.IsOpen)
-        {
-            _highscoreBoardOverlay.Update();
-            SyncOverlayMouseCapture();
-            return;
-        }
-
-        if (CanToggleControlsLayout() && IsKeyPressed(KeyboardKey.C))
-        {
-            _controlsIntroSystem.ToggleManual(_inputSystem);
-            return;
-        }
-
-        if (CanToggleHighscoreBoard() && IsKeyPressed(KeyboardKey.H))
-        {
-            _highscoreBoardOverlay.Toggle();
-            SyncOverlayMouseCapture();
-            return;
-        }
-
-        if (CanInstantRestartLevel() && IsKeyPressed(KeyboardKey.R))
-        {
-            _ = RestartCurrentLevel();
-            return;
-        }
 
         if (!_recordingSystem.IsReplaying)
         {
-            PollBrowserPointerLockEvents();
-            ArmBrowserMovementCapture();
-            _inputSystem.Update(suppressClickToCapture: ShouldDeferGameplayMouseCapture());
+            _overlayInput.PollBrowserPointerLockEvents();
+            _overlayInput.ArmBrowserMovementCapture();
+            _inputSystem.Update(suppressClickToCapture: _overlayInput.ShouldDeferGameplayMouseCapture());
         }
 
         // Sample Raylib once per render frame; ticks consume latched edges/deltas
