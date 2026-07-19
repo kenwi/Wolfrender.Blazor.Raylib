@@ -1,6 +1,5 @@
 using System.Numerics;
 using Game.DebugConsole;
-using Game.Editor;
 using Game.Engine.Movement;
 using Game.Engine.Simulation;
 using Game.Features.Animation;
@@ -24,8 +23,6 @@ namespace Game.Core;
 
 public class World : IScene
 {
-    private string _currentLevelPath = LevelCatalog.DefaultLevelPath;
-
     private readonly Player _player;
     private readonly SoundSystem _soundSystem;
     private readonly EffectSystem _effectSystem;
@@ -65,14 +62,12 @@ public class World : IScene
     private readonly PlayOverlayInputController _overlayInput;
     private readonly PlayConsoleCommands _consoleCommands;
     private readonly PlayHudComposer _hudComposer;
-    private bool _highscoreIntermissionStarted;
+    private readonly PlayLevelSession _levelSession;
     private bool _suppressLevelCompleteClickRestart;
 
     private InputState _inputState = new();
     private SimulationPose _previousSimulationPose;
     private SimulationPose _currentSimulationPose;
-    private int _currentRngSeed;
-    private int? _rngSeedOverride;
 
     public Player Player => _player;
     public PlayerSystem PlayerSystem => _playerSystem;
@@ -82,7 +77,7 @@ public class World : IScene
     public ScoreSystem ScoreSystem => _scoreSystem;
     public ExitSystem ExitSystem => _exitSystem;
     public SecretSystem SecretSystem => _secretSystem;
-    public string CurrentLevelPath => _currentLevelPath;
+    public string CurrentLevelPath => _levelSession.CurrentLevelPath;
 
     public World(MapData mapData)
     {
@@ -161,7 +156,7 @@ public class World : IScene
             _inputSystem,
             _controlsIntroSystem,
             () => GetRenderPose().Position,
-            () => _currentLevelPath);
+            () => CurrentLevelPath);
         _runtimeConsole = WorldConsoleBindings.CreateConsole(
             this,
             _player,
@@ -179,13 +174,35 @@ public class World : IScene
             result => _runtimeConsole.WriteFeedback(result));
         _highscoreBoardOverlay = new HighscoreBoardOverlay(
             _highscoreClient,
-            () => _currentLevelPath,
+            () => CurrentLevelPath,
             StartReplayRemote,
             result => _runtimeConsole.WriteFeedback(result));
+        _levelSession = new PlayLevelSession(
+            _mapData,
+            _playerSystem,
+            _doorSystem,
+            _enemySystem,
+            _pickupSystem,
+            _placedObjectSystem,
+            _scoreSystem,
+            _exitSystem,
+            _secretSystem,
+            _renderSystem,
+            _soundPropagationSystem,
+            _highscoreIntermission,
+            _highscoreClient,
+            _effectSystem,
+            _recordingSystem,
+            _simulationClock,
+            _tickDiagnostics,
+            _inputSystem,
+            _controlsIntroSystem,
+            _optionsMenu,
+            ResetSimulationPoses);
         _recordingSystem.Configure(
-            LoadLevel,
-            RestartCurrentLevel,
-            () => _currentLevelPath,
+            _levelSession.LoadLevel,
+            _levelSession.RestartCurrentLevel,
+            () => _levelSession.CurrentLevelPath,
             sensitivity => _playOptions.SetMouseSensitivity(sensitivity),
             () =>
             {
@@ -202,8 +219,8 @@ public class World : IScene
             tickHz => _simulationClock.SetTickHz(tickHz),
             tick => SimulationChecksum.Capture(
                 tick, _player, _enemySystem.Enemies, _doorSystem.Doors, _scoreSystem),
-            () => _currentRngSeed,
-            seed => _rngSeedOverride = seed,
+            () => _levelSession.CurrentRngSeed,
+            seed => _levelSession.SetRngSeedOverride(seed),
             result => _runtimeConsole.WriteFeedback(result),
             () =>
             {
@@ -212,7 +229,7 @@ public class World : IScene
             });
         _playerSystem.ConfigureLifecycle(
             () => _consoleOverlay.IsOpen,
-            () => _ = RestartCurrentLevel(),
+            () => _ = _levelSession.RestartCurrentLevel(),
             () => _highscoreIntermission.IsBlockingRestart,
             () => _recordingSystem.IsReplaying,
             () => _suppressLevelCompleteClickRestart);
@@ -235,7 +252,7 @@ public class World : IScene
             _playOptions,
             _runtimeConsole,
             ExecuteConsoleLine,
-            RestartCurrentLevel);
+            _levelSession.RestartCurrentLevel);
         _hudComposer = new PlayHudComposer(
             _player,
             _consoleOverlay,
@@ -309,135 +326,16 @@ public class World : IScene
 
     public void OnWindowResize() => _playOptions.OnWindowResize();
 
-    public void OnEnter()
-    {
-        _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
-        _enemySystem.Rebuild(_mapData.Enemies, _mapData);
-        _pickupSystem.Rebuild(_mapData.Pickups, _mapData);
-        _placedObjectSystem.Rebuild(_mapData);
-        _scoreSystem.ResetForLevel(_mapData);
-        _exitSystem.Rebuild(_mapData);
-        _secretSystem.Rebuild(_mapData);
-        _renderSystem.RebuildMeshes();
+    public void OnEnter() => _levelSession.OnEnter();
 
-        if (OperatingSystem.IsBrowser())
-        {
-            _highscoreClient.PrefetchLeaderboardAccess(_currentLevelPath);
-            _inputSystem.EnableMouse();
-        }
-        else if (!_controlsIntroSystem.IsVisible)
-            _inputSystem.DisableMouse();
-        else
-            _inputSystem.EnableMouse();
+    public ConsoleCommandResult LoadLevel(string pathOrName) =>
+        _levelSession.LoadLevel(pathOrName);
 
-        _recordingSystem.ResetInputLatches();
-        TryStartAutoRecording();
-    }
+    public ConsoleCommandResult RestartCurrentLevel() =>
+        _levelSession.RestartCurrentLevel();
 
-    public ConsoleCommandResult LoadLevel(string pathOrName)
-    {
-        if (!LevelCatalog.TryResolve(pathOrName, out var resolvedPath, out var error))
-            return ConsoleCommandResult.Fail(error);
-
-        try
-        {
-            LevelSerializer.LoadFromJson(_mapData, Res.Path(resolvedPath));
-            _currentLevelPath = resolvedPath;
-            ResetLevelState();
-            return ConsoleCommandResult.Ok($"Loaded '{resolvedPath}'.");
-        }
-        catch (Exception ex)
-        {
-            return ConsoleCommandResult.Fail($"load: {ex.Message}");
-        }
-    }
-
-    public ConsoleCommandResult RestartCurrentLevel()
-    {
-        try
-        {
-            LevelSerializer.LoadFromJson(_mapData, Res.Path(_currentLevelPath));
-            ResetLevelState();
-            return ConsoleCommandResult.Ok($"Restarted from '{_currentLevelPath}'.");
-        }
-        catch (Exception ex)
-        {
-            return ConsoleCommandResult.Fail($"restart: {ex.Message}");
-        }
-    }
-
-    public ConsoleCommandResult ListPickupsForConsole()
-    {
-        var placements = _mapData.Pickups;
-        if (placements.Count == 0)
-            return ConsoleCommandResult.Ok($"No pickups in '{_currentLevelPath}'.");
-
-        var activeByTile = new HashSet<(int X, int Y)>(
-            _pickupSystem.ActivePickups.Select(p => (p.TileX, p.TileY)));
-
-        var rows = new List<string>(placements.Count);
-        for (int i = 0; i < placements.Count; i++)
-        {
-            var placement = placements[i];
-            int amount = PickupDefaults.GetAmount(placement.Type, placement.Amount);
-            string amountText = placement.Amount == 0
-                ? $"amount={amount} (default)"
-                : $"amount={amount}";
-
-            var world = LevelData.GetTileAnchorWorld(placement.TileX, placement.TileY, 1.5f);
-            string active = activeByTile.Contains((placement.TileX, placement.TileY)) ? "yes" : "no";
-
-            rows.Add(
-                $"#{i} {placement.Type} tile=({placement.TileX},{placement.TileY}) {amountText} " +
-                $"world=({world.X:F1},{world.Y:F1},{world.Z:F1}) active={active}");
-        }
-
-        int activeCount = _pickupSystem.ActivePickups.Count;
-        string summary = placements.Count == 1
-            ? $"1 pickup in '{_currentLevelPath}' ({activeCount} active):"
-            : $"{placements.Count} pickups in '{_currentLevelPath}' ({activeCount} active):";
-
-        return ConsoleCommandResult.Ok(summary, rows);
-    }
-
-    private void ResetLevelState()
-    {
-        // A level reset invalidates recording/replay tick indexing (sim clock restarts
-        // at tick 0). The recording system's own restarts happen before it flags
-        // recording/replay active, so this only fires for external resets.
-        _recordingSystem.OnLevelStateReset();
-
-        _currentRngSeed = _rngSeedOverride ?? Random.Shared.Next();
-        _enemySystem.SetRandomSeed(_currentRngSeed);
-
-        _playerSystem.ResetForLevelLoad(_mapData);
-        _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
-        _enemySystem.Rebuild(_mapData.Enemies, _mapData);
-        _pickupSystem.Rebuild(_mapData.Pickups, _mapData);
-        _placedObjectSystem.Rebuild(_mapData);
-        _scoreSystem.ResetForLevel(_mapData);
-        _exitSystem.Rebuild(_mapData);
-        _secretSystem.Rebuild(_mapData);
-        _renderSystem.RebuildMeshes();
-        _soundPropagationSystem.ClearPendingEvents();
-        _highscoreIntermission.ResetForLevel();
-        _highscoreIntermissionStarted = false;
-        _effectSystem.Clear();
-        _simulationClock.Reset();
-        _tickDiagnostics.Reset();
-        ResetSimulationPoses();
-
-        if (OperatingSystem.IsBrowser())
-            _highscoreClient.PrefetchLeaderboardAccess(_currentLevelPath);
-
-        TryStartAutoRecording();
-    }
-
-    private void TryStartAutoRecording()
-    {
-        if (_recordingSystem.ShouldAutoRecordOnLevelReset)
-            _recordingSystem.StartAutoRecording(_optionsMenu.Settings.MouseSensitivity);
-    }
+    public ConsoleCommandResult ListPickupsForConsole() =>
+        _levelSession.ListPickupsForConsole();
 
     public void OnExit()
     {
@@ -484,11 +382,11 @@ public class World : IScene
 
         _tickDiagnostics.RecordSimulationStep(_simulationClock);
 
-        if (_exitSystem.IsLevelComplete && !_highscoreIntermissionStarted)
+        if (_exitSystem.IsLevelComplete && !_levelSession.HighscoreIntermissionStarted)
         {
-            _highscoreIntermissionStarted = true;
+            _levelSession.HighscoreIntermissionStarted = true;
             if (!_recordingSystem.IsReplaying)
-                _highscoreIntermission.Begin(_currentLevelPath, _scoreSystem);
+                _highscoreIntermission.Begin(_levelSession.CurrentLevelPath, _scoreSystem);
         }
 
         if (_exitSystem.IsLevelComplete)
