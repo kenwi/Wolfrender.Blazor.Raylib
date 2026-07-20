@@ -1,5 +1,6 @@
 using Game.DebugConsole;
 using Game.Features.Highscores;
+using Game.Features.Hud;
 using Game.Features.LevelProgress;
 using Game.Features.Options;
 using Game.Features.Players;
@@ -7,10 +8,11 @@ using Game.Features.Recording;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 
-namespace Game.Features.Hud;
+namespace Game.Core.Session;
 
 /// <summary>
 /// Play-mode overlay mouse policy and modal input stack (controls intro, options, console, highscores).
+/// Session composition (not a Hud feature slice).
 /// Returns whether the frame was fully handled so World can skip gameplay ticks.
 /// </summary>
 public sealed class PlayOverlayInputController

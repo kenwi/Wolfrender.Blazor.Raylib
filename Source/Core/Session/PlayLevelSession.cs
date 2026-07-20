@@ -1,5 +1,4 @@
 using Game.DebugConsole;
-using Game.Editor;
 using Game.Engine.Rendering;
 using Game.Engine.Simulation;
 using Game.Features.Combat;
@@ -7,6 +6,7 @@ using Game.Features.Doors;
 using Game.Features.Enemies;
 using Game.Features.Highscores;
 using Game.Features.Hud;
+using Game.Features.LevelProgress;
 using Game.Features.Options;
 using Game.Features.Pickups;
 using Game.Features.Players;
@@ -14,10 +14,11 @@ using Game.Features.Recording;
 using Game.Features.SoundPropagation;
 using Game.Features.WorldObjects;
 
-namespace Game.Features.LevelProgress;
+namespace Game.Core.Session;
 
 /// <summary>
 /// Play-mode level path, load/restart/reset, and enter rebuild sequence.
+/// Session composition (not a LevelProgress feature slice).
 /// </summary>
 public sealed class PlayLevelSession
 {

@@ -3,6 +3,7 @@
 // cross-slice dependencies stay visible and greppable.
 global using Game.Core;
 global using Game.Core.Level;
+global using Game.Core.Session;
 global using Game.Engine.Input;
 global using Game.Engine.Movement;
 global using Game.Engine.Camera;
