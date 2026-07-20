@@ -1,21 +1,14 @@
 using System.Numerics;
 using Game.DebugConsole;
-using Game.Engine.Movement;
 using Game.Engine.Simulation;
-using Game.Features.Animation;
-using Game.Features.Combat;
 using Game.Features.Doors;
 using Game.Features.Enemies;
 using Game.Features.Highscores;
-using Game.Features.Hud;
 using Game.Features.LevelProgress;
-using Game.Features.Options;
-using Game.Features.Pickups;
 using Game.Features.Players;
 using Game.Features.Recording;
-using Game.Features.WorldObjects;
 using Game.Features.SoundPropagation;
-using Game.Engine.Rendering;
+using Game.Features.WorldObjects;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 
@@ -23,309 +16,227 @@ namespace Game.Core;
 
 public class World : IScene
 {
-    private readonly Player _player;
-    private readonly SoundSystem _soundSystem;
-    private readonly EffectSystem _effectSystem;
-    private readonly CombatFeedback _combatFeedback;
-    private readonly MapData _mapData;
-    private readonly LevelData _level;
-    private readonly List<Texture2D> _tileTextures;
-    private readonly List<Texture2D> _gameTextures;
-    private readonly InputSystem _inputSystem;
-    private readonly RecordingSystem _recordingSystem;
-    private readonly FixedSimulationClock _simulationClock = new();
-    private readonly TickDiagnostics _tickDiagnostics = new();
-    private readonly CollisionSystem _collisionSystem;
-    private readonly CameraSystem _cameraSystem;
-    private readonly DoorSystem _doorSystem;
-    private readonly RenderSystem _renderSystem;
-    private readonly LightOcclusionMap _lightOcclusionMap = new();
-    private readonly AnimationSystem _animationSystem;
-    private readonly MinimapSystem _minimapSystem;
-    private readonly ConsoleOverlay _consoleOverlay;
-    private readonly RuntimeConsoleService _runtimeConsole;
-    private readonly EnemySystem _enemySystem;
-    private readonly PickupSystem _pickupSystem;
-    private readonly PlacedObjectSystem _placedObjectSystem;
-    private readonly WeaponSystem _weaponSystem;
-    private readonly SoundPropagationSystem _soundPropagationSystem;
-    private readonly PlayerSystem _playerSystem;
-    private readonly ScoreSystem _scoreSystem;
-    private readonly ScoreSignals _scoreSignals = new();
-    private readonly ExitSystem _exitSystem;
-    private readonly SecretSystem _secretSystem;
-    private readonly HighscoreClient _highscoreClient;
-    private readonly HighscoreIntermission _highscoreIntermission;
-    private readonly HighscoreBoardOverlay _highscoreBoardOverlay;
-    private readonly OptionsMenuSystem _optionsMenu = new();
-    private readonly ControlsIntroSystem _controlsIntroSystem = new();
-    private readonly PlayOptionsFacade _playOptions;
-    private readonly PlayOverlayInputController _overlayInput;
-    private readonly PlayConsoleCommands _consoleCommands;
-    private readonly PlayHudComposer _hudComposer;
-    private readonly PlayLevelSession _levelSession;
+    private readonly WorldComposition _c;
+    private RuntimeConsoleService _runtimeConsole = null!;
+    private HighscoreIntermission _highscoreIntermission = null!;
+    private HighscoreBoardOverlay _highscoreBoardOverlay = null!;
+    private PlayOverlayInputController _overlayInput = null!;
+    private PlayConsoleCommands _consoleCommands = null!;
+    private PlayHudComposer _hudComposer = null!;
+    private PlayLevelSession _levelSession = null!;
     private bool _suppressLevelCompleteClickRestart;
 
     private InputState _inputState = new();
     private SimulationPose _previousSimulationPose;
     private SimulationPose _currentSimulationPose;
 
-    public Player Player => _player;
-    public PlayerSystem PlayerSystem => _playerSystem;
-    public EnemySystem EnemySystem => _enemySystem;
-    public DoorSystem DoorSystem => _doorSystem;
-    public SoundPropagationSystem SoundPropagationSystem => _soundPropagationSystem;
-    public ScoreSystem ScoreSystem => _scoreSystem;
-    public ExitSystem ExitSystem => _exitSystem;
-    public SecretSystem SecretSystem => _secretSystem;
+    public Player Player => _c.Player;
+    public PlayerSystem PlayerSystem => _c.PlayerSystem;
+    public EnemySystem EnemySystem => _c.EnemySystem;
+    public DoorSystem DoorSystem => _c.DoorSystem;
+    public SoundPropagationSystem SoundPropagationSystem => _c.SoundPropagationSystem;
+    public ScoreSystem ScoreSystem => _c.ScoreSystem;
+    public ExitSystem ExitSystem => _c.ExitSystem;
+    public SecretSystem SecretSystem => _c.SecretSystem;
     public string CurrentLevelPath => _levelSession.CurrentLevelPath;
 
     public World(MapData mapData)
     {
-        _mapData = mapData;
-        _level = new LevelData(mapData);
-        _tileTextures = mapData.TileTextures;
-        _gameTextures = mapData.GameTextures;
-        _player = new Player();
-
-        _soundSystem = new SoundSystem(Res.Path("resources/03.mp3"));
-        _effectSystem = new EffectSystem();
-        _combatFeedback = new CombatFeedback(_soundSystem, _effectSystem);
-        _inputSystem = new InputSystem();
-        _recordingSystem = new RecordingSystem(_inputSystem);
-        _doorSystem = new DoorSystem(mapData.Doors, mapData.Width, _tileTextures);
-        _scoreSystem = new ScoreSystem(_scoreSignals);
-        _secretSystem = new SecretSystem(_scoreSignals, _tileTextures);
-        _collisionSystem = new CollisionSystem(
-            _level,
-            new CompositeMovementBlocker(_doorSystem, _secretSystem),
-            ObjectCollisionRules.Instance);
-        _soundPropagationSystem = new SoundPropagationSystem(mapData, _doorSystem);
-        _cameraSystem = new CameraSystem(_collisionSystem);
-        _playOptions = new PlayOptionsFacade(_optionsMenu, _soundSystem, _cameraSystem);
-        _renderSystem = new RenderSystem(_level, _mapData, _tileTextures, DoorTileEncoding.ForEngine);
-        _minimapSystem = new MinimapSystem(_level, _renderSystem);
-        _exitSystem = new ExitSystem(_scoreSystem);
-        _highscoreClient = new HighscoreClient();
-        _pickupSystem = new PickupSystem(_scoreSignals);
-        _placedObjectSystem = new PlacedObjectSystem();
-        _enemySystem = new EnemySystem(
-            _player, _inputSystem, _collisionSystem, _doorSystem, _combatFeedback,
-            _pickupSystem, _scoreSignals, _soundPropagationSystem);
-        _pickupSystem.SetObjectsTexture(_gameTextures[GameTextureIndex.Objects]);
-        _pickupSystem.Rebuild(_mapData.Pickups, _mapData);
-        _placedObjectSystem.SetObjectsTexture(_gameTextures[GameTextureIndex.Objects]);
-        _placedObjectSystem.Rebuild(_mapData);
-        _animationSystem = new AnimationSystem(
-            _gameTextures[GameTextureIndex.EnemyGuard],
-            _gameTextures[GameTextureIndex.Weapons],
-            _player,
-            _enemySystem);
-        _weaponSystem = new WeaponSystem(
-            _mapData,
-            _doorSystem,
-            _enemySystem,
-            _gameTextures[GameTextureIndex.EnemyGuard],
-            _effectSystem,
-            _soundSystem,
-            _animationSystem,
-            _soundPropagationSystem);
-        _playerSystem = new PlayerSystem(
-            _player,
-            _inputSystem,
-            _collisionSystem,
-            _cameraSystem,
-            _pickupSystem,
-            _doorSystem,
-            _animationSystem,
-            _enemySystem,
-            _weaponSystem,
-            _effectSystem,
-            _exitSystem,
-            _secretSystem);
-
-        _consoleOverlay = new ConsoleOverlay();
-        _consoleCommands = new PlayConsoleCommands(
-            _tickDiagnostics,
-            _renderSystem,
-            _player,
-            _mapData,
-            _doorSystem,
-            _lightOcclusionMap,
-            _recordingSystem,
-            _consoleOverlay,
-            _inputSystem,
-            _controlsIntroSystem,
-            () => GetRenderPose().Position,
-            () => CurrentLevelPath);
-        _runtimeConsole = WorldConsoleBindings.CreateConsole(
-            this,
-            _player,
-            _enemySystem,
-            _scoreSystem,
-            _consoleOverlay,
-            _recordingSystem,
-            () => _optionsMenu.Settings.MouseSensitivity);
-        _highscoreIntermission = new HighscoreIntermission(
-            _highscoreClient,
-            submission => _recordingSystem.PrepareRecordingForScoreSubmission(submission),
-            submission => _recordingSystem.UploadRecordingForScoreAsync(submission),
-            () => _recordingSystem.DiscardCurrentRecording(),
-            StartReplayRemote,
-            result => _runtimeConsole.WriteFeedback(result));
-        _highscoreBoardOverlay = new HighscoreBoardOverlay(
-            _highscoreClient,
-            () => CurrentLevelPath,
-            StartReplayRemote,
-            result => _runtimeConsole.WriteFeedback(result));
-        _levelSession = new PlayLevelSession(
-            _mapData,
-            _playerSystem,
-            _doorSystem,
-            _enemySystem,
-            _pickupSystem,
-            _placedObjectSystem,
-            _scoreSystem,
-            _exitSystem,
-            _secretSystem,
-            _renderSystem,
-            _soundPropagationSystem,
-            _highscoreIntermission,
-            _highscoreClient,
-            _effectSystem,
-            _recordingSystem,
-            _simulationClock,
-            _tickDiagnostics,
-            _inputSystem,
-            _controlsIntroSystem,
-            _optionsMenu,
-            ResetSimulationPoses);
-        _recordingSystem.Configure(
-            _levelSession.LoadLevel,
-            _levelSession.RestartCurrentLevel,
-            () => _levelSession.CurrentLevelPath,
-            sensitivity => _playOptions.SetMouseSensitivity(sensitivity),
-            () =>
-            {
-                _playOptions.ApplyControlSettings();
-                _inputSystem.RestoreGameplayMouse();
-            },
-            () => PlayerSnapshotApplication.From(_player),
-            snapshot =>
-            {
-                snapshot.ApplyTo(_player);
-                ResetSimulationPoses();
-            },
-            () => _simulationClock.TickHz,
-            tickHz => _simulationClock.SetTickHz(tickHz),
-            tick => SimulationChecksum.Capture(
-                tick, _player, _enemySystem.Enemies, _doorSystem.Doors, _scoreSystem),
-            () => _levelSession.CurrentRngSeed,
-            seed => _levelSession.SetRngSeedOverride(seed),
-            result => _runtimeConsole.WriteFeedback(result),
-            () =>
-            {
-                _consoleOverlay.Close();
-                _inputSystem.DisableMouse();
-            });
-        _playerSystem.ConfigureLifecycle(
-            () => _consoleOverlay.IsOpen,
-            () => _ = _levelSession.RestartCurrentLevel(),
-            () => _highscoreIntermission.IsBlockingRestart,
-            () => _recordingSystem.IsReplaying,
-            () => _suppressLevelCompleteClickRestart);
-        _playerSystem.ResetForLevelLoad(_mapData);
-        ResetSimulationPoses();
-        _exitSystem.Rebuild(_mapData);
-        _secretSystem.Rebuild(_mapData);
-        _renderSystem.RebuildMeshes();
-
-        _overlayInput = new PlayOverlayInputController(
-            _controlsIntroSystem,
-            _consoleOverlay,
-            _optionsMenu,
-            _highscoreBoardOverlay,
-            _highscoreIntermission,
-            _recordingSystem,
-            _player,
-            _exitSystem,
-            _inputSystem,
-            _playOptions,
-            _runtimeConsole,
-            ExecuteConsoleLine,
-            _levelSession.RestartCurrentLevel);
-        _hudComposer = new PlayHudComposer(
-            _player,
-            _consoleOverlay,
-            _optionsMenu,
-            _controlsIntroSystem,
-            _exitSystem,
-            _doorSystem,
-            _weaponSystem,
-            _effectSystem,
-            _scoreSystem,
-            _animationSystem,
-            _highscoreBoardOverlay,
-            _highscoreIntermission,
-            _recordingSystem,
-            _tickDiagnostics,
-            _minimapSystem,
-            () => _inputState,
-            () => _player.Camera);
-
-        Debug.Setup(_doorSystem.Doors, _player, _animationSystem, _enemySystem);
-        _playOptions.InitializeRenderTargets();
+        _c = WorldCompositionRoot.Create(mapData);
+        WireSessionComposers();
+        ConfigureRecordingAndLifecycle();
+        InitializeLevelSystems();
+        Debug.Setup(_c.DoorSystem.Doors, _c.Player, _c.AnimationSystem, _c.EnemySystem);
+        _c.PlayOptions.InitializeRenderTargets();
 #if DEBUG
         ConsoleSelfTests.RunOnce();
 #endif
     }
 
-    public void SetVolume(float volume) => _playOptions.SetVolume(volume);
+    private void WireSessionComposers()
+    {
+        _consoleCommands = new PlayConsoleCommands(
+            _c.TickDiagnostics,
+            _c.RenderSystem,
+            _c.Player,
+            _c.MapData,
+            _c.DoorSystem,
+            _c.LightOcclusionMap,
+            _c.RecordingSystem,
+            _c.ConsoleOverlay,
+            _c.InputSystem,
+            _c.ControlsIntro,
+            () => GetRenderPose().Position,
+            () => CurrentLevelPath);
+        _runtimeConsole = WorldConsoleBindings.CreateConsole(
+            this,
+            _c.Player,
+            _c.EnemySystem,
+            _c.ScoreSystem,
+            _c.ConsoleOverlay,
+            _c.RecordingSystem,
+            () => _c.OptionsMenu.Settings.MouseSensitivity);
+        _highscoreIntermission = new HighscoreIntermission(
+            _c.HighscoreClient,
+            submission => _c.RecordingSystem.PrepareRecordingForScoreSubmission(submission),
+            submission => _c.RecordingSystem.UploadRecordingForScoreAsync(submission),
+            () => _c.RecordingSystem.DiscardCurrentRecording(),
+            StartReplayRemote,
+            result => _runtimeConsole.WriteFeedback(result));
+        _highscoreBoardOverlay = new HighscoreBoardOverlay(
+            _c.HighscoreClient,
+            () => CurrentLevelPath,
+            StartReplayRemote,
+            result => _runtimeConsole.WriteFeedback(result));
+        _levelSession = new PlayLevelSession(
+            _c.MapData,
+            _c.PlayerSystem,
+            _c.DoorSystem,
+            _c.EnemySystem,
+            _c.PickupSystem,
+            _c.PlacedObjectSystem,
+            _c.ScoreSystem,
+            _c.ExitSystem,
+            _c.SecretSystem,
+            _c.RenderSystem,
+            _c.SoundPropagationSystem,
+            _highscoreIntermission,
+            _c.HighscoreClient,
+            _c.EffectSystem,
+            _c.RecordingSystem,
+            _c.SimulationClock,
+            _c.TickDiagnostics,
+            _c.InputSystem,
+            _c.ControlsIntro,
+            _c.OptionsMenu,
+            ResetSimulationPoses);
+        _overlayInput = new PlayOverlayInputController(
+            _c.ControlsIntro,
+            _c.ConsoleOverlay,
+            _c.OptionsMenu,
+            _highscoreBoardOverlay,
+            _highscoreIntermission,
+            _c.RecordingSystem,
+            _c.Player,
+            _c.ExitSystem,
+            _c.InputSystem,
+            _c.PlayOptions,
+            _runtimeConsole,
+            ExecuteConsoleLine,
+            _levelSession.RestartCurrentLevel);
+        _hudComposer = new PlayHudComposer(
+            _c.Player,
+            _c.ConsoleOverlay,
+            _c.OptionsMenu,
+            _c.ControlsIntro,
+            _c.ExitSystem,
+            _c.DoorSystem,
+            _c.WeaponSystem,
+            _c.EffectSystem,
+            _c.ScoreSystem,
+            _c.AnimationSystem,
+            _highscoreBoardOverlay,
+            _highscoreIntermission,
+            _c.RecordingSystem,
+            _c.TickDiagnostics,
+            _c.MinimapSystem,
+            () => _inputState,
+            () => _c.Player.Camera);
+    }
 
-    public float GetVolume() => _playOptions.GetVolume();
+    private void ConfigureRecordingAndLifecycle()
+    {
+        _c.RecordingSystem.Configure(
+            _levelSession.LoadLevel,
+            _levelSession.RestartCurrentLevel,
+            () => _levelSession.CurrentLevelPath,
+            sensitivity => _c.PlayOptions.SetMouseSensitivity(sensitivity),
+            () =>
+            {
+                _c.PlayOptions.ApplyControlSettings();
+                _c.InputSystem.RestoreGameplayMouse();
+            },
+            () => PlayerSnapshotApplication.From(_c.Player),
+            snapshot =>
+            {
+                snapshot.ApplyTo(_c.Player);
+                ResetSimulationPoses();
+            },
+            () => _c.SimulationClock.TickHz,
+            tickHz => _c.SimulationClock.SetTickHz(tickHz),
+            tick => SimulationChecksum.Capture(
+                tick, _c.Player, _c.EnemySystem.Enemies, _c.DoorSystem.Doors, _c.ScoreSystem),
+            () => _levelSession.CurrentRngSeed,
+            seed => _levelSession.SetRngSeedOverride(seed),
+            result => _runtimeConsole.WriteFeedback(result),
+            () =>
+            {
+                _c.ConsoleOverlay.Close();
+                _c.InputSystem.DisableMouse();
+            });
+        _c.PlayerSystem.ConfigureLifecycle(
+            () => _c.ConsoleOverlay.IsOpen,
+            () => _ = _levelSession.RestartCurrentLevel(),
+            () => _highscoreIntermission.IsBlockingRestart,
+            () => _c.RecordingSystem.IsReplaying,
+            () => _suppressLevelCompleteClickRestart);
+    }
+
+    private void InitializeLevelSystems()
+    {
+        _c.PlayerSystem.ResetForLevelLoad(_c.MapData);
+        ResetSimulationPoses();
+        _c.ExitSystem.Rebuild(_c.MapData);
+        _c.SecretSystem.Rebuild(_c.MapData);
+        _c.RenderSystem.RebuildMeshes();
+    }
+
+    public void SetVolume(float volume) => _c.PlayOptions.SetVolume(volume);
+
+    public float GetVolume() => _c.PlayOptions.GetVolume();
 
     public void SetMouseSensitivity(float sensitivity) =>
-        _playOptions.SetMouseSensitivity(sensitivity);
+        _c.PlayOptions.SetMouseSensitivity(sensitivity);
 
-    public void ApplyControlSettings() => _playOptions.ApplyControlSettings();
+    public void ApplyControlSettings() => _c.PlayOptions.ApplyControlSettings();
 
-    public void ApplyAudioSettings() => _playOptions.ApplyAudioSettings();
+    public void ApplyAudioSettings() => _c.PlayOptions.ApplyAudioSettings();
 
-    public void ApplyWindowDisplay() => _playOptions.ApplyWindowDisplay();
+    public void ApplyWindowDisplay() => _c.PlayOptions.ApplyWindowDisplay();
 
-    public void ApplyGameResolution() => _playOptions.ApplyGameResolution();
+    public void ApplyGameResolution() => _c.PlayOptions.ApplyGameResolution();
 
-    public bool GetFullscreenEnabled() => _playOptions.GetFullscreenEnabled();
+    public bool GetFullscreenEnabled() => _c.PlayOptions.GetFullscreenEnabled();
 
     public void SetFullscreenEnabled(bool enabled) =>
-        _playOptions.SetFullscreenEnabled(enabled);
+        _c.PlayOptions.SetFullscreenEnabled(enabled);
 
     public string GetWindowResolutionPresetId() =>
-        _playOptions.GetWindowResolutionPresetId();
+        _c.PlayOptions.GetWindowResolutionPresetId();
 
     public void SetWindowResolutionPresetId(string presetId) =>
-        _playOptions.SetWindowResolutionPresetId(presetId);
+        _c.PlayOptions.SetWindowResolutionPresetId(presetId);
 
     public string GetGameResolutionPresetId() =>
-        _playOptions.GetGameResolutionPresetId();
+        _c.PlayOptions.GetGameResolutionPresetId();
 
     public void SetGameResolutionPresetId(string presetId) =>
-        _playOptions.SetGameResolutionPresetId(presetId);
+        _c.PlayOptions.SetGameResolutionPresetId(presetId);
 
-    public bool GetVSyncEnabled() => _playOptions.GetVSyncEnabled();
+    public bool GetVSyncEnabled() => _c.PlayOptions.GetVSyncEnabled();
 
     public void SetVSyncEnabled(bool enabled) =>
-        _playOptions.SetVSyncEnabled(enabled);
+        _c.PlayOptions.SetVSyncEnabled(enabled);
 
-    public int GetTargetFps() => _playOptions.GetTargetFps();
+    public int GetTargetFps() => _c.PlayOptions.GetTargetFps();
 
-    public void SetTargetFps(int fps) => _playOptions.SetTargetFps(fps);
+    public void SetTargetFps(int fps) => _c.PlayOptions.SetTargetFps(fps);
 
-    public void ApplyGraphicsSettings() => _playOptions.ApplyGraphicsSettings();
+    public void ApplyGraphicsSettings() => _c.PlayOptions.ApplyGraphicsSettings();
 
-    public void EnsureStartupDisplay() => _playOptions.EnsureStartupDisplay();
+    public void EnsureStartupDisplay() => _c.PlayOptions.EnsureStartupDisplay();
 
-    public void OnWindowResize() => _playOptions.OnWindowResize();
+    public void OnWindowResize() => _c.PlayOptions.OnWindowResize();
 
     public void OnEnter() => _levelSession.OnEnter();
 
@@ -340,88 +251,88 @@ public class World : IScene
 
     public void OnExit()
     {
-        _optionsMenu.Dismiss();
-        _inputSystem.EnableMouse();
+        _c.OptionsMenu.Dismiss();
+        _c.InputSystem.EnableMouse();
     }
 
     public void ToggleMouse()
     {
-        _inputSystem.ToggleMouse();
+        _c.InputSystem.ToggleMouse();
     }
 
     public void Update(float deltaTime)
     {
-        _soundSystem.Update();
-        _recordingSystem.Update(deltaTime);
+        _c.SoundSystem.Update();
+        _c.RecordingSystem.Update(deltaTime);
 
         if (_overlayInput.TryHandleOverlays(deltaTime))
             return;
 
-        if (!_recordingSystem.IsReplaying)
+        if (!_c.RecordingSystem.IsReplaying)
         {
             _overlayInput.PollBrowserPointerLockEvents();
             _overlayInput.ArmBrowserMovementCapture();
-            _inputSystem.Update(suppressClickToCapture: _overlayInput.ShouldDeferGameplayMouseCapture());
+            _c.InputSystem.Update(suppressClickToCapture: _overlayInput.ShouldDeferGameplayMouseCapture());
         }
 
         // Sample Raylib once per render frame; ticks consume latched edges/deltas
         // so per-frame input maps 1:1 onto simulation ticks (see LiveInputProvider).
-        _recordingSystem.BeginInputFrame();
+        _c.RecordingSystem.BeginInputFrame();
 
-        _tickDiagnostics.BeginFrame(deltaTime);
-        int ticksThisFrame = _simulationClock.Advance(deltaTime);
+        _c.TickDiagnostics.BeginFrame(deltaTime);
+        int ticksThisFrame = _c.SimulationClock.Advance(deltaTime);
 
         _suppressLevelCompleteClickRestart = false;
-        if (_exitSystem.IsLevelComplete && _highscoreIntermission.IsLeaderboardInteractive)
+        if (_c.ExitSystem.IsLevelComplete && _highscoreIntermission.IsLeaderboardInteractive)
             _suppressLevelCompleteClickRestart = _highscoreIntermission.TryHandleLeaderboardInput();
 
         for (int i = 0; i < ticksThisFrame; i++)
         {
-            _simulationClock.AdvanceTick();
-            SimulateGameplayTick(_simulationClock.FixedDeltaTime);
+            _c.SimulationClock.AdvanceTick();
+            SimulateGameplayTick(_c.SimulationClock.FixedDeltaTime);
         }
 
-        _tickDiagnostics.RecordSimulationStep(_simulationClock);
+        _c.TickDiagnostics.RecordSimulationStep(_c.SimulationClock);
 
-        if (_exitSystem.IsLevelComplete && !_levelSession.HighscoreIntermissionStarted)
+        if (_c.ExitSystem.IsLevelComplete && !_levelSession.HighscoreIntermissionStarted)
         {
             _levelSession.HighscoreIntermissionStarted = true;
-            if (!_recordingSystem.IsReplaying)
-                _highscoreIntermission.Begin(_levelSession.CurrentLevelPath, _scoreSystem);
+            if (!_c.RecordingSystem.IsReplaying)
+                _highscoreIntermission.Begin(_levelSession.CurrentLevelPath, _c.ScoreSystem);
         }
 
-        if (_exitSystem.IsLevelComplete)
+        if (_c.ExitSystem.IsLevelComplete)
             _highscoreIntermission.Update();
     }
 
     private void SimulateGameplayTick(float fixedDeltaTime)
     {
-        var poll = _recordingSystem.ActiveProvider.Poll(fixedDeltaTime);
-        _recordingSystem.CaptureTick(poll, _simulationClock.TickIndex);
+        var poll = _c.RecordingSystem.ActiveProvider.Poll(fixedDeltaTime);
+        _c.RecordingSystem.CaptureTick(poll, _c.SimulationClock.TickIndex);
         _inputState = poll.InputState;
         var mouseDelta = poll.MouseDelta;
 
-        if (!_exitSystem.IsBlockingGameplay)
-            _scoreSystem.Tick(fixedDeltaTime);
+        if (!_c.ExitSystem.IsBlockingGameplay)
+            _c.ScoreSystem.Tick(fixedDeltaTime);
 
-        _effectSystem.Update(fixedDeltaTime);
+        _c.EffectSystem.Update(fixedDeltaTime);
 
         int screenWidth = RenderData.InternalWidth;
         int screenHeight = RenderData.InternalHeight;
 
-        if (_player.IsAlive)
+        if (_c.Player.IsAlive)
         {
-            _playerSystem.UpdateAlive(fixedDeltaTime, _inputState, mouseDelta, screenWidth, screenHeight);
-            if (!_exitSystem.IsBlockingGameplay)
-                _enemySystem.Update(fixedDeltaTime, _inputState);
+            _c.PlayerSystem.UpdateAlive(fixedDeltaTime, _inputState, mouseDelta, screenWidth, screenHeight);
+            if (!_c.ExitSystem.IsBlockingGameplay)
+                _c.EnemySystem.Update(fixedDeltaTime, _inputState);
         }
         else
         {
-            _playerSystem.UpdateDead(fixedDeltaTime, _inputState, mouseDelta);
-            _enemySystem.Update(fixedDeltaTime, _inputState);
+            _c.PlayerSystem.UpdateDead(fixedDeltaTime, _inputState, mouseDelta);
+            _c.EnemySystem.Update(fixedDeltaTime, _inputState);
         }
 
-        _recordingSystem.OnTickSimulated(_simulationClock.TickIndex);
+        _c.RecordingSystem.OnTickSimulated(_c.SimulationClock.TickIndex);
         AdvanceSimulationPose();
     }
 
@@ -439,17 +350,17 @@ public class World : IScene
 
     private SimulationPose GetRenderPose()
     {
-        if (!_player.IsAlive || _exitSystem.IsBlockingGameplay)
+        if (!_c.Player.IsAlive || _c.ExitSystem.IsBlockingGameplay)
             return CapturePlayerPose();
 
         return SimulationPose.Lerp(
             _previousSimulationPose,
             _currentSimulationPose,
-            _simulationClock.InterpolationAlpha);
+            _c.SimulationClock.InterpolationAlpha);
     }
 
     private SimulationPose CapturePlayerPose() =>
-        SimulationPose.FromPositionAndLook(_player.Position, _player.Camera.Target);
+        SimulationPose.FromPositionAndLook(_c.Player.Position, _c.Player.Camera.Target);
 
     public ConsoleCommandResult ToggleTickDiagnostics() => _consoleCommands.ToggleTickDiagnostics();
 
@@ -504,30 +415,30 @@ public class World : IScene
     public void Render()
     {
         RenderSceneToTexture();
-        _hudComposer.RenderHudToTexture(_playOptions.HudRenderTexture);
+        _hudComposer.RenderHudToTexture(_c.PlayOptions.HudRenderTexture);
         _hudComposer.ComposeToScreen(
-            _playOptions.SceneRenderTexture.Texture,
-            _playOptions.HudRenderTexture.Texture);
+            _c.PlayOptions.SceneRenderTexture.Texture,
+            _c.PlayOptions.HudRenderTexture.Texture);
     }
 
     private void RenderSceneToTexture()
     {
         var renderPose = GetRenderPose();
-        var renderCamera = renderPose.ToCamera(_player.Camera);
+        var renderCamera = renderPose.ToCamera(_c.Player.Camera);
         var renderPosition = renderPose.Position;
         var renderTarget = renderCamera.Target;
 
         SceneLightingSetup.ApplyForView(
-            _mapData,
-            _lightOcclusionMap,
-            _renderSystem.RoomMap,
+            _c.MapData,
+            _c.LightOcclusionMap,
+            _c.RenderSystem.RoomMap,
             DoorTileEncoding.ForEngine,
-            _doorSystem,
+            _c.DoorSystem,
             renderPosition,
-            _renderSystem.ComputeVisibleRooms);
+            _c.RenderSystem.ComputeVisibleRooms);
         var lightingShader = PrimitiveRenderer.GetLightingShader();
 
-        var sceneRt = _playOptions.SceneRenderTexture;
+        var sceneRt = _c.PlayOptions.SceneRenderTexture;
         BeginTextureMode(sceneRt);
         BeginMode3D(renderCamera);
         ClearBackground(Color.Black);
@@ -539,20 +450,20 @@ public class World : IScene
             PrimitiveRenderer.ApplyWallLightingUniforms();
         }
 
-        _renderSystem.Render(
+        _c.RenderSystem.Render(
             renderCamera,
             sceneRt.Texture.Width,
             sceneRt.Texture.Height,
-            _doorSystem);
-        _secretSystem.Render(renderPosition);
-        _doorSystem.Render();
-        _animationSystem.Render();
+            _c.DoorSystem);
+        _c.SecretSystem.Render(renderPosition);
+        _c.DoorSystem.Render();
+        _c.AnimationSystem.Render();
 
         if (lightingShader.HasValue)
             EndShaderMode();
 
-        _placedObjectSystem.Render(renderPosition, renderTarget);
-        _pickupSystem.Render(renderPosition, renderTarget);
+        _c.PlacedObjectSystem.Render(renderPosition, renderTarget);
+        _c.PickupSystem.Render(renderPosition, renderTarget);
         Debug.Draw3DOverlays(_inputState.IsDebugEnabled);
 
         EndMode3D();

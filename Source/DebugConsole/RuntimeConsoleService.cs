@@ -12,31 +12,10 @@ public sealed class RuntimeConsoleService
     public RuntimeConsoleService(
         IConsoleVariableAccessor variables,
         IConsoleOutput output,
-        Func<string, ConsoleCommandResult> loadLevel,
-        Func<ConsoleCommandResult> restartCurrentLevel,
-        Func<ConsoleCommandResult> clearConsoleScrollback,
-        Func<string> getCurrentLevelPath,
-        Func<ConsoleCommandResult> listPickups,
-        Func<string, ConsoleCommandResult> startRecording,
-        Func<ConsoleCommandResult> stopRecording,
-        Func<string, ConsoleCommandResult> startReplay,
-        Func<string, ConsoleCommandResult> verifyReplay,
-        Func<ConsoleCommandResult> stopReplay,
-        Func<string, ConsoleCommandResult> sendRecording,
-        Func<int, ConsoleCommandResult> replayRemote,
-        Func<ConsoleCommandResult> toggleTickDiagnostics,
-        Func<bool, ConsoleCommandResult> setTickDiagnostics,
-        Func<ConsoleCommandResult> getTickDiagnosticsStatus,
-        Func<ConsoleCommandResult> toggleStaticMeshes,
-        Func<bool, ConsoleCommandResult> setStaticMeshes,
-        Func<ConsoleCommandResult> getStaticMeshesStatus,
-        Func<ConsoleCommandResult> toggleFlying,
-        Func<bool, ConsoleCommandResult> setFlying,
-        Func<ConsoleCommandResult> getFlyingStatus,
-        Func<ConsoleCommandResult> dumpLightingCheck,
-        Func<ConsoleCommandResult> toggleFullBright,
-        Func<bool, ConsoleCommandResult> setFullBright,
-        Func<ConsoleCommandResult> getFullBrightStatus)
+        ConsoleLevelActions level,
+        ConsoleRecordingActions recording,
+        ConsoleDiagnosticsActions diagnostics,
+        ConsoleRenderToggleActions renderToggles)
     {
         _output = output;
 
@@ -70,32 +49,11 @@ public sealed class RuntimeConsoleService
         _context = new ConsoleCommandContext
         {
             Variables = variables,
-            LoadLevel = loadLevel,
-            RestartCurrentLevel = restartCurrentLevel,
-            ClearConsoleScrollback = clearConsoleScrollback,
             GetAllCommands = () => _dispatcher.Commands,
-            GetCurrentLevelPath = getCurrentLevelPath,
-            ListPickups = listPickups,
-            StartRecording = startRecording,
-            StopRecording = stopRecording,
-            StartReplay = startReplay,
-            VerifyReplay = verifyReplay,
-            StopReplay = stopReplay,
-            SendRecording = sendRecording,
-            ReplayRemote = replayRemote,
-            ToggleTickDiagnostics = toggleTickDiagnostics,
-            SetTickDiagnostics = setTickDiagnostics,
-            GetTickDiagnosticsStatus = getTickDiagnosticsStatus,
-            ToggleStaticMeshes = toggleStaticMeshes,
-            SetStaticMeshes = setStaticMeshes,
-            GetStaticMeshesStatus = getStaticMeshesStatus,
-            ToggleFlying = toggleFlying,
-            SetFlying = setFlying,
-            GetFlyingStatus = getFlyingStatus,
-            DumpLightingCheck = dumpLightingCheck,
-            ToggleFullBright = toggleFullBright,
-            SetFullBright = setFullBright,
-            GetFullBrightStatus = getFullBrightStatus
+            Level = level,
+            Recording = recording,
+            Diagnostics = diagnostics,
+            RenderToggles = renderToggles
         };
     }
 

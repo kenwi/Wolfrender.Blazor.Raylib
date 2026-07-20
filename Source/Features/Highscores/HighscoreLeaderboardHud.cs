@@ -1,6 +1,5 @@
 using System.Numerics;
 using Game.Features.Highscores.Shared;
-using Game.Features.Hud;
 using Game.Features.LevelProgress;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
