@@ -29,14 +29,14 @@ public static class OptionsMenuHud
         var valueColor = Color.RayWhite;
         int centerX = layout.PanelX + layout.PanelW / 2;
 
-        var (monitorW, monitorH) = WindowDisplayMode.GetReferenceDimensions();
+        var (monitorW, monitorH) = WindowDisplayMode.GetNativeDimensions();
         int windowW = (int)RenderData.Resolution.X;
         int windowH = (int)RenderData.Resolution.Y;
 
         DrawText("Fullscreen", contentX, layout.PanelY + 74, LabelSize, labelColor);
         DrawCheckbox(layout.FullscreenCheckbox, settings.FullscreenEnabled);
 
-        bool windowRowEnabled = !settings.FullscreenEnabled && !OperatingSystem.IsBrowser();
+        bool windowRowEnabled = !OperatingSystem.IsBrowser();
         DrawText("Window resolution", contentX, layout.PanelY + 120, LabelSize, windowRowEnabled ? labelColor : DisabledColor);
         if (windowRowEnabled)
         {
@@ -45,11 +45,6 @@ public static class OptionsMenuHud
             var windowPreset = KnownResolutions.FindById(settings.WindowResolutionPresetId);
             string windowLabel = KnownResolutions.FormatLabel(windowPreset, monitorW, monitorH);
             DrawCenteredValue(windowLabel, centerX, layout.PanelY + 128, LabelSize, valueColor);
-        }
-        else if (settings.FullscreenEnabled)
-        {
-            string fullscreenLabel = $"Monitor ({windowW} x {windowH})";
-            DrawCenteredValue(fullscreenLabel, centerX, layout.PanelY + 128, LabelSize, DisabledColor);
         }
         else
         {

@@ -19,6 +19,7 @@ public class Application
         NativeConsole.EnsureAttached();
 
         InitWindow(0, 0, "");
+        WindowDisplayMode.CaptureNativeResolution();
         SetWindowState(ConfigFlags.FullscreenMode);
         SetExitKey(KeyboardKey.Null);
         InitAudioDevice();
@@ -98,6 +99,7 @@ public class Application
 
     private void Cleanup()
     {
+        WindowDisplayMode.RestoreNativeResolutionIfNeeded();
         CloseAudioDevice();
         CloseWindow();
     }

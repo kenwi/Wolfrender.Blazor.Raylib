@@ -32,7 +32,7 @@ public static class OptionsMenuInput
             windowDisplayChanged = true;
         }
 
-        if (!settings.FullscreenEnabled)
+        if (!OperatingSystem.IsBrowser())
         {
             if (shift && IsKeyPressed(KeyboardKey.Left))
             {
@@ -90,7 +90,7 @@ public static class OptionsMenuInput
             windowDisplayChanged = true;
         }
 
-        if (!settings.FullscreenEnabled)
+        if (!OperatingSystem.IsBrowser())
         {
             if (click && OptionsMenuLayout.Contains(layout.WindowResolutionPrev, mouse))
             {

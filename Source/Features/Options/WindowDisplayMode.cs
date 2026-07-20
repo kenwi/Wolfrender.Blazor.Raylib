@@ -8,6 +8,57 @@ namespace Game.Features.Options;
 /// <summary>Window size and fullscreen mode. Does not change the internal render texture.</summary>
 public static class WindowDisplayMode
 {
+    private static int _nativeWidth;
+    private static int _nativeHeight;
+    private static bool _hasNativeCapture;
+
+    /// <summary>
+    /// Record the desktop/monitor resolution before the game changes display mode.
+    /// Call once after <see cref="InitWindow"/> and before entering fullscreen.
+    /// </summary>
+    public static void CaptureNativeResolution()
+    {
+        if (OperatingSystem.IsBrowser() || _hasNativeCapture)
+            return;
+
+        var (width, height) = GetReferenceDimensions();
+        _nativeWidth = width;
+        _nativeHeight = height;
+        _hasNativeCapture = true;
+    }
+
+    public static (int Width, int Height) GetNativeDimensions() =>
+        _hasNativeCapture
+            ? (_nativeWidth, _nativeHeight)
+            : GetReferenceDimensions();
+
+    /// <summary>
+    /// Leave fullscreen and restore the captured native resolution when the display size changed.
+    /// Call from desktop host cleanup before <see cref="CloseWindow"/>.
+    /// </summary>
+    public static void RestoreNativeResolutionIfNeeded()
+    {
+        if (OperatingSystem.IsBrowser() || !_hasNativeCapture)
+            return;
+
+        bool wasFullscreen = IsWindowFullscreen();
+        if (wasFullscreen)
+            ToggleFullscreen();
+
+        ClearWindowState(ConfigFlags.FullscreenMode);
+
+        int currentWidth = GetScreenWidth();
+        int currentHeight = GetScreenHeight();
+        if (wasFullscreen
+            || currentWidth != _nativeWidth
+            || currentHeight != _nativeHeight)
+        {
+            SetWindowSize(_nativeWidth, _nativeHeight);
+        }
+
+        SyncRenderDataFromWindow();
+    }
+
     /// <summary>
     /// Apply display mode immediately after <see cref="InitWindow"/> (before heavy loading).
     /// </summary>
@@ -20,7 +71,7 @@ public static class WindowDisplayMode
         }
 
         if (settings.FullscreenEnabled)
-            EnterFullscreen();
+            EnterFullscreen(ResolveDisplaySize(settings.WindowResolutionPresetId));
 
         SyncRenderDataFromWindow();
     }
@@ -44,7 +95,7 @@ public static class WindowDisplayMode
             return;
 
         if (!IsWindowFullscreen())
-            EnterFullscreen();
+            EnterFullscreen(ResolveDisplaySize(settings.WindowResolutionPresetId));
     }
 
     public static void SyncRenderDataFromWindow()
@@ -61,21 +112,25 @@ public static class WindowDisplayMode
         return (Math.Max(1, GetMonitorWidth(monitor)), Math.Max(1, GetMonitorHeight(monitor)));
     }
 
-    public static void EnterFullscreen()
+    public static void EnterFullscreen(int width, int height)
     {
-        int monitor = GetCurrentMonitor();
-        SetWindowSize(GetMonitorWidth(monitor), GetMonitorHeight(monitor));
+        SetWindowSize(Math.Max(1, width), Math.Max(1, height));
         SetWindowState(ConfigFlags.FullscreenMode);
 
         if (!IsWindowFullscreen())
             ToggleFullscreen();
     }
 
+    public static void EnterFullscreen((int Width, int Height) size) =>
+        EnterFullscreen(size.Width, size.Height);
+
     private static void ApplyDesktop(GameSettings settings)
     {
+        var size = ResolveDisplaySize(settings.WindowResolutionPresetId);
+
         if (settings.FullscreenEnabled)
         {
-            EnterFullscreen();
+            EnterFullscreen(size);
             return;
         }
 
@@ -83,14 +138,20 @@ public static class WindowDisplayMode
             ToggleFullscreen();
 
         ClearWindowState(ConfigFlags.FullscreenMode);
-        var (width, height) = ResolveWindowedSize(settings.WindowResolutionPresetId);
-        SetWindowSize(width, height);
+        SetWindowSize(size.Width, size.Height);
     }
 
-    public static (int Width, int Height) ResolveWindowedSize(string presetId)
+    /// <summary>
+    /// Resolve the window/display size for a preset. Native uses the captured desktop
+    /// resolution when available so fullscreen native stays at the real monitor size.
+    /// </summary>
+    public static (int Width, int Height) ResolveDisplaySize(string presetId)
     {
-        var (monitorW, monitorH) = GetReferenceDimensions();
+        var (referenceW, referenceH) = GetNativeDimensions();
         var preset = KnownResolutions.FindById(presetId);
-        return KnownResolutions.Resolve(preset, monitorW, monitorH);
+        return KnownResolutions.Resolve(preset, referenceW, referenceH);
     }
+
+    public static (int Width, int Height) ResolveWindowedSize(string presetId) =>
+        ResolveDisplaySize(presetId);
 }

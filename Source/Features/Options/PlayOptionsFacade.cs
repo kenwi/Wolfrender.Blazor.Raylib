@@ -127,7 +127,7 @@ public sealed class PlayOptionsFacade
 
     public void EnsureStartupDisplay()
     {
-        WindowDisplayMode.ReapplyFullscreenIfNeeded(_optionsMenu.Settings);
+        WindowDisplayMode.Apply(_optionsMenu.Settings);
         WindowDisplayMode.SyncRenderDataFromWindow();
 
         if (KnownResolutions.FindById(_optionsMenu.Settings.GameResolutionPresetId).IsNative)
