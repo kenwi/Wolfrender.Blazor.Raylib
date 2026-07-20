@@ -1,10 +1,11 @@
 using System.Numerics;
 using Game.Features.Combat;
+using Game.Features.Doors;
 using Raylib_cs;
 
 namespace Game.Features.Players;
 
-public class Player
+public class Player : IDoorKeyInventory
 {
     public Camera3D Camera { get; set; }
     public Vector3 Position { get; set; }

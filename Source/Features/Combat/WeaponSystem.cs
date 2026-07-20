@@ -132,7 +132,10 @@ public sealed class WeaponSystem
     private void ExecuteFire(Player player, int screenWidth, int screenHeight)
     {
         var def = WeaponCatalog.Get(player.Weapons.ActiveWeapon);
-        Enemy? hit = null;
+        ICombatTarget? hit = null;
+
+        // List<Enemy> is covariant as IReadOnlyList<ICombatTarget> via Enemy : ICombatTarget.
+        IReadOnlyList<ICombatTarget> targets = _enemySystem.Enemies;
 
         if (def.Kind == WeaponKind.Hitscan)
         {
@@ -142,7 +145,7 @@ public sealed class WeaponSystem
                     player.Camera,
                     screenWidth,
                     screenHeight,
-                    _enemySystem.Enemies,
+                    targets,
                     _enemySpriteSheet,
                     4f,
                     4f,
@@ -160,7 +163,7 @@ public sealed class WeaponSystem
                     _doorSystem.Doors,
                     player.Camera.Position,
                     rayDir,
-                    _enemySystem.Enemies,
+                    targets,
                     Hitscan.DefaultEnemyHitRadiusWorld,
                     def.MaxRangeTiles,
                     out hit) && hit is not null)

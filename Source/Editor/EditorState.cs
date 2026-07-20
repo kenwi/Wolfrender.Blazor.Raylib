@@ -31,6 +31,9 @@ public class EditorState
     public readonly List<EditorLayer> Layers;
     public readonly EditorUndoStack UndoStack = new();
 
+    private readonly ActorDoorOccupancyProbe _doorOccupancy = new();
+    private readonly List<Vector3> _doorOccupancyOthers = new();
+
     public enum EditorToolMode { Paint, Select }
 
     // Tile painting / wall selection
@@ -620,7 +623,7 @@ public class EditorState
     public void UpdateDoorsDuringSimulation(float deltaTime, bool interactPressed)
     {
         var input = new InputState { IsInteractPressed = interactPressed };
-        DoorSystem.Update(deltaTime, input, Player, EnemySystem.Enemies);
+        UpdateDoors(deltaTime, input);
     }
 
     /// <summary>Runs secret then door interact with the same priority as play mode.</summary>
@@ -629,7 +632,18 @@ public class EditorState
         var input = new InputState { IsInteractPressed = interactPressed };
         bool secretConsumed = SecretSystem.Update(deltaTime, input, Player);
         var doorInput = secretConsumed ? input.WithoutInteract() : input;
-        DoorSystem.Update(deltaTime, doorInput, Player, EnemySystem.Enemies);
+        UpdateDoors(deltaTime, doorInput);
+    }
+
+    private void UpdateDoors(float deltaTime, InputState doorInput)
+    {
+        _doorOccupancyOthers.Clear();
+        var enemies = EnemySystem.Enemies;
+        for (int i = 0; i < enemies.Count; i++)
+            _doorOccupancyOthers.Add(enemies[i].Position);
+
+        _doorOccupancy.BeginFrame(Player.Position, _doorOccupancyOthers);
+        DoorSystem.Update(deltaTime, doorInput, Player.Position, Player, _doorOccupancy);
     }
 
     public void ClearLevel()

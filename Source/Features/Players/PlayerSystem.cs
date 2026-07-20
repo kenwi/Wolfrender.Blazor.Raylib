@@ -28,6 +28,8 @@ public sealed class PlayerSystem
     private readonly EffectSystem _effectSystem;
     private readonly ExitSystem _exitSystem;
     private readonly SecretSystem _secretSystem;
+    private readonly ActorDoorOccupancyProbe _doorOccupancy = new();
+    private readonly List<Vector3> _doorOccupancyOthers = new();
 
     private bool _deathHandled;
     private bool _levelCompleteHandled;
@@ -120,7 +122,7 @@ public sealed class PlayerSystem
         var camera = _player.Camera;
         _cameraSystem.Update(ref camera, _player.Position, input.IsMouseFree, mouseDelta);
         _player.Camera = camera;
-        _doorSystem.Update(deltaTime, doorInput, _player, _enemySystem.Enemies);
+        UpdateDoors(deltaTime, doorInput);
 
         bool wantsFire = !input.IsMouseFree && WantsPrimaryFire(input, _player);
         var activeDef = WeaponCatalog.Get(_player.Weapons.ActiveWeapon);
@@ -142,9 +144,20 @@ public sealed class PlayerSystem
         var camera = _player.Camera;
         _cameraSystem.UpdateDeathFall(ref camera, _player.Position, deltaTime);
         _player.Camera = camera;
-        _doorSystem.Update(deltaTime, input, _player, _enemySystem.Enemies);
+        UpdateDoors(deltaTime, input);
         _animationSystem.Update(deltaTime);
         TryRestartFromGameOver();
+    }
+
+    private void UpdateDoors(float deltaTime, InputState doorInput)
+    {
+        _doorOccupancyOthers.Clear();
+        var enemies = _enemySystem.Enemies;
+        for (int i = 0; i < enemies.Count; i++)
+            _doorOccupancyOthers.Add(enemies[i].Position);
+
+        _doorOccupancy.BeginFrame(_player.Position, _doorOccupancyOthers);
+        _doorSystem.Update(deltaTime, doorInput, _player.Position, _player, _doorOccupancy);
     }
 
     private void UpdateVelocity(float deltaTime, InputState input)
