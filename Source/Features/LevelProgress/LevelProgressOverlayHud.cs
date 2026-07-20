@@ -23,7 +23,7 @@ public static class LevelProgressOverlayHud
         int ContentX,
         int ContentY);
 
-    public static void DrawScore(ScoreSystem score, int screenWidth)
+    public static void DrawScore(IScoreSnapshot score, int screenWidth)
     {
         const int fontSize = 20;
         var label = $"SCORE: {score.LevelScore}";
@@ -72,7 +72,7 @@ public static class LevelProgressOverlayHud
     }
 
     public static void DrawLevelComplete(
-        ScoreSystem score,
+        IScoreSnapshot score,
         int screenWidth,
         int screenHeight,
         bool showRestartHint = true,

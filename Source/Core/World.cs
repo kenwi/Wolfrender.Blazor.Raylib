@@ -51,6 +51,7 @@ public class World : IScene
     private readonly SoundPropagationSystem _soundPropagationSystem;
     private readonly PlayerSystem _playerSystem;
     private readonly ScoreSystem _scoreSystem;
+    private readonly ScoreSignals _scoreSignals = new();
     private readonly ExitSystem _exitSystem;
     private readonly SecretSystem _secretSystem;
     private readonly HighscoreClient _highscoreClient;
@@ -93,8 +94,8 @@ public class World : IScene
         _inputSystem = new InputSystem();
         _recordingSystem = new RecordingSystem(_inputSystem);
         _doorSystem = new DoorSystem(mapData.Doors, mapData.Width, _tileTextures);
-        _scoreSystem = new ScoreSystem();
-        _secretSystem = new SecretSystem(_scoreSystem, _tileTextures);
+        _scoreSystem = new ScoreSystem(_scoreSignals);
+        _secretSystem = new SecretSystem(_scoreSignals, _tileTextures);
         _collisionSystem = new CollisionSystem(
             _level,
             new CompositeMovementBlocker(_doorSystem, _secretSystem),
@@ -106,11 +107,11 @@ public class World : IScene
         _minimapSystem = new MinimapSystem(_level, _renderSystem);
         _exitSystem = new ExitSystem(_scoreSystem);
         _highscoreClient = new HighscoreClient();
-        _pickupSystem = new PickupSystem(_scoreSystem);
+        _pickupSystem = new PickupSystem(_scoreSignals);
         _placedObjectSystem = new PlacedObjectSystem();
         _enemySystem = new EnemySystem(
             _player, _inputSystem, _collisionSystem, _doorSystem, _combatFeedback,
-            _pickupSystem, _scoreSystem, _soundPropagationSystem);
+            _pickupSystem, _scoreSignals, _soundPropagationSystem);
         _pickupSystem.SetObjectsTexture(_gameTextures[GameTextureIndex.Objects]);
         _pickupSystem.Rebuild(_mapData.Pickups, _mapData);
         _placedObjectSystem.SetObjectsTexture(_gameTextures[GameTextureIndex.Objects]);

@@ -27,7 +27,7 @@ public sealed class HighscoreIntermission
     private readonly Action<ConsoleCommandResult>? _onReplayFeedback;
     private Phase _phase = Phase.Hidden;
     private string _levelId = string.Empty;
-    private ScoreSystem? _score;
+    private IScoreSnapshot? _score;
     private string _playerNameInput = string.Empty;
     private string? _submittedPlayerName;
     private int? _submittedFinalScore;
@@ -80,7 +80,7 @@ public sealed class HighscoreIntermission
         _pendingTask = null;
     }
 
-    public void Begin(string levelPath, ScoreSystem score)
+    public void Begin(string levelPath, IScoreSnapshot score)
     {
         _levelId = ScoreSanitizer.LevelIdFromPath(levelPath);
         _score = score;
@@ -114,7 +114,7 @@ public sealed class HighscoreIntermission
         }
     }
 
-    public void Draw(ScoreSystem score, int screenWidth, int screenHeight)
+    public void Draw(IScoreSnapshot score, int screenWidth, int screenHeight)
     {
         switch (_phase)
         {
@@ -282,7 +282,7 @@ public sealed class HighscoreIntermission
         return true;
     }
 
-    private void DrawNameEntryPanel(ScoreSystem score, int screenWidth, int screenHeight)
+    private void DrawNameEntryPanel(IScoreSnapshot score, int screenWidth, int screenHeight)
     {
         var layout = LevelProgressOverlayHud.DrawIntermissionFrame(screenWidth, screenHeight, "SUBMIT SCORE");
         const int lineSize = LevelProgressOverlayHud.IntermissionLineSize;

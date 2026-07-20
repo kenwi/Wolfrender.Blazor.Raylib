@@ -15,7 +15,7 @@ public class PickupSystem
     private static float CollectTileOffsetZ => LevelData.QuadSize * 0.5f;
 
     private Texture2D _objectsTexture;
-    private readonly ScoreSystem? _scoreSystem;
+    private readonly ScoreSignals? _scoreSignals;
 
     private readonly List<Pickup> _activePickups = new();
     private Pickup?[] _pickupByTile = Array.Empty<Pickup?>();
@@ -24,7 +24,7 @@ public class PickupSystem
 
     public IReadOnlyList<Pickup> ActivePickups => _activePickups;
 
-    public PickupSystem(ScoreSystem? scoreSystem = null) => _scoreSystem = scoreSystem;
+    public PickupSystem(ScoreSignals? scoreSignals = null) => _scoreSignals = scoreSignals;
 
     public void SetObjectsTexture(Texture2D texture) => _objectsTexture = texture;
 
@@ -77,8 +77,8 @@ public class PickupSystem
         if (TreasureScoreCatalog.IsTreasure(pickup.Type))
         {
             int points = TreasureScoreCatalog.GetPoints(pickup.Type);
-            _scoreSystem?.OnTreasureCollected(pickup.Type);
-            Debug.Log($"Picked up {pickup.Type} (+{points} score, total {_scoreSystem?.LevelScore ?? points}). {positions}");
+            _scoreSignals?.NotifyTreasureCollected(pickup.Type);
+            Debug.Log($"Picked up {pickup.Type} (+{points} score). {positions}");
             return;
         }
 

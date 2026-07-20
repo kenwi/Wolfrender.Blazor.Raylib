@@ -17,7 +17,7 @@ public class EnemySystem
     private readonly DoorSystem _doorSystem;
     private readonly ICombatFeedback _combatFeedback;
     private readonly PickupSystem? _pickupSystem;
-    private readonly ScoreSystem? _scoreSystem;
+    private readonly ScoreSignals? _scoreSignals;
     private readonly SoundPropagationSystem? _soundPropagationSystem;
     private Random _rng = new();
     private MapData _mapData = null!;
@@ -53,7 +53,7 @@ public class EnemySystem
         DoorSystem doorSystem,
         ICombatFeedback combatFeedback,
         PickupSystem? pickupSystem = null,
-        ScoreSystem? scoreSystem = null,
+        ScoreSignals? scoreSignals = null,
         SoundPropagationSystem? soundPropagationSystem = null)
     {
         _inputSystem = inputSystem;
@@ -62,7 +62,7 @@ public class EnemySystem
         _doorSystem = doorSystem;
         _combatFeedback = combatFeedback;
         _pickupSystem = pickupSystem;
-        _scoreSystem = scoreSystem;
+        _scoreSignals = scoreSignals;
         _soundPropagationSystem = soundPropagationSystem;
         _enemies = new List<Enemy>();
     }
@@ -503,7 +503,7 @@ public class EnemySystem
             return;
 
         enemy.KillPointsAwarded = true;
-        _scoreSystem?.OnEnemyKilled(enemy.ScoreKind);
+        _scoreSignals?.NotifyEnemyKilled(enemy.ScoreKind);
     }
 
     private void TrySpawnAmmoDrop(Enemy enemy)
