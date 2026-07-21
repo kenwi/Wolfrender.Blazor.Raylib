@@ -394,19 +394,19 @@ public class World : IScene
     public ConsoleCommandResult GetFullBrightStatus() =>
         _consoleCommands.GetFullBrightStatus();
 
-    public ConsoleCommandResult DumpLightingCheckForConsole() =>
+    public ConsoleCommandResult DumpLightingCheck() =>
         _consoleCommands.DumpLightingCheck();
 
-    public ConsoleCommandResult StartRecordingForConsole(string filename, float mouseSensitivity) =>
+    public ConsoleCommandResult StartRecording(string filename, float mouseSensitivity) =>
         _consoleCommands.StartRecording(filename, mouseSensitivity);
 
-    public ConsoleCommandResult StartReplayForConsole(string filename) =>
+    public ConsoleCommandResult StartReplay(string filename) =>
         _consoleCommands.StartReplay(filename);
 
     public ConsoleCommandResult StartReplayRemote(int rank) =>
         _consoleCommands.StartReplayRemote(rank);
 
-    public ConsoleCommandResult StartVerifyReplayForConsole(string filename) =>
+    public ConsoleCommandResult StartVerifyReplay(string filename) =>
         _consoleCommands.StartVerifyReplay(filename);
 
     public ConsoleCommandResult ExecuteConsoleLine(string line) =>

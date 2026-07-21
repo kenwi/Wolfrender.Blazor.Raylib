@@ -47,10 +47,10 @@ public static class WorldConsoleBindings
             },
             recording: new ConsoleRecordingActions
             {
-                StartRecording = filename => world.StartRecordingForConsole(filename, getMouseSensitivity()),
+                StartRecording = filename => world.StartRecording(filename, getMouseSensitivity()),
                 StopRecording = recordingSystem.StopRecording,
-                StartReplay = world.StartReplayForConsole,
-                VerifyReplay = world.StartVerifyReplayForConsole,
+                StartReplay = world.StartReplay,
+                VerifyReplay = world.StartVerifyReplay,
                 StopReplay = recordingSystem.StopReplay,
                 SendRecording = recordingSystem.SendRecording,
                 ReplayRemote = recordingSystem.ReplayRemote
@@ -60,7 +60,7 @@ public static class WorldConsoleBindings
                 ToggleTickDiagnostics = world.ToggleTickDiagnostics,
                 SetTickDiagnostics = world.SetTickDiagnostics,
                 GetTickDiagnosticsStatus = world.GetTickDiagnosticsStatus,
-                DumpLightingCheck = world.DumpLightingCheckForConsole
+                DumpLightingCheck = world.DumpLightingCheck
             },
             renderToggles: new ConsoleRenderToggleActions
             {
