@@ -43,7 +43,7 @@ public static class WorldConsoleBindings
                     return ConsoleCommandResult.Ok("Console output cleared. History (↑/↓) is unchanged.");
                 },
                 GetCurrentLevelPath = () => world.CurrentLevelPath,
-                ListPickups = world.ListPickupsForConsole
+                ListPickups = world.ListPickups
             },
             recording: new ConsoleRecordingActions
             {

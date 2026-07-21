@@ -148,7 +148,7 @@ public sealed class PlayLevelSession
         }
     }
 
-    public ConsoleCommandResult ListPickupsForConsole()
+    public ConsoleCommandResult ListPickups()
     {
         var placements = _mapData.Pickups;
         if (placements.Count == 0)

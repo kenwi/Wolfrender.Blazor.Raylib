@@ -246,8 +246,8 @@ public class World : IScene
     public ConsoleCommandResult RestartCurrentLevel() =>
         _levelSession.RestartCurrentLevel();
 
-    public ConsoleCommandResult ListPickupsForConsole() =>
-        _levelSession.ListPickupsForConsole();
+    public ConsoleCommandResult ListPickups() =>
+        _levelSession.ListPickups();
 
     public void OnExit()
     {
