@@ -22,12 +22,12 @@ public static class Hitscan
         List<Door> doors,
         Vector3 rayOriginWorld,
         Vector3 rayDirectionWorld,
-        IReadOnlyList<Enemy> enemies,
+        IReadOnlyList<ICombatTarget> targets,
         float enemyHitRadiusWorld,
         float maxRangeTiles,
-        out Enemy? hitEnemy)
+        out ICombatTarget? hitTarget)
     {
-        hitEnemy = null;
+        hitTarget = null;
 
         var dirHoriz = new Vector3(rayDirectionWorld.X, 0f, rayDirectionWorld.Z);
         if (dirHoriz.LengthSquared() < 1e-8f)
@@ -49,12 +49,12 @@ public static class Hitscan
         Vector2 dirXz = new(dirHoriz.X, dirHoriz.Z);
 
         float bestT = float.MaxValue;
-        foreach (var enemy in enemies)
+        foreach (var target in targets)
         {
-            if (!enemy.IsCombatActive)
+            if (!target.IsCombatActive)
                 continue;
 
-            Vector2 center = new(enemy.Position.X, enemy.Position.Z);
+            Vector2 center = new(target.Position.X, target.Position.Z);
             Vector2 toCircle = center - originXz;
             float t = Vector2.Dot(toCircle, dirXz);
             if (t < 0f || t > wallDistanceWorld + 0.001f)
@@ -68,11 +68,11 @@ public static class Hitscan
             if (t < bestT)
             {
                 bestT = t;
-                hitEnemy = enemy;
+                hitTarget = target;
             }
         }
 
-        return hitEnemy != null;
+        return hitTarget != null;
     }
 
     /// <summary>
@@ -86,15 +86,15 @@ public static class Hitscan
         Camera3D camera,
         int screenWidth,
         int screenHeight,
-        IReadOnlyList<Enemy> enemies,
+        IReadOnlyList<ICombatTarget> targets,
         Texture2D enemySpriteSheet,
         float spriteWidth,
         float spriteHeight,
         float spriteYAxisRotationRadians,
         float maxRangeTiles,
-        out Enemy? hitEnemy)
+        out ICombatTarget? hitTarget)
     {
-        hitEnemy = null;
+        hitTarget = null;
         if (screenWidth <= 0 || screenHeight <= 0)
             return false;
 
@@ -106,15 +106,15 @@ public static class Hitscan
 
         Vector3 cameraPos = camera.Position;
         float bestDist = float.MaxValue;
-        Enemy? best = null;
+        ICombatTarget? best = null;
 
-        foreach (var enemy in enemies)
+        foreach (var target in targets)
         {
-            if (!enemy.IsCombatActive)
+            if (!target.IsCombatActive)
                 continue;
 
             SpriteBillboardGeometry.ComputeBillboardQuad(
-                enemy.Position,
+                target.Position,
                 cameraPos,
                 spriteWidth,
                 spriteHeight,
@@ -133,7 +133,7 @@ public static class Hitscan
 
             if (!IsBillboardHitOnOpaqueSpriteTexel(
                     enemySpriteSheet,
-                    enemy.FrameRect,
+                    target.FrameRect,
                     col.Point,
                     topLeft,
                     topRight,
@@ -143,11 +143,11 @@ public static class Hitscan
             if (col.Distance < bestDist)
             {
                 bestDist = col.Distance;
-                best = enemy;
+                best = target;
             }
         }
 
-        hitEnemy = best;
+        hitTarget = best;
         return best != null;
     }
 
@@ -161,12 +161,12 @@ public static class Hitscan
         Camera3D camera,
         int screenWidth,
         int screenHeight,
-        IReadOnlyList<Enemy> enemies,
+        IReadOnlyList<ICombatTarget> targets,
         Texture2D enemySpriteSheet,
         float spriteWidth,
         float spriteHeight,
         float maxRangeTiles,
-        out Enemy? hitEnemy)
+        out ICombatTarget? hitTarget)
     {
         return TryHitEnemyScreenRay(
             mapData,
@@ -174,13 +174,13 @@ public static class Hitscan
             camera,
             screenWidth,
             screenHeight,
-            enemies,
+            targets,
             enemySpriteSheet,
             spriteWidth,
             spriteHeight,
             0f,
             maxRangeTiles,
-            out hitEnemy);
+            out hitTarget);
     }
 
     /// <summary>

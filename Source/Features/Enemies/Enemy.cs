@@ -1,7 +1,7 @@
 using System.Numerics;
 using Raylib_cs;
 
-using Game.Features.LevelProgress;
+using Game.Features.Combat;
 
 namespace Game.Features.Enemies;
 
@@ -21,7 +21,7 @@ public enum EnemyState
     CORPSE
 }
 
-public class Enemy
+public class Enemy : ICombatTarget
 {
     public float MaxHealth { get; set; } = 25f;
     public float Health { get; set; } = 25f;

@@ -26,7 +26,7 @@ public static class SimulationChecksum
         Player player,
         IReadOnlyList<Enemy> enemies,
         IReadOnlyList<Door> doors,
-        ScoreSystem score)
+        IScoreSnapshot score)
     {
         return new ChecksumKeyframe(
             tick,
@@ -77,7 +77,7 @@ public static class SimulationChecksum
         return h;
     }
 
-    private static uint HashScore(ScoreSystem score)
+    private static uint HashScore(IScoreSnapshot score)
     {
         uint h = FnvOffset;
         h = Mix(h, (uint)score.LevelScore);

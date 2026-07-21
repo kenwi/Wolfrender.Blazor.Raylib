@@ -4,6 +4,7 @@ using Game.Features.Animation;
 using Game.Features.Combat;
 using Game.Features.Doors;
 using Game.Features.Highscores;
+using Game.Features.Hud;
 using Game.Features.LevelProgress;
 using Game.Features.Options;
 using Game.Features.Players;
@@ -11,11 +12,11 @@ using Game.Features.Recording;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 
-namespace Game.Features.Hud;
+namespace Game.Core.Session;
 
 /// <summary>
 /// Orders HUD texture passes and window-space overlays for play mode.
-/// 3D scene rendering stays on World.
+/// Session composition (not a Hud feature slice). 3D scene rendering stays on World.
 /// </summary>
 public sealed class PlayHudComposer
 {

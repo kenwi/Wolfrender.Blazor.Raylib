@@ -32,7 +32,7 @@ public sealed class HighscoreClient
         }
     }
 
-    public ScoreSubmission CreateSubmission(string levelId, string playerName, ScoreSystem score) => new()
+    public ScoreSubmission CreateSubmission(string levelId, string playerName, IScoreSnapshot score) => new()
     {
         LevelId = ScoreSanitizer.SanitizeLevelId(levelId),
         PlayerName = ScoreSanitizer.SanitizePlayerName(playerName),

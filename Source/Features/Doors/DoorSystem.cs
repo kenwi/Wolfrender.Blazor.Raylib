@@ -1,7 +1,5 @@
 using System.Numerics;
 using Game.Engine.Rendering;
-using Game.Features.Enemies;
-using Game.Features.Players;
 using Raylib_cs;
 
 namespace Game.Features.Doors;
@@ -12,7 +10,7 @@ public class DoorSystem : IMovementBlocker, IDoorPortalState
     private readonly List<Door> _doors;
     private readonly int _quadSize;
     private Vector2 _playerPosition;
-    private IReadOnlyList<Enemy> _enemies = Array.Empty<Enemy>();
+    private IDoorOccupancyProbe _occupancy = EmptyDoorOccupancyProbe.Instance;
 
     private const float LockedHintDurationSeconds = 2.5f;
     private float _lockedHintRemaining;
@@ -75,22 +73,27 @@ public class DoorSystem : IMovementBlocker, IDoorPortalState
             }
         }
     }
-    
-    public void Update(float deltaTime, InputState input, Player player, IReadOnlyList<Enemy> enemies)
+
+    public void Update(
+        float deltaTime,
+        InputState input,
+        Vector3 actorWorldPosition,
+        IDoorKeyInventory keys,
+        IDoorOccupancyProbe occupancy)
     {
-        _playerPosition = new Vector2(player.Position.X / _quadSize, player.Position.Z / _quadSize);
-        _enemies = enemies;
+        _playerPosition = new Vector2(actorWorldPosition.X / _quadSize, actorWorldPosition.Z / _quadSize);
+        _occupancy = occupancy ?? EmptyDoorOccupancyProbe.Instance;
 
         if (_lockedHintRemaining > 0f)
             _lockedHintRemaining = MathF.Max(0f, _lockedHintRemaining - deltaTime);
 
         if (input.IsInteractPressed)
-            TryInteractOpenDoor(player);
+            TryInteractOpenDoor(keys);
 
         Animate(deltaTime);
     }
 
-    private void TryInteractOpenDoor(Player player)
+    private void TryInteractOpenDoor(IDoorKeyInventory keys)
     {
         var closestDoor = FindClosestDoor(_playerPosition);
         if (closestDoor == null)
@@ -100,7 +103,7 @@ public class DoorSystem : IMovementBlocker, IDoorPortalState
         if (Vector2.Distance(_playerPosition, doorCenter) >= 1.5f)
             return;
 
-        if (!CanPlayerOpen(closestDoor, player))
+        if (!CanPlayerOpen(closestDoor, keys))
         {
             ShowLockedHint(closestDoor);
             return;
@@ -109,11 +112,11 @@ public class DoorSystem : IMovementBlocker, IDoorPortalState
         OpenDoor(closestDoor);
     }
 
-    public static bool CanPlayerOpen(Door door, Player player)
+    public static bool CanPlayerOpen(Door door, IDoorKeyInventory keys)
     {
-        if (door.RequiresGoldKey && !player.HasGoldKey)
+        if (door.RequiresGoldKey && !keys.HasGoldKey)
             return false;
-        if (door.RequiresSilverKey && !player.HasSilverKey)
+        if (door.RequiresSilverKey && !keys.HasSilverKey)
             return false;
         return true;
     }
@@ -191,7 +194,7 @@ public class DoorSystem : IMovementBlocker, IDoorPortalState
                         return false;
                     }
                     return true;
-                    
+
                 }
             }
 
@@ -208,33 +211,12 @@ public class DoorSystem : IMovementBlocker, IDoorPortalState
                     return true;
                 }
             }
-
-            // if (closestDoor.TimeDoorHasBeenOpening > 0.5)
-            // {
-            //     // TODO: handle door auto-close logic
-            // }
         }
         return false;
     }
 
-    private bool IsPlayerOnTile(Vector2 tilePosition)
-    {
-        var iPlayerPosition = new Vector2((int)(_playerPosition.X + 0.5f), (int)(_playerPosition.Y + 0.5f));
-        return iPlayerPosition == tilePosition;
-    }
-
-    private bool IsEnemyOnTile(Vector2 tilePosition)
-    {
-        foreach (var enemy in _enemies)
-        {
-            var enemyTile = new Vector2(
-                (int)(enemy.Position.X / _quadSize + 0.5f),
-                (int)(enemy.Position.Z / _quadSize + 0.5f));
-            if (enemyTile == tilePosition)
-                return true;
-        }
-        return false;
-    }
+    private bool IsOccupiedAtTile(Vector2 tilePosition) =>
+        _occupancy.IsTileOccupied((int)tilePosition.X, (int)tilePosition.Y);
 
     public void Animate(float deltaTime)
     {
@@ -259,7 +241,7 @@ public class DoorSystem : IMovementBlocker, IDoorPortalState
                         door.DoorState = DoorState.OPEN;
                         break;
                     }
-                
+
                     if (door.DoorRotation == DoorRotation.HORIZONTAL)
                     {
                         door.Position += new Vector2(1, 0) * deltaTime;
@@ -270,13 +252,10 @@ public class DoorSystem : IMovementBlocker, IDoorPortalState
                     }
                     break;
                 case DoorState.CLOSING:
-                    // Avoid closing door on player or enemies
+                    // Avoid closing door on player or other actors
                     var idoorPosition = new Vector2((int)door.StartPosition.X, (int)door.StartPosition.Y);
-                    
-                    if (IsPlayerOnTile(idoorPosition))
-                        break;
 
-                    if (IsEnemyOnTile(idoorPosition))
+                    if (IsOccupiedAtTile(idoorPosition))
                         break;
 
                     if (distanceDoorHasTraveled < 0.01f)
@@ -287,7 +266,7 @@ public class DoorSystem : IMovementBlocker, IDoorPortalState
                         door.TimeDoorHasBeenOpening = 0;
                         break;
                     }
-                
+
                     if (door.DoorRotation == DoorRotation.HORIZONTAL)
                     {
                         door.Position -= new Vector2(1, 0) * deltaTime;
@@ -296,9 +275,9 @@ public class DoorSystem : IMovementBlocker, IDoorPortalState
                     {
                         door.Position -= new Vector2(0, 1) * deltaTime;
                     }
-                    break;                    
+                    break;
                 default:
-                    break;                   
+                    break;
             }
         }
     }
@@ -334,3 +313,8 @@ public class DoorSystem : IMovementBlocker, IDoorPortalState
     }
 }
 
+file sealed class EmptyDoorOccupancyProbe : IDoorOccupancyProbe
+{
+    public static readonly EmptyDoorOccupancyProbe Instance = new();
+    public bool IsTileOccupied(int tileX, int tileY) => false;
+}

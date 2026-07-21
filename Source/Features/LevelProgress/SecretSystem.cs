@@ -14,7 +14,7 @@ public sealed class SecretSystem : IMovementBlocker
 {
     private const float SlideSpeedTilesPerSecond = 1f;
 
-    private readonly ScoreSystem _scoreSystem;
+    private readonly ScoreSignals _scoreSignals;
     private readonly List<Texture2D> _textures;
     private MapData _mapData = null!;
     private readonly List<SecretWall> _secrets = new();
@@ -22,9 +22,9 @@ public sealed class SecretSystem : IMovementBlocker
 
     public IReadOnlyList<SecretWall> Secrets => _secrets;
 
-    public SecretSystem(ScoreSystem scoreSystem, List<Texture2D> textures)
+    public SecretSystem(ScoreSignals scoreSignals, List<Texture2D> textures)
     {
-        _scoreSystem = scoreSystem;
+        _scoreSignals = scoreSignals;
         _textures = textures;
         _quadSize = LevelData.QuadSize;
     }
@@ -204,7 +204,7 @@ public sealed class SecretSystem : IMovementBlocker
         if (!secret.HasScored)
         {
             secret.HasScored = true;
-            _scoreSystem.OnSecretFound();
+            _scoreSignals.NotifySecretFound();
         }
 
         Debug.Log(

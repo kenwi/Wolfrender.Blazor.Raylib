@@ -33,35 +33,47 @@ public static class WorldConsoleBindings
         return new RuntimeConsoleService(
             variables,
             output,
-            world.LoadLevel,
-            world.RestartCurrentLevel,
-            () =>
+            level: new ConsoleLevelActions
             {
-                overlay.ClearScrollback();
-                return ConsoleCommandResult.Ok("Console output cleared. History (↑/↓) is unchanged.");
+                LoadLevel = world.LoadLevel,
+                RestartCurrentLevel = world.RestartCurrentLevel,
+                ClearConsoleScrollback = () =>
+                {
+                    overlay.ClearScrollback();
+                    return ConsoleCommandResult.Ok("Console output cleared. History (↑/↓) is unchanged.");
+                },
+                GetCurrentLevelPath = () => world.CurrentLevelPath,
+                ListPickups = world.ListPickupsForConsole
             },
-            () => world.CurrentLevelPath,
-            world.ListPickupsForConsole,
-            filename => world.StartRecordingForConsole(filename, getMouseSensitivity()),
-            recordingSystem.StopRecording,
-            world.StartReplayForConsole,
-            world.StartVerifyReplayForConsole,
-            recordingSystem.StopReplay,
-            recordingSystem.SendRecording,
-            recordingSystem.ReplayRemote,
-            world.ToggleTickDiagnostics,
-            world.SetTickDiagnostics,
-            world.GetTickDiagnosticsStatus,
-            world.ToggleStaticMeshes,
-            world.SetStaticMeshes,
-            world.GetStaticMeshesStatus,
-            world.ToggleFlying,
-            world.SetFlying,
-            world.GetFlyingStatus,
-            world.DumpLightingCheckForConsole,
-            world.ToggleFullBright,
-            world.SetFullBright,
-            world.GetFullBrightStatus);
+            recording: new ConsoleRecordingActions
+            {
+                StartRecording = filename => world.StartRecordingForConsole(filename, getMouseSensitivity()),
+                StopRecording = recordingSystem.StopRecording,
+                StartReplay = world.StartReplayForConsole,
+                VerifyReplay = world.StartVerifyReplayForConsole,
+                StopReplay = recordingSystem.StopReplay,
+                SendRecording = recordingSystem.SendRecording,
+                ReplayRemote = recordingSystem.ReplayRemote
+            },
+            diagnostics: new ConsoleDiagnosticsActions
+            {
+                ToggleTickDiagnostics = world.ToggleTickDiagnostics,
+                SetTickDiagnostics = world.SetTickDiagnostics,
+                GetTickDiagnosticsStatus = world.GetTickDiagnosticsStatus,
+                DumpLightingCheck = world.DumpLightingCheckForConsole
+            },
+            renderToggles: new ConsoleRenderToggleActions
+            {
+                ToggleStaticMeshes = world.ToggleStaticMeshes,
+                SetStaticMeshes = world.SetStaticMeshes,
+                GetStaticMeshesStatus = world.GetStaticMeshesStatus,
+                ToggleFlying = world.ToggleFlying,
+                SetFlying = world.SetFlying,
+                GetFlyingStatus = world.GetFlyingStatus,
+                ToggleFullBright = world.ToggleFullBright,
+                SetFullBright = world.SetFullBright,
+                GetFullBrightStatus = world.GetFullBrightStatus
+            });
     }
 
     private static IReadOnlyList<RootBinding> CreateRoots(

@@ -4,7 +4,7 @@ using Game.Features.Pickups;
 namespace Game.Features.LevelProgress;
 
 /// <summary>Tracks Wolf3D-aligned runtime score and level-run counters during play mode.</summary>
-public sealed class ScoreSystem
+public sealed class ScoreSystem : IScoreSnapshot
 {
     private LevelScoringMetadata _metadata = LevelScoringMetadata.Default;
 
@@ -30,6 +30,16 @@ public sealed class ScoreSystem
     public int CompletionBonus { get; private set; }
     public int FinalScore { get; private set; }
     public bool IsFinalized { get; private set; }
+
+    public ScoreSystem(ScoreSignals? signals = null)
+    {
+        if (signals is null)
+            return;
+
+        signals.EnemyKilled += OnEnemyKilled;
+        signals.TreasureCollected += OnTreasureCollected;
+        signals.SecretFound += OnSecretFound;
+    }
 
     public void ResetForLevel(MapData mapData, LevelScoringMetadata? metadata = null)
     {

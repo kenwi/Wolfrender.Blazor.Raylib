@@ -1,9 +1,8 @@
 using System.Numerics;
-using Game.Core.Level;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 
-namespace Game.Features.Hud;
+namespace Game.Engine.Rendering;
 
 /// <summary>Maps window-space coordinates to the internal game render resolution.</summary>
 public static class GameRenderSpace
