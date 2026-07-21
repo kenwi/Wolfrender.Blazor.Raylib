@@ -42,7 +42,9 @@ public sealed class RuntimeConsoleService
             new StaticMeshCommand(),
             new FlyCommand(),
             new LightCheckCommand(),
-            new FullBrightCommand()
+            new FullBrightCommand(),
+            new QuitCommand(),
+            new ExitCommand()
         };
 
         _dispatcher = new ConsoleCommandDispatcher(commands);
