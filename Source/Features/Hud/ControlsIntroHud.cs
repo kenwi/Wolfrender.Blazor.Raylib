@@ -80,6 +80,7 @@ public static class ControlsIntroHud
             new("E", "Open doors, activate exit"),
             new("H", "Toggle high score board"),
             new("R", "Restart level"),
+            new(OperatingSystem.IsBrowser() ? "Period" : "| (Pipe)", "Toggle console"),
         };
 
         if (OperatingSystem.IsBrowser())
