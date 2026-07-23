@@ -84,8 +84,8 @@ public static class ControlsIntroHud
 
         if (OperatingSystem.IsBrowser())
         {
-            rows.Add(new("Click canvas", "Activate game"));
             rows.Add(new("F11", "Fullscreen (reload with Ctrl+R)"));
+            rows.Add(new("Click canvas", "Activate game"));
         }
 
         rows.Add(new("Esc", "Options menu"));
