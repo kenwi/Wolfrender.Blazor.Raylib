@@ -125,6 +125,8 @@ public sealed class ImGuiEntityProperties
         if (ImGui.Button("Guard")) state.SetEnemyType(selectedEnemyIndex, "Guard");
         ImGui.SameLine();
         if (ImGui.Button("Dog")) state.SetEnemyType(selectedEnemyIndex, "Dog");
+        ImGui.SameLine();
+        if (ImGui.Button("Officer")) state.SetEnemyType(selectedEnemyIndex, "Officer");
 
         ImGui.Spacing();
 

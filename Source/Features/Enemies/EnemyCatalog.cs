@@ -29,6 +29,7 @@ public static class EnemyCatalog
                 Accuracy = 1f,
                 PreferredRangeTiles = 8f,
             },
+            MaxHearThroughClosedDoors = 0,
         },
         new()
         {
@@ -53,6 +54,33 @@ public static class EnemyCatalog
                 Accuracy = 0.85f,
                 MeleeRangeTiles = 1f,
             },
+            MaxHearThroughClosedDoors = 0,
+        },
+        new()
+        {
+            Kind = EnemyKind.Officer,
+            DisplayName = "Officer",
+            MaxHealth = 50f,
+            MoveSpeed = 2.4f,
+            SightRangeTiles = 14f,
+            FovHalfAngleRadians = MathF.PI / 3f,
+            TurnSpeedRadians = 5f,
+            NoticingDurationSeconds = 0.35f,
+            HitReactionDurationSeconds = 0.35f,
+            CorpseLingerSeconds = 30f,
+            ScorePoints = 400,
+            // Dedicated officer sheet can replace this index when art is ready.
+            TextureIndex = GameTextureIndex.EnemyOfficer,
+            Attack = new EnemyAttackProfile
+            {
+                Kind = EnemyAttackKind.Hitscan,
+                Damage = 15f,
+                AimToleranceRadians = 0.38f,
+                Accuracy = 1f,
+                PreferredRangeTiles = 8f,
+            },
+            // Can hear a gunshot through one closed door.
+            MaxHearThroughClosedDoors = 1,
         },
     ];
 

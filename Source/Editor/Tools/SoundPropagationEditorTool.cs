@@ -69,7 +69,7 @@ public sealed class SoundPropagationEditorTool
         var reach = SoundPropagation.ComputeReach(
             _mapData, _doorSystem.Doors, tileX, tileY, treatAllDoorsClosed);
 
-        if (reach.Count == 0)
+        if (reach.TileCount == 0)
         {
             OverlayTiles = null;
             OverlayShowUntil = 0;
@@ -78,11 +78,15 @@ public sealed class SoundPropagationEditorTool
             return;
         }
 
-        OverlayTiles = reach
+        int freeTiles = reach.DoorCrossingsByTile.Count(kv => kv.Value == 0);
+        int throughDoorTiles = reach.TileCount - freeTiles;
+
+        OverlayTiles = reach.DoorCrossingsByTile.Keys
             .Select(t => new Vector2(t.X, t.Y))
             .ToList();
         OverlayShowUntil = now + OverlayDurationSeconds;
-        _setStatus($"Sound reached {reach.Count} tiles");
+        _setStatus(
+            $"Sound reached {reach.TileCount} tiles ({freeTiles} at 0 doors, {throughDoorTiles} through closed doors)");
         _notifyChanged();
     }
 

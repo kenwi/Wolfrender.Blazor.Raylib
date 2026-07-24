@@ -92,6 +92,8 @@ public class Application
                 LoadTexture(Path("resources/Objects.png")),
                 // Placeholder: same sheet layout as guard until a dedicated dog spritesheet exists.
                 LoadTexture(Path("resources/enemy_guard.png")),
+                // Placeholder: same sheet layout as guard until a dedicated officer spritesheet exists.
+                LoadTexture(Path("resources/enemy_guard.png")),
             }
         };
         LevelSerializer.LoadFromJson(mapData, Path(LevelCatalog.DefaultLevelPath));

@@ -37,14 +37,14 @@ public sealed class SoundPropagationSystem
         var reach = SoundPropagation.ComputeReach(
             _mapData, _doorSystem.Doors, originX, originY);
 
-        if (reach.Count == 0)
+        if (reach.TileCount == 0)
             return;
 
         _pendingEvents.Add(new SoundEvent
         {
             OriginX = originX,
             OriginY = originY,
-            ReachedTiles = reach,
+            DoorCrossingsByTile = reach.DoorCrossingsByTile,
         });
     }
 }

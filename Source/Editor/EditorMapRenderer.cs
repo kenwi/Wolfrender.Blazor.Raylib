@@ -245,7 +245,9 @@ public class EditorMapRenderer
                 ? new Color(90, 90, 90, 200)
                 : enemy.EnemyType.Equals("Dog", StringComparison.OrdinalIgnoreCase)
                     ? new Color(200, 140, 40, 200)
-                    : new Color(200, 40, 40, 200);
+                    : enemy.EnemyType.Equals("Officer", StringComparison.OrdinalIgnoreCase)
+                        ? new Color(60, 100, 220, 200)
+                        : new Color(200, 40, 40, 200);
             DrawCircle((int)centerX, (int)centerY, radius, fillColor);
 
             if (i == hoveredEnemyIndex)
@@ -476,12 +478,20 @@ public class EditorMapRenderer
                 }
             }
 
-            DrawCircle((int)liveCX, (int)liveCY, liveRadius, liveEnemy.ScoreKind == EnemyKind.Dog
-                ? new Color(200, 140, 40, 180)
-                : new Color(40, 200, 40, 180));
-            DrawCircleLines((int)liveCX, (int)liveCY, liveRadius, liveEnemy.ScoreKind == EnemyKind.Dog
-                ? new Color(255, 180, 60, 255)
-                : new Color(40, 255, 40, 255));
+            Color liveFill = liveEnemy.ScoreKind switch
+            {
+                EnemyKind.Dog => new Color(200, 140, 40, 180),
+                EnemyKind.Officer => new Color(60, 100, 220, 180),
+                _ => new Color(40, 200, 40, 180),
+            };
+            Color liveOutline = liveEnemy.ScoreKind switch
+            {
+                EnemyKind.Dog => new Color(255, 180, 60, 255),
+                EnemyKind.Officer => new Color(100, 150, 255, 255),
+                _ => new Color(40, 255, 40, 255),
+            };
+            DrawCircle((int)liveCX, (int)liveCY, liveRadius, liveFill);
+            DrawCircleLines((int)liveCX, (int)liveCY, liveRadius, liveOutline);
 
             float liveDirLen = liveRadius * 0.8f;
             float liveAngle = liveEnemy.Rotation;
