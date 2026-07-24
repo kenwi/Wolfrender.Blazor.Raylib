@@ -20,7 +20,7 @@ public sealed class WeaponSystem
     private readonly MapData _mapData;
     private readonly DoorSystem _doorSystem;
     private readonly EnemySystem _enemySystem;
-    private readonly Texture2D _enemySpriteSheet;
+    private readonly IReadOnlyList<Texture2D> _gameTextures;
     private readonly EffectSystem _effectSystem;
     private readonly SoundSystem _soundSystem;
     private readonly AnimationSystem _animationSystem;
@@ -30,7 +30,7 @@ public sealed class WeaponSystem
         MapData mapData,
         DoorSystem doorSystem,
         EnemySystem enemySystem,
-        Texture2D enemySpriteSheet,
+        IReadOnlyList<Texture2D> gameTextures,
         EffectSystem effectSystem,
         SoundSystem soundSystem,
         AnimationSystem animationSystem,
@@ -39,7 +39,7 @@ public sealed class WeaponSystem
         _mapData = mapData;
         _doorSystem = doorSystem;
         _enemySystem = enemySystem;
-        _enemySpriteSheet = enemySpriteSheet;
+        _gameTextures = gameTextures;
         _effectSystem = effectSystem;
         _soundSystem = soundSystem;
         _animationSystem = animationSystem;
@@ -146,7 +146,7 @@ public sealed class WeaponSystem
                     screenWidth,
                     screenHeight,
                     targets,
-                    _enemySpriteSheet,
+                    ResolveTargetTexture,
                     4f,
                     4f,
                     def.MaxRangeTiles,
@@ -182,5 +182,17 @@ public sealed class WeaponSystem
 
         if (def.Kind == WeaponKind.Hitscan)
             _soundPropagationSystem.EmitPlayerGunshot(player.Position);
+    }
+
+    private Texture2D ResolveTargetTexture(ICombatTarget target)
+    {
+        if (target is Enemy enemy)
+        {
+            int index = enemy.TextureIndex;
+            if (index >= 0 && index < _gameTextures.Count)
+                return _gameTextures[index];
+        }
+
+        return _gameTextures[Game.Core.GameTextureIndex.EnemyGuard];
     }
 }

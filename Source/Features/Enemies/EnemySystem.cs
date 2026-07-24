@@ -30,12 +30,8 @@ public class EnemySystem
     // Movement / behavior constants
     private const float ArrivalThreshold = 0.1f;
     private const float EnemyCollisionRadius = 1.0f;
-    private const float TurnSpeed = 4f; // radians per second when facing player
-    private const float NoticingDuration = 0.5f; // seconds before transitioning to ATTACKING
+    private const float TurnSpeed = 4f; // fallback if definition turn speed is unset
 
-    private const float EnemyFireInterval = 0.85f;
-    private const float EnemyFireAimTolerance = 0.42f; // radians (~24°)
-    private const float EnemyShotDamage = 9f;
     private const float SearchSweepHalfAngle = 0.65f;
     private const float SearchSweepHoldSeconds = 0.85f;
 
@@ -43,6 +39,8 @@ public class EnemySystem
     private const float StuckRecoverSeconds = 0.5f;
 
     private bool IsPlayerTargetable => _player.IsAlive && !_player.IsFlying;
+
+    private readonly BehaviorServices _behaviorServices;
 
     public List<Enemy> Enemies => _enemies;
 
@@ -65,6 +63,7 @@ public class EnemySystem
         _scoreSignals = scoreSignals;
         _soundPropagationSystem = soundPropagationSystem;
         _enemies = new List<Enemy>();
+        _behaviorServices = new BehaviorServices(this);
     }
 
     /// <summary>
@@ -102,22 +101,7 @@ public class EnemySystem
 
         foreach (var placement in placements)
         {
-            var startPos = LevelData.GetTileAnchorWorld(placement.TileX, placement.TileY, 2f);
-
-            var enemy = new EnemyGuard
-            {
-                Position = startPos,
-                PatrolOrigin = startPos,
-                Rotation = placement.Rotation,
-                MoveSpeed = 2f,
-                CurrentWaypointIndex = 0,
-                DropsAmmoOnDeath = placement.DropsAmmo,
-                ScoreKind = EnemyScoreCatalog.ParseKind(placement.EnemyType),
-                PatrolPath = placement.PatrolPath.Select(wp =>
-                    LevelData.GetTileAnchorWorld(wp.TileX, wp.TileY, 2f)).ToList()
-            };
-            ApplyPlacementSpawnState(enemy, placement);
-            _enemies.Add(enemy);
+            _enemies.Add(EnemyFactory.Create(placement));
         }
     }
 
@@ -178,7 +162,7 @@ public class EnemySystem
                 break;
 
             case EnemyState.ATTACKING:
-                OnAttacking(enemy, deltaTime);
+                enemy.Behavior.UpdateAttacking(enemy, _behaviorServices, deltaTime);
                 break;
 
             case EnemyState.SEARCHING:
@@ -287,46 +271,12 @@ public class EnemySystem
             return;
         }
 
-        if (enemy.StateTimer >= NoticingDuration)
+        if (enemy.StateTimer >= enemy.Definition.NoticingDurationSeconds)
         {
             enemy.ResetShootingState();
             enemy.TransitionTo(EnemyState.ATTACKING);
             enemy.AttackCooldownRemaining = 0.35f;
         }
-    }
-
-    private void OnAttacking(Enemy enemy, float deltaTime)
-    {
-        if (enemy.CanSeePlayer && IsPlayerTargetable)
-        {
-            if (!_player.IsAlive)
-            {
-                enemy.TransitionTo(EnemyState.WALKING);
-                return;
-            }
-
-            // While we can see the player, keep updating the last known position
-            enemy.LastSeenPlayerPosition = _player.Position;
-            RotateTowardPlayer(enemy, deltaTime);
-
-            if (enemy.IsShooting && !enemy.WasShooting)
-            {
-                Vector3 toPlayer = _player.Position - enemy.Position;
-                float targetAngle = MathF.Atan2(toPlayer.X, -toPlayer.Z) - MathF.PI / 2f;
-                float aimDiff = MathF.Abs(NormalizeAngle(targetAngle - enemy.Rotation));
-                if (aimDiff <= EnemyFireAimTolerance)
-                {
-                    _combatFeedback.OnEnemyFired();
-                    TryEnemyHitPlayer(enemy);
-                }
-            }
-
-            enemy.WasShooting = enemy.IsShooting;
-        }
-        else if (enemy.LastSeenPlayerPosition.HasValue)
-            TryStartChaseToLastKnown(enemy);
-        else
-            ReturnToPatrol(enemy);
     }
 
     private void OnSearching(Enemy enemy, float deltaTime)
@@ -472,10 +422,10 @@ public class EnemySystem
         return MathF.Sqrt(dx * dx + dz * dz) <= ArrivalThreshold;
     }
 
-    private void TryEnemyHitPlayer(Enemy enemy)
+    private bool TryHitscanPlayer(Enemy enemy)
     {
         if (_mapData == null || !IsPlayerTargetable)
-            return;
+            return false;
 
         float quadSize = LevelData.QuadSize;
         var enemyTile = new Vector2(
@@ -486,15 +436,46 @@ public class EnemySystem
             _player.Position.Z / quadSize + 0.5f);
 
         if (!LineOfSight.CanSee(_mapData, _doorSystem.Doors, enemyTile, playerTile))
-            return;
+            return false;
 
-        // if (_rng.NextSingle() > 0.72f)
-        //     return;
+        var attack = enemy.Definition.Attack;
+        if (_rng.NextSingle() > attack.Accuracy)
+            return false;
 
+        ApplyDamageToPlayer(attack.Damage);
+        return true;
+    }
+
+    private bool TryMeleePlayer(Enemy enemy)
+    {
+        if (!IsPlayerTargetable)
+            return false;
+
+        float distTiles = DistanceToPlayerTiles(enemy);
+        var attack = enemy.Definition.Attack;
+        if (distTiles > attack.MeleeRangeTiles)
+            return false;
+
+        if (_rng.NextSingle() > attack.Accuracy)
+            return false;
+
+        ApplyDamageToPlayer(attack.Damage);
+        return true;
+    }
+
+    private void ApplyDamageToPlayer(float damage)
+    {
         float healthBefore = _player.Health;
-        _player.TakeDamage(EnemyShotDamage);
+        _player.TakeDamage(damage);
         if (_player.Health < healthBefore)
-            _combatFeedback.OnPlayerDamaged(EnemyShotDamage);
+            _combatFeedback.OnPlayerDamaged(damage);
+    }
+
+    private float DistanceToPlayerTiles(Enemy enemy)
+    {
+        float dx = enemy.Position.X - _player.Position.X;
+        float dz = enemy.Position.Z - _player.Position.Z;
+        return MathF.Sqrt(dx * dx + dz * dz) / LevelData.QuadSize;
     }
 
     private void TryAwardKillPoints(Enemy enemy)
@@ -567,13 +548,23 @@ public class EnemySystem
 
     /// <summary>
     /// Walk along the chase path using MoveToward.
-    /// When the path is finished, return to normal behavior.
+    /// When the path is finished, optionally begin searching at last known.
     /// </summary>
-    private void FollowChasePath(Enemy enemy, float deltaTime)
+    /// <param name="allowSearchAtEnd">
+    /// False while a melee behavior is closing under live LOS (do not drop into SEARCHING mid-fight).
+    /// </param>
+    /// <param name="preserveCombatState">
+    /// True when following a path during <see cref="EnemyState.ATTACKING"/> so MoveToward does not force WALKING.
+    /// </param>
+    private void FollowChasePath(
+        Enemy enemy,
+        float deltaTime,
+        bool allowSearchAtEnd = true,
+        bool preserveCombatState = false)
     {
         if (enemy.ChasePath.Count == 0 || enemy.ChasePathIndex >= enemy.ChasePath.Count)
         {
-            if (IsNearLastSeenPosition(enemy))
+            if (allowSearchAtEnd && IsNearLastSeenPosition(enemy))
             {
                 BeginSearchAtLastKnown(enemy);
                 return;
@@ -581,14 +572,17 @@ public class EnemySystem
 
             // No (or exhausted) chase path but we're still not at the last-seen tile.
             // Re-run A* to that tile instead of straight-lining through walls.
-            if (enemy.LastSeenPlayerPosition.HasValue && _mapData != null)
+            if (allowSearchAtEnd
+                && enemy.LastSeenPlayerPosition.HasValue
+                && _mapData != null)
                 ComputeChasePath(enemy, enemy.LastSeenPlayerPosition.Value);
 
             // If A* couldn't produce a usable path (target blocked, unreachable, etc.),
             // give up the chase and search from here.
             if (enemy.ChasePath.Count == 0 || enemy.ChasePathIndex >= enemy.ChasePath.Count)
             {
-                BeginSearchAtLastKnown(enemy);
+                if (allowSearchAtEnd)
+                    BeginSearchAtLastKnown(enemy);
                 return;
             }
 
@@ -601,14 +595,16 @@ public class EnemySystem
 
         if (distXZ > ArrivalThreshold)
         {
-            MoveToward(enemy, toTarget, distXZ, deltaTime);
+            MoveToward(enemy, toTarget, distXZ, deltaTime, preserveCombatState);
         }
         else
         {
             enemy.Position = new Vector3(target.X, enemy.Position.Y, target.Z);
             enemy.ChasePathIndex++;
 
-            if (enemy.ChasePathIndex >= enemy.ChasePath.Count && IsNearLastSeenPosition(enemy))
+            if (allowSearchAtEnd
+                && enemy.ChasePathIndex >= enemy.ChasePath.Count
+                && IsNearLastSeenPosition(enemy))
                 BeginSearchAtLastKnown(enemy);
         }
     }
@@ -703,7 +699,10 @@ public class EnemySystem
     private static void RotateTowardAngle(Enemy enemy, float targetAngle, float deltaTime)
     {
         float diff = NormalizeAngle(targetAngle - enemy.Rotation);
-        float maxStep = TurnSpeed * deltaTime;
+        float turnSpeed = enemy.Definition.TurnSpeedRadians > 0f
+            ? enemy.Definition.TurnSpeedRadians
+            : TurnSpeed;
+        float maxStep = turnSpeed * deltaTime;
 
         if (MathF.Abs(diff) <= maxStep)
             enemy.Rotation = targetAngle;
@@ -739,7 +738,12 @@ public class EnemySystem
     /// <summary>
     /// Move the enemy toward a target direction, handling wall and door collisions.
     /// </summary>
-    private void MoveToward(Enemy enemy, Vector3 toTarget, float distXZ, float deltaTime)
+    private void MoveToward(
+        Enemy enemy,
+        Vector3 toTarget,
+        float distXZ,
+        float deltaTime,
+        bool preserveCombatState = false)
     {
         Vector3 direction = new Vector3(toTarget.X / distXZ, 0, toTarget.Z / distXZ);
         float step = MathF.Min(enemy.MoveSpeed * deltaTime, distXZ);
@@ -758,13 +762,25 @@ public class EnemySystem
 
         if ((resolved - from).LengthSquared() < 0.0001f)
         {
-            enemy.EnemyState = EnemyState.COLLIDING;
+            if (!preserveCombatState)
+                enemy.EnemyState = EnemyState.COLLIDING;
             return;
         }
 
         enemy.Position = resolved;
         enemy.StuckTimer = 0f;
-        enemy.EnemyState = EnemyState.WALKING;
+        if (!preserveCombatState)
+            enemy.EnemyState = EnemyState.WALKING;
+    }
+
+    private void MoveInCombat(Enemy enemy, Vector3 worldTarget, float deltaTime)
+    {
+        Vector3 toTarget = worldTarget - enemy.Position;
+        float distXZ = MathF.Sqrt(toTarget.X * toTarget.X + toTarget.Z * toTarget.Z);
+        if (distXZ <= ArrivalThreshold)
+            return;
+
+        MoveToward(enemy, toTarget, distXZ, deltaTime, preserveCombatState: true);
     }
 
     /// <summary>
@@ -1022,5 +1038,51 @@ public class EnemySystem
         while (angle > MathF.PI) angle -= 2f * MathF.PI;
         while (angle < -MathF.PI) angle += 2f * MathF.PI;
         return angle;
+    }
+
+    /// <summary>Adapter so behaviors call into EnemySystem without taking a circular dependency on the full type.</summary>
+    private sealed class BehaviorServices : IEnemyBehaviorServices
+    {
+        private readonly EnemySystem _owner;
+
+        public BehaviorServices(EnemySystem owner) => _owner = owner;
+
+        public bool IsPlayerTargetable => _owner.IsPlayerTargetable;
+        public Vector3 PlayerPosition => _owner._player.Position;
+        public Random Rng => _owner._rng;
+
+        public void RotateTowardPlayer(Enemy enemy, float deltaTime) =>
+            _owner.RotateTowardPlayer(enemy, deltaTime);
+
+        public void MoveInCombat(Enemy enemy, Vector3 worldTarget, float deltaTime) =>
+            _owner.MoveInCombat(enemy, worldTarget, deltaTime);
+
+        public void RepathTo(Enemy enemy, Vector3 worldTarget) =>
+            _owner.ComputeChasePath(enemy, worldTarget);
+
+        public void FollowChasePath(Enemy enemy, float deltaTime) =>
+            _owner.FollowChasePath(
+                enemy,
+                deltaTime,
+                allowSearchAtEnd: false,
+                preserveCombatState: true);
+
+        public void TryStartChaseToLastKnown(Enemy enemy) =>
+            _owner.TryStartChaseToLastKnown(enemy);
+
+        public void ReturnToPatrol(Enemy enemy) =>
+            _owner.ReturnToPatrol(enemy);
+
+        public float DistanceToPlayerTiles(Enemy enemy) =>
+            _owner.DistanceToPlayerTiles(enemy);
+
+        public bool TryHitscanPlayer(Enemy enemy) =>
+            _owner.TryHitscanPlayer(enemy);
+
+        public bool TryMeleePlayer(Enemy enemy) =>
+            _owner.TryMeleePlayer(enemy);
+
+        public void PlayEnemyFiredFeedback() =>
+            _owner._combatFeedback.OnEnemyFired();
     }
 }

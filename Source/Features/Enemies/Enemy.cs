@@ -77,6 +77,15 @@ public class Enemy : ICombatTarget
     /// <summary>Score table id for this enemy (from level JSON <c>EnemyType</c>).</summary>
     public EnemyKind ScoreKind { get; set; } = EnemyKind.Guard;
 
+    /// <summary>Catalog entry applied at spawn (stats, attack profile, texture).</summary>
+    public EnemyDefinition Definition { get; set; } = EnemyCatalog.Get(EnemyKind.Guard);
+
+    /// <summary>Per-kind combat behavior (hitscan stand-off, melee chase, etc.).</summary>
+    public IEnemyBehavior Behavior { get; set; } = EnemyBehaviorRegistry.Get(EnemyKind.Guard);
+
+    /// <summary>Index into <see cref="MapData.GameTextures"/> for this enemy's spritesheet.</summary>
+    public int TextureIndex { get; set; }
+
     /// <summary>True after kill points were awarded for entering <see cref="EnemyState.DYING"/>.</summary>
     public bool KillPointsAwarded { get; set; }
 
@@ -212,15 +221,4 @@ public class Enemy : ICombatTarget
 
     /// <summary>0 = sweep left, 1 = sweep right, 2 = return to center and finish.</summary>
     public int SearchSweepStep { get; set; }
-}
-
-public class EnemyGuard : Enemy
-{
-    public EnemyGuard()
-    {
-        MaxHealth = 25f;
-        Health = MaxHealth;
-        CorpseLingerSeconds = 30f;
-        HitReactionDurationSeconds = 0.4f;
-    }
 }

@@ -243,7 +243,9 @@ public class EditorMapRenderer
 
             var fillColor = enemy.StartsAsCorpse
                 ? new Color(90, 90, 90, 200)
-                : new Color(200, 40, 40, 200);
+                : enemy.EnemyType.Equals("Dog", StringComparison.OrdinalIgnoreCase)
+                    ? new Color(200, 140, 40, 200)
+                    : new Color(200, 40, 40, 200);
             DrawCircle((int)centerX, (int)centerY, radius, fillColor);
 
             if (i == hoveredEnemyIndex)
@@ -474,8 +476,12 @@ public class EditorMapRenderer
                 }
             }
 
-            DrawCircle((int)liveCX, (int)liveCY, liveRadius, new Color(40, 200, 40, 180));
-            DrawCircleLines((int)liveCX, (int)liveCY, liveRadius, new Color(40, 255, 40, 255));
+            DrawCircle((int)liveCX, (int)liveCY, liveRadius, liveEnemy.ScoreKind == EnemyKind.Dog
+                ? new Color(200, 140, 40, 180)
+                : new Color(40, 200, 40, 180));
+            DrawCircleLines((int)liveCX, (int)liveCY, liveRadius, liveEnemy.ScoreKind == EnemyKind.Dog
+                ? new Color(255, 180, 60, 255)
+                : new Color(40, 255, 40, 255));
 
             float liveDirLen = liveRadius * 0.8f;
             float liveAngle = liveEnemy.Rotation;
@@ -483,7 +489,9 @@ public class EditorMapRenderer
             float liveEndY = liveCY + MathF.Sin(liveAngle) * liveDirLen;
             DrawLineEx(new Vector2(liveCX, liveCY), new Vector2(liveEndX, liveEndY), 2f, Color.White);
 
-            string stateText = liveEnemy.CanSeePlayer ? "SPOTTED!" : liveEnemy.EnemyState.ToString();
+            string stateText = liveEnemy.CanSeePlayer
+                ? $"{liveEnemy.Definition.DisplayName}!"
+                : $"{liveEnemy.Definition.DisplayName}:{liveEnemy.EnemyState}";
             int stateW = MeasureText(stateText, 14);
             Color stateColor;
             if (liveEnemy.CanSeePlayer)
