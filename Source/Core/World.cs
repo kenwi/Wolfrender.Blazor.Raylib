@@ -386,6 +386,14 @@ public class World : IScene
     public ConsoleCommandResult GetFlyingStatus() =>
         _consoleCommands.GetFlyingStatus();
 
+    public ConsoleCommandResult ToggleGodMode() => _consoleCommands.ToggleGodMode();
+
+    public ConsoleCommandResult SetGodMode(bool enabled) =>
+        _consoleCommands.SetGodMode(enabled);
+
+    public ConsoleCommandResult GetGodModeStatus() =>
+        _consoleCommands.GetGodModeStatus();
+
     public ConsoleCommandResult ToggleFullBright() => _consoleCommands.ToggleFullBright();
 
     public ConsoleCommandResult SetFullBright(bool enabled) =>

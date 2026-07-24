@@ -41,6 +41,7 @@ public sealed class RuntimeConsoleService
             new TickDiagnosticsCommand(),
             new StaticMeshCommand(),
             new FlyCommand(),
+            new GodModeCommand(),
             new LightCheckCommand(),
             new FullBrightCommand(),
             new QuitCommand(),

@@ -70,6 +70,9 @@ public static class WorldConsoleBindings
                 ToggleFlying = world.ToggleFlying,
                 SetFlying = world.SetFlying,
                 GetFlyingStatus = world.GetFlyingStatus,
+                ToggleGodMode = world.ToggleGodMode,
+                SetGodMode = world.SetGodMode,
+                GetGodModeStatus = world.GetGodModeStatus,
                 ToggleFullBright = world.ToggleFullBright,
                 SetFullBright = world.SetFullBright,
                 GetFullBrightStatus = world.GetFullBrightStatus

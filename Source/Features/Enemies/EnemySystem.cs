@@ -465,9 +465,7 @@ public class EnemySystem
 
     private void ApplyDamageToPlayer(float damage)
     {
-        float healthBefore = _player.Health;
-        _player.TakeDamage(damage);
-        if (_player.Health < healthBefore)
+        if (_player.TakeDamage(damage))
             _combatFeedback.OnPlayerDamaged(damage);
     }
 

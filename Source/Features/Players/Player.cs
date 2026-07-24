@@ -20,6 +20,12 @@ public class Player : IDoorKeyInventory
     /// <summary>Free-flight debug mode: no collision, Shift/Ctrl for vertical movement.</summary>
     public bool IsFlying { get; set; }
 
+    /// <summary>
+    /// Debug invulnerability: hits still register (damage flash) but health is unchanged.
+    /// Enemies keep targeting and attacking normally.
+    /// </summary>
+    public bool IsGodMode { get; set; }
+
     public float MaxHealth { get; set; } = 100f;
     public float Health { get; set; } = 100f;
     public bool IsAlive => Health > 0f;
@@ -61,11 +67,20 @@ public class Player : IDoorKeyInventory
         Weapons.Reset();
     }
 
-    public void TakeDamage(float amount)
+    /// <summary>
+    /// Registers an incoming hit. Returns true when the hit is acknowledged
+    /// (so callers can play damage feedback). In god mode health is not reduced.
+    /// </summary>
+    public bool TakeDamage(float amount)
     {
         if (!IsAlive || amount <= 0f)
-            return;
+            return false;
+
+        if (IsGodMode)
+            return true;
+
         Health = MathF.Max(0f, Health - amount);
         System.Console.WriteLine($"{DateTime.Now.ToString("HH:mm:ss")} Player health: {Health}, Took damage: {amount}");
+        return true;
     }
 }
