@@ -40,6 +40,9 @@ public sealed class ConsoleRenderToggleActions
     public required Func<ConsoleCommandResult> ToggleFlying { get; init; }
     public required Func<bool, ConsoleCommandResult> SetFlying { get; init; }
     public required Func<ConsoleCommandResult> GetFlyingStatus { get; init; }
+    public required Func<ConsoleCommandResult> ToggleGodMode { get; init; }
+    public required Func<bool, ConsoleCommandResult> SetGodMode { get; init; }
+    public required Func<ConsoleCommandResult> GetGodModeStatus { get; init; }
     public required Func<ConsoleCommandResult> ToggleFullBright { get; init; }
     public required Func<bool, ConsoleCommandResult> SetFullBright { get; init; }
     public required Func<ConsoleCommandResult> GetFullBrightStatus { get; init; }
@@ -84,6 +87,9 @@ public sealed class ConsoleCommandContext
     public Func<ConsoleCommandResult> ToggleFlying => RenderToggles.ToggleFlying;
     public Func<bool, ConsoleCommandResult> SetFlying => RenderToggles.SetFlying;
     public Func<ConsoleCommandResult> GetFlyingStatus => RenderToggles.GetFlyingStatus;
+    public Func<ConsoleCommandResult> ToggleGodMode => RenderToggles.ToggleGodMode;
+    public Func<bool, ConsoleCommandResult> SetGodMode => RenderToggles.SetGodMode;
+    public Func<ConsoleCommandResult> GetGodModeStatus => RenderToggles.GetGodModeStatus;
     public Func<ConsoleCommandResult> ToggleFullBright => RenderToggles.ToggleFullBright;
     public Func<bool, ConsoleCommandResult> SetFullBright => RenderToggles.SetFullBright;
     public Func<ConsoleCommandResult> GetFullBrightStatus => RenderToggles.GetFullBrightStatus;

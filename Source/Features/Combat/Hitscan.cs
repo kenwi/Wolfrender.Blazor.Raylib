@@ -87,7 +87,7 @@ public static class Hitscan
         int screenWidth,
         int screenHeight,
         IReadOnlyList<ICombatTarget> targets,
-        Texture2D enemySpriteSheet,
+        Func<ICombatTarget, Texture2D> resolveSpriteSheet,
         float spriteWidth,
         float spriteHeight,
         float spriteYAxisRotationRadians,
@@ -132,7 +132,7 @@ public static class Hitscan
                 continue;
 
             if (!IsBillboardHitOnOpaqueSpriteTexel(
-                    enemySpriteSheet,
+                    resolveSpriteSheet(target),
                     target.FrameRect,
                     col.Point,
                     topLeft,
@@ -162,6 +162,35 @@ public static class Hitscan
         int screenWidth,
         int screenHeight,
         IReadOnlyList<ICombatTarget> targets,
+        Func<ICombatTarget, Texture2D> resolveSpriteSheet,
+        float spriteWidth,
+        float spriteHeight,
+        float maxRangeTiles,
+        out ICombatTarget? hitTarget)
+    {
+        return TryHitEnemyScreenRay(
+            mapData,
+            doors,
+            camera,
+            screenWidth,
+            screenHeight,
+            targets,
+            resolveSpriteSheet,
+            spriteWidth,
+            spriteHeight,
+            0f,
+            maxRangeTiles,
+            out hitTarget);
+    }
+
+    /// <summary>Legacy helper when every target shares one spritesheet.</summary>
+    public static bool TryHitEnemyScreenRay(
+        MapData mapData,
+        List<Door> doors,
+        Camera3D camera,
+        int screenWidth,
+        int screenHeight,
+        IReadOnlyList<ICombatTarget> targets,
         Texture2D enemySpriteSheet,
         float spriteWidth,
         float spriteHeight,
@@ -175,7 +204,7 @@ public static class Hitscan
             screenWidth,
             screenHeight,
             targets,
-            enemySpriteSheet,
+            _ => enemySpriteSheet,
             spriteWidth,
             spriteHeight,
             0f,

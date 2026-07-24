@@ -110,6 +110,21 @@ public sealed class PlayConsoleCommands
     public ConsoleCommandResult GetFlyingStatus() =>
         ConsoleCommandResult.Ok(BuildFlyingStatusMessage());
 
+    public ConsoleCommandResult ToggleGodMode()
+    {
+        _player.IsGodMode = !_player.IsGodMode;
+        return ConsoleCommandResult.Ok(BuildGodModeStatusMessage());
+    }
+
+    public ConsoleCommandResult SetGodMode(bool enabled)
+    {
+        _player.IsGodMode = enabled;
+        return ConsoleCommandResult.Ok(BuildGodModeStatusMessage());
+    }
+
+    public ConsoleCommandResult GetGodModeStatus() =>
+        ConsoleCommandResult.Ok(BuildGodModeStatusMessage());
+
     public ConsoleCommandResult ToggleFullBright()
     {
         PrimitiveRenderer.SetFullBright(!PrimitiveRenderer.FullBright);
@@ -222,4 +237,9 @@ public sealed class PlayConsoleCommands
 
         return $"Flying: on. Position Y={_player.Position.Y:F1}. Shift=up, Ctrl=down.";
     }
+
+    private string BuildGodModeStatusMessage() =>
+        _player.IsGodMode
+            ? "God mode: on (damage flash still plays; health unchanged; enemies attack normally)."
+            : "God mode: off.";
 }

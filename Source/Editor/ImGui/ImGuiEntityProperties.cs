@@ -123,6 +123,8 @@ public sealed class ImGuiEntityProperties
 
         ImGui.Text($"Type: {enemy.EnemyType}");
         if (ImGui.Button("Guard")) state.SetEnemyType(selectedEnemyIndex, "Guard");
+        ImGui.SameLine();
+        if (ImGui.Button("Dog")) state.SetEnemyType(selectedEnemyIndex, "Dog");
 
         ImGui.Spacing();
 

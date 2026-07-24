@@ -8,7 +8,7 @@ namespace Game.Features.Animation;
 
 public class AnimationSystem
 {
-    private readonly Texture2D _enemyTexture;
+    private readonly IReadOnlyList<Texture2D> _gameTextures;
     private readonly Texture2D _weaponTexture;
     private readonly Player _player;
     private readonly EnemySystem _enemySystem;
@@ -20,12 +20,12 @@ public class AnimationSystem
     private bool _sustainedFireLoop;
 
     public AnimationSystem(
-        Texture2D enemyTexture,
+        IReadOnlyList<Texture2D> gameTextures,
         Texture2D weaponTexture,
         Player player,
         EnemySystem enemySystem)
     {
-        _enemyTexture = enemyTexture;
+        _gameTextures = gameTextures;
         _weaponTexture = weaponTexture;
         _player = player;
         _enemySystem = enemySystem;
@@ -166,6 +166,21 @@ public class AnimationSystem
                     currentRowPixel = 6 * (spriteSize + padding);
                     break;
                 case EnemyState.ATTACKING:
+                    // Melee chasers use walk frames while closing; bite frames only in range.
+                    if (enemy.Definition.Attack.Kind == EnemyAttackKind.Melee
+                        && enemy.DistanceFromPlayer > enemy.Definition.Attack.MeleeRangeTiles)
+                    {
+                        if (enemy.AnimationTimer >= 1)
+                        {
+                            enemy.FrameRowIndex++;
+                            enemy.AnimationTimer = 0;
+                        }
+                        currentColumnPixel = (frameColumnIndex % 8) * (spriteSize + padding);
+                        currentRowPixel = (1 + enemy.FrameRowIndex % 4) * (spriteSize + padding);
+                        currentAnimationSpeed = 3f;
+                        break;
+                    }
+
                     if (enemy.AnimationTimer >= 1)
                     {
                         enemy.AnimationTimer = 0;
@@ -173,7 +188,9 @@ public class AnimationSystem
                     }
                     currentColumnPixel = (1 + enemy.ShootingAnimationIndex % 2) * (spriteSize + padding);
                     currentRowPixel = 6 * (spriteSize + padding);
-                    currentAnimationSpeed = 0.5f;
+                    currentAnimationSpeed = enemy.Definition.Attack.Kind == EnemyAttackKind.Melee
+                        ? 1.2f
+                        : 0.5f;
 
                     var currentFrameColumn = 1 + enemy.ShootingAnimationIndex % 2;
                     if (currentFrameColumn != enemy.PreviousAttackFrameColumn)
@@ -213,8 +230,9 @@ public class AnimationSystem
         {
             bool isCorpse = enemy.EnemyState == EnemyState.CORPSE;
             bool smoothFaceOnDeath = enemy.EnemyState == EnemyState.DYING;
+            var texture = ResolveEnemyTexture(enemy);
             PrimitiveRenderer.DrawSpriteTexture(
-                _enemyTexture,
+                texture,
                 enemy.Position,
                 _player.Camera.Position,
                 Color.White,
@@ -225,6 +243,14 @@ public class AnimationSystem
                     ? SpriteBillboardGeometry.FacingMode.ViewAligned
                     : SpriteBillboardGeometry.FacingMode.PointAtCamera);
         }
+    }
+
+    private Texture2D ResolveEnemyTexture(Enemy enemy)
+    {
+        int index = enemy.TextureIndex;
+        if (index < 0 || index >= _gameTextures.Count)
+            index = Game.Core.GameTextureIndex.EnemyGuard;
+        return _gameTextures[index];
     }
 
     public void RenderWeaponOverlay(int screenWidth, int screenHeight)

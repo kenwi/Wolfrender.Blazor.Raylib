@@ -112,7 +112,7 @@ public static class WorldCompositionRoot
         placedObjectSystem.Rebuild(mapData);
 
         var animationSystem = new AnimationSystem(
-            gameTextures[GameTextureIndex.EnemyGuard],
+            gameTextures,
             gameTextures[GameTextureIndex.Weapons],
             player,
             enemySystem);
@@ -120,7 +120,7 @@ public static class WorldCompositionRoot
             mapData,
             doorSystem,
             enemySystem,
-            gameTextures[GameTextureIndex.EnemyGuard],
+            gameTextures,
             effectSystem,
             soundSystem,
             animationSystem,
