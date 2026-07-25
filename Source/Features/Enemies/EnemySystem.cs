@@ -909,7 +909,8 @@ public class EnemySystem
                 if (!ShouldEnemyHearGunshot(enemy))
                     continue;
 
-                if (!soundEvent.ReachedTiles.Contains(GetEnemyFloorTile(enemy)))
+                var tile = GetEnemyFloorTile(enemy);
+                if (!soundEvent.CanHearAt(tile, enemy.Definition.MaxHearThroughClosedDoors))
                     continue;
 
                 ReactToHeardGunshot(enemy);

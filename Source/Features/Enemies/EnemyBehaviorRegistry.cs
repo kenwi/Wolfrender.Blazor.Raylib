@@ -11,6 +11,8 @@ public static class EnemyBehaviorRegistry
     public static IEnemyBehavior Get(EnemyKind kind) => kind switch
     {
         EnemyKind.Dog => Dog,
+        // Officer uses the same stand-and-shoot hitscan loop; stats differ via catalog.
+        EnemyKind.Officer => Guard,
         _ => Guard
     };
 }

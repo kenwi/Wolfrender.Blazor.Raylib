@@ -8,4 +8,6 @@ public static class GameTextureIndex
     public const int Objects = 2;
     /// <summary>Dog spritesheet. Placeholder loads the guard sheet until dedicated art ships.</summary>
     public const int EnemyDog = 3;
+    /// <summary>Officer spritesheet. Placeholder loads the guard sheet until dedicated art ships.</summary>
+    public const int EnemyOfficer = 4;
 }

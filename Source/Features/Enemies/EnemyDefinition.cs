@@ -24,4 +24,10 @@ public sealed class EnemyDefinition
 
     /// <summary>How often a chasing melee enemy re-runs A* toward the live player (seconds).</summary>
     public float ChasePathRefreshSeconds { get; init; } = 0.4f;
+
+    /// <summary>
+    /// Maximum closed doors a gunshot may cross and still alert this enemy.
+    /// 0 = same-room (and through open doors) only; 1 = can hear through one closed door; etc.
+    /// </summary>
+    public int MaxHearThroughClosedDoors { get; init; }
 }

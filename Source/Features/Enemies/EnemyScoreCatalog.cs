@@ -6,7 +6,7 @@ public static class EnemyScoreCatalog
     {
         EnemyKind.Guard => EnemyCatalog.Get(EnemyKind.Guard).ScorePoints,
         EnemyKind.Dog => EnemyCatalog.Get(EnemyKind.Dog).ScorePoints,
-        EnemyKind.Officer => 400,
+        EnemyKind.Officer => EnemyCatalog.Get(EnemyKind.Officer).ScorePoints,
         EnemyKind.Ss => 500,
         EnemyKind.Mutant => 700,
         EnemyKind.Boss => 5_000,
