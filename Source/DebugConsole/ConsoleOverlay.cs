@@ -20,6 +20,11 @@ public sealed class ConsoleOverlay
     private readonly ConsoleInputController _input;
     private int _scrollbackOffsetLines;
     private float _heightScale = 1f;
+    /// <summary>
+    /// After opening via the toggle key, briefly ignore glyphs that key produces
+    /// (e.g. '|' on Norwegian) in case GetCharPressed arrives a frame late.
+    /// </summary>
+    private float _suppressToggleKeyCharsSeconds;
 
     public ConsoleOverlay()
     {
@@ -40,7 +45,10 @@ public sealed class ConsoleOverlay
         IsOpen = !IsOpen;
         _input.ResetHistoryNavigation();
         if (IsOpen)
+        {
             _scrollbackOffsetLines = 0;
+            _suppressToggleKeyCharsSeconds = 0.25f;
+        }
         _selection.Reset();
         _input.ResetCompletionSession();
     }
@@ -79,6 +87,9 @@ public sealed class ConsoleOverlay
     {
         HandleHeightScaleKeys();
 
+        if (_suppressToggleKeyCharsSeconds > 0f)
+            _suppressToggleKeyCharsSeconds = MathF.Max(0f, _suppressToggleKeyCharsSeconds - deltaTime);
+
         float wheel = GetMouseWheelMove();
         if (MathF.Abs(wheel) > 0.01f)
             _scrollbackOffsetLines += (int)MathF.Round(wheel);
@@ -90,23 +101,37 @@ public sealed class ConsoleOverlay
 
         _selection.HandleMouseSelection();
 
-        _input.Update(deltaTime, onSubmit, getCompletions, consumeTypedCharsForThisFrame);
+        // Toggle is KeyboardKey.Grave; on Norwegian that key types '|', on US '`'/'~'.
+        // Drop those glyphs while Grave is held or shortly after open (delayed char queue).
+        bool suppressToggleKeyChars = _suppressToggleKeyCharsSeconds > 0f
+            || IsKeyDown(KeyboardKey.Grave);
+
+        _input.Update(
+            deltaTime,
+            onSubmit,
+            getCompletions,
+            consumeTypedCharsForThisFrame,
+            AdjustHeightScale,
+            suppressToggleKeyChars);
     }
 
     /// <summary>
-    /// + / - (and numpad) grow or shrink the console panel. Those characters are reserved
-    /// for scaling while the console is open and are not inserted into the input line.
+    /// Grow/shrink from the typed characters + / - (layout-independent) and numpad +/-.
+    /// Physical US Equal/Minus scancodes are not used - on Norwegian those keys type + and \.
     /// </summary>
     private void HandleHeightScaleKeys()
     {
-        bool grow = IsKeyPressed(KeyboardKey.Equal)
-            || IsKeyPressed(KeyboardKey.KpAdd);
-        bool shrink = IsKeyPressed(KeyboardKey.Minus)
-            || IsKeyPressed(KeyboardKey.KpSubtract);
+        if (IsKeyPressed(KeyboardKey.KpAdd))
+            AdjustHeightScale(+1);
+        if (IsKeyPressed(KeyboardKey.KpSubtract))
+            AdjustHeightScale(-1);
+    }
 
-        if (grow)
+    private void AdjustHeightScale(int direction)
+    {
+        if (direction > 0)
             _heightScale = MathF.Min(MaxHeightScale, _heightScale + HeightScaleStep);
-        if (shrink)
+        else if (direction < 0)
             _heightScale = MathF.Max(MinHeightScale, _heightScale - HeightScaleStep);
     }
 

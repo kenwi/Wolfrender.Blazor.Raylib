@@ -49,7 +49,9 @@ internal sealed class ConsoleInputController
         float deltaTime,
         Action<string> onSubmit,
         Func<string, int, IReadOnlyList<string>> getCompletions,
-        bool consumeTypedCharsForThisFrame)
+        bool consumeTypedCharsForThisFrame,
+        Action<int>? onHeightScale = null,
+        bool suppressToggleKeyChars = false)
     {
         bool ctrl = IsKeyDown(KeyboardKey.LeftControl) || IsKeyDown(KeyboardKey.RightControl);
         bool shift = IsKeyDown(KeyboardKey.LeftShift) || IsKeyDown(KeyboardKey.RightShift);
@@ -123,9 +125,26 @@ internal sealed class ConsoleInputController
             char ch = (char)key;
             if (ctrl && IsClipboardOrEditControlChar(ch))
                 continue;
-            // Reserved for console height scale (+/-) while the overlay is open.
-            if (ch is '+' or '-' or '=')
+
+            // Console opens on KeyboardKey.Grave. Layouts map that key to different glyphs
+            // (Norwegian '|', US '`'/ '~', some Nordic '§'). consumeTypedCharsForThisFrame
+            // covers the toggle frame; also drop these while the toggle key is held / shortly
+            // after open so a delayed GetCharPressed does not leak into the prompt.
+            if (suppressToggleKeyChars && ch is '|' or '`' or '~' or '§')
                 continue;
+
+            // Layout-independent: scale from the character produced, not US key positions.
+            // (Norwegian: the US "Minus" key types '+'; the US "Equal" key types '\'.)
+            if (ch == '+')
+            {
+                onHeightScale?.Invoke(+1);
+                continue;
+            }
+            if (ch == '-')
+            {
+                onHeightScale?.Invoke(-1);
+                continue;
+            }
             if (!consumeTypedCharsForThisFrame && !char.IsControl(ch))
             {
                 _selection.InsertTextAtCursor(ch.ToString());
