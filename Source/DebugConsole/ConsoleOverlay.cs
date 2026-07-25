@@ -10,12 +10,16 @@ public sealed class ConsoleOverlay
     internal const int PaddingX = 12;
     internal const int LineHeight = 24;
     private const int PromptBottomOffset = 34;
+    private const float HeightScaleStep = 0.15f;
+    private const float MinHeightScale = 0.5f;
+    private const float MaxHeightScale = 3f;
 
     private readonly List<string> _scrollback = new();
     private readonly ConsoleInputLine _inputLine = new();
     private readonly ConsoleSelectionController _selection;
     private readonly ConsoleInputController _input;
     private int _scrollbackOffsetLines;
+    private float _heightScale = 1f;
 
     public ConsoleOverlay()
     {
@@ -73,6 +77,8 @@ public sealed class ConsoleOverlay
         Func<string, int, IReadOnlyList<string>> getCompletions,
         bool consumeTypedCharsForThisFrame = false)
     {
+        HandleHeightScaleKeys();
+
         float wheel = GetMouseWheelMove();
         if (MathF.Abs(wheel) > 0.01f)
             _scrollbackOffsetLines += (int)MathF.Round(wheel);
@@ -85,6 +91,23 @@ public sealed class ConsoleOverlay
         _selection.HandleMouseSelection();
 
         _input.Update(deltaTime, onSubmit, getCompletions, consumeTypedCharsForThisFrame);
+    }
+
+    /// <summary>
+    /// + / - (and numpad) grow or shrink the console panel. Those characters are reserved
+    /// for scaling while the console is open and are not inserted into the input line.
+    /// </summary>
+    private void HandleHeightScaleKeys()
+    {
+        bool grow = IsKeyPressed(KeyboardKey.Equal)
+            || IsKeyPressed(KeyboardKey.KpAdd);
+        bool shrink = IsKeyPressed(KeyboardKey.Minus)
+            || IsKeyPressed(KeyboardKey.KpSubtract);
+
+        if (grow)
+            _heightScale = MathF.Min(MaxHeightScale, _heightScale + HeightScaleStep);
+        if (shrink)
+            _heightScale = MathF.Max(MinHeightScale, _heightScale - HeightScaleStep);
     }
 
     public void Render()
@@ -220,8 +243,10 @@ public sealed class ConsoleOverlay
     private LayoutMetrics GetLayout()
     {
         int screenW = GetScreenWidth();
-        int height = Math.Max(240, GetScreenHeight() / 3);
-        int maxLines = (height - 56) / LineHeight;
+        int screenH = GetScreenHeight();
+        float baseHeight = Math.Max(240f, screenH / 3f);
+        int height = (int)Math.Clamp(baseHeight * _heightScale, 160f, screenH);
+        int maxLines = Math.Max(1, (height - 56) / LineHeight);
         int promptY = height - PromptBottomOffset;
         return new LayoutMetrics(screenW, height, maxLines, promptY);
     }

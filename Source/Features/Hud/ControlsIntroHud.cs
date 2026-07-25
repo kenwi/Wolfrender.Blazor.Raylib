@@ -81,6 +81,7 @@ public static class ControlsIntroHud
             new("H", "Toggle high score board"),
             new("R", "Restart level"),
             new(OperatingSystem.IsBrowser() ? "Period" : "| (Pipe)", "Toggle console"),
+            new("+ / -", "Console height (while open)"),
         };
 
         if (OperatingSystem.IsBrowser())

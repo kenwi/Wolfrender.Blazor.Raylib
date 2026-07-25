@@ -123,6 +123,9 @@ internal sealed class ConsoleInputController
             char ch = (char)key;
             if (ctrl && IsClipboardOrEditControlChar(ch))
                 continue;
+            // Reserved for console height scale (+/-) while the overlay is open.
+            if (ch is '+' or '-' or '=')
+                continue;
             if (!consumeTypedCharsForThisFrame && !char.IsControl(ch))
             {
                 _selection.InsertTextAtCursor(ch.ToString());
