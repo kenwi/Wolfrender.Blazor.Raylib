@@ -20,6 +20,7 @@ public class LevelFileData
     public List<EnemyPlacementData> Enemies { get; set; } = new();
     public List<PickupPlacementData> Pickups { get; set; } = new();
     public List<SecretWallPlacementData> SecretWalls { get; set; } = new();
+    public List<WallFaceOverrideData> WallFaceOverrides { get; set; } = new();
     public PlayerSpawnData? PlayerSpawn { get; set; }
 }
 
@@ -91,6 +92,7 @@ public static class LevelSerializer
             Enemies = mapData.Enemies.Select(EnemyPlacementData.FromPlacement).ToList(),
             Pickups = mapData.Pickups.Select(PickupPlacementData.FromPlacement).ToList(),
             SecretWalls = mapData.SecretWalls.Select(SecretWallPlacementData.FromPlacement).ToList(),
+            WallFaceOverrides = mapData.WallFaceOverrides.Select(WallFaceOverrideData.FromPlacement).ToList(),
             PlayerSpawn = PlayerSpawnData.FromPlacement(mapData.Spawn)
         };
 
@@ -119,6 +121,10 @@ public static class LevelSerializer
             .ToList();
         mapData.SecretWalls = (fileData.SecretWalls ?? new List<SecretWallPlacementData>())
             .Select(s => s.ToPlacement())
+            .ToList();
+        mapData.WallFaceOverrides = (fileData.WallFaceOverrides ?? new List<WallFaceOverrideData>())
+            .Select(o => o.ToPlacement())
+            .Where(o => o.HasAnyFace)
             .ToList();
         fileData.PlayerSpawn?.ApplyTo(mapData.Spawn);
         mapData.ResetGeometryVersion();
@@ -156,6 +162,7 @@ public static class LevelSerializer
         mapData.Objects = new uint[mapData.Width * mapData.Height];
         mapData.Pickups = new List<PickupPlacement>();
         mapData.SecretWalls = new List<SecretWallPlacement>();
+        mapData.WallFaceOverrides = new List<WallFaceOverride>();
         mapData.ResetGeometryVersion();
     }
 
@@ -185,6 +192,7 @@ public static class LevelSerializer
         mapData.Enemies = new List<EnemyPlacement>();
         mapData.Pickups = new List<PickupPlacement>();
         mapData.SecretWalls = new List<SecretWallPlacement>();
+        mapData.WallFaceOverrides = new List<WallFaceOverride>();
 
         for (int tileY = 0; tileY < mapHeight; tileY++)
         {

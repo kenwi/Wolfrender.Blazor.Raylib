@@ -22,6 +22,8 @@ public class MapData
     public List<EnemyPlacement> Enemies { get; set; } = new();
     public List<PickupPlacement> Pickups { get; set; } = new();
     public List<SecretWallPlacement> SecretWalls { get; set; } = new();
+    /// <summary>Sparse per-face texture exceptions. Missing faces use <see cref="Walls"/>.</summary>
+    public List<WallFaceOverride> WallFaceOverrides { get; set; } = new();
     public PlayerSpawnPlacement Spawn { get; set; } = new();
     /// <summary>64 baked tiles from <see cref="Rendering.TileSpriteSheet"/> (index 0 = tile ID 1).</summary>
     public List<Texture2D> TileTextures { get; set; } = new();
@@ -48,5 +50,25 @@ public class MapData
             return 0;
 
         return layer[Width * y + x];
+    }
+
+    public WallFaceOverride? FindWallFaceOverride(int x, int y) =>
+        WallFaceOverrides.Find(o => o.TileX == x && o.TileY == y);
+
+    public void RemoveWallFaceOverrideAt(int x, int y)
+    {
+        int index = WallFaceOverrides.FindIndex(o => o.TileX == x && o.TileY == y);
+        if (index >= 0)
+            WallFaceOverrides.RemoveAt(index);
+    }
+
+    /// <summary>
+    /// Tile ID for one wall face. Falls back to <see cref="Walls"/> when the face is unset.
+    /// </summary>
+    public uint GetWallFaceTile(int x, int y, WallFace face)
+    {
+        uint fallback = GetTile(Walls, x, y);
+        uint? id = FindWallFaceOverride(x, y)?.Get(face);
+        return id is > 0 ? id.Value : fallback;
     }
 }

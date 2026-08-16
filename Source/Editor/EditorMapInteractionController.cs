@@ -27,6 +27,7 @@ public sealed class EditorMapInteractionController
         _state.EndEnemyDrag();
         _state.EndPickupDrag();
         _state.EndPlayerDrag();
+        _state.EndWallSelectionDrag();
         _state.IsDraggingPlayer = false;
     }
 
@@ -274,15 +275,27 @@ public sealed class EditorMapInteractionController
 
     private void HandleWallSelectInput(bool mouseOverUi)
     {
-        if (mouseOverUi || !IsMouseButtonPressed(MouseButton.Left)) return;
+        if (mouseOverUi) return;
 
-        var clickPos = _state.Camera.ScreenToWorld(GetMousePosition());
-        int px = (int)MathF.Floor(clickPos.X);
-        int py = (int)MathF.Floor(clickPos.Y);
+        GetTileUnderMouse(out int px, out int py);
 
-        if (_state.GetWallTileAt(px, py) > 0)
-            _state.SelectWallTile(px, py);
-        else
-            _state.ClearWallSelection();
+        if (IsMouseButtonPressed(MouseButton.Left))
+        {
+            if (_state.GetWallTileAt(px, py) > 0)
+                _state.BeginWallSelection(px, py);
+            else
+                _state.ClearWallSelection();
+            return;
+        }
+
+        if (IsMouseButtonDown(MouseButton.Left) && _state.GetWallTileAt(px, py) > 0)
+            _state.AddWallToSelection(px, py);
+    }
+
+    private void GetTileUnderMouse(out int tileX, out int tileY)
+    {
+        var worldPos = _state.Camera.ScreenToWorld(GetMousePosition());
+        tileX = (int)MathF.Floor(worldPos.X);
+        tileY = (int)MathF.Floor(worldPos.Y);
     }
 }

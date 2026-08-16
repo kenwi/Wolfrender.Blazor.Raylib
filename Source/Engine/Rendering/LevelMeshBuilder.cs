@@ -50,7 +50,7 @@ internal static class LevelMeshBuilder
 
                 uint wallTile = mapData.Walls[index];
                 if (wallTile != 0 && !hasDoor)
-                    AddWallTile(wallBuilders, roomMap, mapData, doorTiles, x, y, (int)wallTile - 1, maxTextureIndex);
+                    AddWallTile(wallBuilders, roomMap, mapData, doorTiles, x, y, maxTextureIndex);
 
                 if (!ShouldEmitFloorOrCeiling(mapData, x, y, hasDoor, secretTiles))
                     continue;
@@ -187,18 +187,15 @@ internal static class LevelMeshBuilder
         IDoorTileEncoding doorTiles,
         int x,
         int y,
-        int textureIndex,
         int maxTextureIndex)
     {
-        if (textureIndex < 0)
-            return;
-
         float cx = x * TileSize;
         float cy = WallCenterY;
         float cz = y * TileSize;
         float half = TileSize * 0.5f;
 
-        TryAddWallFace(buildersByRoom, roomMap, mapData, doorTiles, x, y, textureIndex, maxTextureIndex, x, y + 1,
+        TryAddWallFace(buildersByRoom, roomMap, mapData, doorTiles, x, y,
+            FaceTextureIndex(mapData, x, y, WallFace.South, maxTextureIndex), maxTextureIndex, x, y + 1,
             new Vector3(cx - half, cy - half, cz + half),
             new Vector3(cx + half, cy - half, cz + half),
             new Vector3(cx + half, cy + half, cz + half),
@@ -206,7 +203,8 @@ internal static class LevelMeshBuilder
             new Vector3(0f, 0f, 1f),
             T(0f, 0f), T(1f, 0f), T(1f, 1f), T(0f, 1f));
 
-        TryAddWallFace(buildersByRoom, roomMap, mapData, doorTiles, x, y, textureIndex, maxTextureIndex, x, y - 1,
+        TryAddWallFace(buildersByRoom, roomMap, mapData, doorTiles, x, y,
+            FaceTextureIndex(mapData, x, y, WallFace.North, maxTextureIndex), maxTextureIndex, x, y - 1,
             new Vector3(cx - half, cy - half, cz - half),
             new Vector3(cx - half, cy + half, cz - half),
             new Vector3(cx + half, cy + half, cz - half),
@@ -214,7 +212,8 @@ internal static class LevelMeshBuilder
             new Vector3(0f, 0f, -1f),
             T(1f, 0f), T(1f, 1f), T(0f, 1f), T(0f, 0f));
 
-        TryAddWallFace(buildersByRoom, roomMap, mapData, doorTiles, x, y, textureIndex, maxTextureIndex, x + 1, y,
+        TryAddWallFace(buildersByRoom, roomMap, mapData, doorTiles, x, y,
+            FaceTextureIndex(mapData, x, y, WallFace.East, maxTextureIndex), maxTextureIndex, x + 1, y,
             new Vector3(cx + half, cy - half, cz - half),
             new Vector3(cx + half, cy + half, cz - half),
             new Vector3(cx + half, cy + half, cz + half),
@@ -222,13 +221,22 @@ internal static class LevelMeshBuilder
             new Vector3(1f, 0f, 0f),
             T(1f, 0f), T(1f, 1f), T(0f, 1f), T(0f, 0f));
 
-        TryAddWallFace(buildersByRoom, roomMap, mapData, doorTiles, x, y, textureIndex, maxTextureIndex, x - 1, y,
+        TryAddWallFace(buildersByRoom, roomMap, mapData, doorTiles, x, y,
+            FaceTextureIndex(mapData, x, y, WallFace.West, maxTextureIndex), maxTextureIndex, x - 1, y,
             new Vector3(cx - half, cy - half, cz - half),
             new Vector3(cx - half, cy - half, cz + half),
             new Vector3(cx - half, cy + half, cz + half),
             new Vector3(cx - half, cy + half, cz - half),
             new Vector3(-1f, 0f, 0f),
             T(0f, 0f), T(1f, 0f), T(1f, 1f), T(0f, 1f));
+    }
+
+    private static int FaceTextureIndex(MapData mapData, int x, int y, WallFace face, int maxTextureIndex)
+    {
+        int index = (int)mapData.GetWallFaceTile(x, y, face) - 1;
+        if (index < 0 || index >= maxTextureIndex)
+            return -1;
+        return index;
     }
 
     /// <summary>
@@ -256,6 +264,9 @@ internal static class LevelMeshBuilder
         Vector2 t3)
     {
         if (BlocksWallFace(mapData, doorTiles, neighborX, neighborY))
+            return;
+
+        if (textureIndex < 0)
             return;
 
         foreach (int roomId in roomMap.GetTileRoomIds(neighborX, neighborY))

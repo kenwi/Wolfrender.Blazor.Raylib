@@ -11,10 +11,15 @@ public sealed class SecretWallEditorTool
     private readonly Action _notifyChanged;
     private readonly Action _rebuildRoomMap;
     private readonly Action _deselectOthers;
+    private readonly HashSet<(int X, int Y)> _selected = new();
 
     public int SelectedTileX { get; private set; } = -1;
     public int SelectedTileY { get; private set; } = -1;
-    public bool HasSelection => SelectedTileX >= 0 && SelectedTileY >= 0;
+    public bool HasSelection => _selected.Count > 0;
+    public int SelectionCount => _selected.Count;
+    public bool IsSingleSelection => _selected.Count == 1;
+    public bool IsDraggingSelection { get; private set; }
+    public IReadOnlyCollection<(int X, int Y)> SelectedTiles => _selected;
 
     public SecretWallEditorTool(
         MapData mapData,
@@ -30,21 +35,39 @@ public sealed class SecretWallEditorTool
         _deselectOthers = deselectOthers;
     }
 
-    public void SelectTile(int tileX, int tileY, Func<int, int, uint> getWallTile)
+    public void BeginSelection(int tileX, int tileY, Func<int, int, uint> getWallTile)
     {
         if (getWallTile(tileX, tileY) == 0) return;
 
         _deselectOthers();
+        _selected.Clear();
+        _selected.Add((tileX, tileY));
         SelectedTileX = tileX;
         SelectedTileY = tileY;
+        IsDraggingSelection = true;
         _notifyChanged();
     }
 
+    public void AddToSelection(int tileX, int tileY, Func<int, int, uint> getWallTile)
+    {
+        if (!IsDraggingSelection) return;
+        if (getWallTile(tileX, tileY) == 0) return;
+        if (!_selected.Add((tileX, tileY))) return;
+        _notifyChanged();
+    }
+
+    public void EndSelectionDrag() => IsDraggingSelection = false;
+
+    public void SelectTile(int tileX, int tileY, Func<int, int, uint> getWallTile) =>
+        BeginSelection(tileX, tileY, getWallTile);
+
     public void ClearSelection()
     {
-        if (SelectedTileX < 0) return;
+        if (_selected.Count == 0 && SelectedTileX < 0) return;
+        _selected.Clear();
         SelectedTileX = -1;
         SelectedTileY = -1;
+        IsDraggingSelection = false;
         _notifyChanged();
     }
 
@@ -52,13 +75,13 @@ public sealed class SecretWallEditorTool
         _mapData.SecretWalls.FirstOrDefault(s => s.TileX == tileX && s.TileY == tileY);
 
     public SecretWallPlacement? GetSelectedPlacement() =>
-        HasSelection ? FindAt(SelectedTileX, SelectedTileY) : null;
+        IsSingleSelection ? FindAt(SelectedTileX, SelectedTileY) : null;
 
     public bool IsSelectedSecret => GetSelectedPlacement() != null;
 
     public void SetSecret(bool isSecret, SecretWallDirection direction, int travelTiles)
     {
-        if (!HasSelection) return;
+        if (!IsSingleSelection) return;
 
         var before = ClonePlacement(FindAt(SelectedTileX, SelectedTileY));
         RemoveAt(SelectedTileX, SelectedTileY);

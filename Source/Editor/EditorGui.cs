@@ -591,28 +591,28 @@ public class EditorGui
             return;
         }
 
-        if (editorState.IsWallSelectMode)
-        {
-            ImGui.TextWrapped("Click a wall on the map to edit secret properties.");
-            ImGui.End();
-            return;
-        }
-
         float buttonSize = PickupSprites.PaletteIconSize;
 
-        bool isEraserSelected = selectedTileId == 0;
-        if (isEraserSelected)
+        if (editorState.IsWallSelectMode)
         {
-            ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.8f, 0.2f, 0.2f, 1f));
-            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.9f, 0.3f, 0.3f, 1f));
+            ImGui.TextWrapped("Click or drag walls to select. Assign a face to every selected wall.");
         }
-        if (ImGui.Button("Eraser\n(Empty)", new Vector2(buttonSize + 20, buttonSize)))
+        else
         {
-            selectedTileId = 0;
-        }
-        if (isEraserSelected)
-        {
-            ImGui.PopStyleColor(2);
+            bool isEraserSelected = selectedTileId == 0;
+            if (isEraserSelected)
+            {
+                ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.8f, 0.2f, 0.2f, 1f));
+                ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.9f, 0.3f, 0.3f, 1f));
+            }
+            if (ImGui.Button("Eraser\n(Empty)", new Vector2(buttonSize + 20, buttonSize)))
+            {
+                selectedTileId = 0;
+            }
+            if (isEraserSelected)
+            {
+                ImGui.PopStyleColor(2);
+            }
         }
 
         if (layers[activeLayerIndex].Name == EditorState.ObjectsLayerName)

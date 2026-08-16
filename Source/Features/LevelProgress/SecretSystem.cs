@@ -55,7 +55,11 @@ public sealed class SecretSystem : IMovementBlocker
                 Position = start,
                 Direction = placement.Direction,
                 TravelTiles = Math.Max(1, placement.TravelTiles),
-                WallTileId = wallTileId
+                WallTileId = wallTileId,
+                NorthTileId = mapData.GetWallFaceTile(placement.TileX, placement.TileY, WallFace.North),
+                EastTileId = mapData.GetWallFaceTile(placement.TileX, placement.TileY, WallFace.East),
+                SouthTileId = mapData.GetWallFaceTile(placement.TileX, placement.TileY, WallFace.South),
+                WestTileId = mapData.GetWallFaceTile(placement.TileX, placement.TileY, WallFace.West)
             });
         }
     }
@@ -80,16 +84,21 @@ public sealed class SecretSystem : IMovementBlocker
             if (secret.State != SecretWallState.Sliding)
                 continue;
 
-            int texIndex = (int)secret.WallTileId - 1;
-            if (texIndex < 0 || texIndex >= _textures.Count)
+            if (!TryGetTexture(secret.NorthTileId, out var north)
+                || !TryGetTexture(secret.SouthTileId, out var south)
+                || !TryGetTexture(secret.EastTileId, out var east)
+                || !TryGetTexture(secret.WestTileId, out var west))
                 continue;
 
             var worldPos = new Vector3(
                 secret.Position.X * _quadSize,
                 2,
                 secret.Position.Y * _quadSize);
-            PrimitiveRenderer.DrawCubeTexture(
-                _textures[texIndex],
+            PrimitiveRenderer.DrawCubeTextures(
+                north,
+                south,
+                east,
+                west,
                 worldPos,
                 _quadSize,
                 _quadSize,
@@ -223,6 +232,7 @@ public sealed class SecretSystem : IMovementBlocker
         {
             int endIndex = LevelData.GetIndex(occupied.x, occupied.y, _mapData.Width);
             _mapData.Walls[endIndex] = secret.WallTileId;
+            MoveFaceOverride(secret.TileX, secret.TileY, occupied.x, occupied.y);
         }
 
         _mapData.NotifyGeometryChanged();
@@ -263,6 +273,7 @@ public sealed class SecretSystem : IMovementBlocker
 
             int endX = placement.TileX + dx * travel;
             int endY = placement.TileY + dy * travel;
+            bool restoredFromEnd = false;
             if (wallTileId == 0
                 && endX >= 0 && endX < mapData.Width
                 && endY >= 0 && endY < mapData.Height)
@@ -270,11 +281,49 @@ public sealed class SecretSystem : IMovementBlocker
                 int endIndex = LevelData.GetIndex(endX, endY, mapData.Width);
                 wallTileId = mapData.Walls[endIndex];
                 if (wallTileId > 0)
+                {
                     mapData.Walls[endIndex] = 0;
+                    restoredFromEnd = true;
+                }
             }
 
             if (wallTileId > 0)
                 mapData.Walls[startIndex] = wallTileId;
+
+            if (restoredFromEnd)
+                MoveFaceOverride(mapData, endX, endY, placement.TileX, placement.TileY);
         }
+    }
+
+    private void MoveFaceOverride(int fromX, int fromY, int toX, int toY) =>
+        MoveFaceOverride(_mapData, fromX, fromY, toX, toY);
+
+    private static void MoveFaceOverride(MapData mapData, int fromX, int fromY, int toX, int toY)
+    {
+        if (fromX == toX && fromY == toY)
+            return;
+
+        var faceOverride = mapData.FindWallFaceOverride(fromX, fromY);
+        if (faceOverride == null)
+            return;
+
+        mapData.RemoveWallFaceOverrideAt(fromX, fromY);
+        mapData.RemoveWallFaceOverrideAt(toX, toY);
+        faceOverride.TileX = toX;
+        faceOverride.TileY = toY;
+        mapData.WallFaceOverrides.Add(faceOverride);
+    }
+
+    private bool TryGetTexture(uint tileId, out Texture2D texture)
+    {
+        int index = (int)tileId - 1;
+        if (index < 0 || index >= _textures.Count)
+        {
+            texture = default;
+            return false;
+        }
+
+        texture = _textures[index];
+        return true;
     }
 }

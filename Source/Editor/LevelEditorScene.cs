@@ -265,10 +265,8 @@ public class LevelEditorScene : IScene
 
         if (_state.HasSelectedWall)
         {
-            _mapRenderer.DrawSelectedWallHighlight(
-                _state.SecretWallTool.SelectedTileX,
-                _state.SecretWallTool.SelectedTileY,
-                _state.Camera);
+            foreach (var (x, y) in _state.SelectedWallTiles)
+                _mapRenderer.DrawSelectedWallHighlight(x, y, _state.Camera);
             var secret = _state.GetSelectedSecretPlacement();
             if (secret != null)
                 _mapRenderer.DrawSecretWallPreview(secret, _state.Camera);
@@ -316,7 +314,7 @@ public class LevelEditorScene : IScene
         }
         else if (_state.IsWallSelectMode)
         {
-            const string msg = "SELECT MODE - LMB: Select wall | B: Paint mode";
+            const string msg = "SELECT MODE - LMB drag: Select walls | B: Paint mode";
             int msgW = MeasureText(msg, 24);
             DrawText(msg, (GetScreenWidth() - msgW) / 2, GetScreenHeight() - 100, 24, Color.SkyBlue);
         }

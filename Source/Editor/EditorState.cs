@@ -417,9 +417,23 @@ public class EditorState
     }
 
     public void SelectWallTile(int tileX, int tileY) =>
-        SecretWallTool.SelectTile(tileX, tileY, GetWallTileAt);
+        SecretWallTool.BeginSelection(tileX, tileY, GetWallTileAt);
+
+    public void BeginWallSelection(int tileX, int tileY) =>
+        SecretWallTool.BeginSelection(tileX, tileY, GetWallTileAt);
+
+    public void AddWallToSelection(int tileX, int tileY) =>
+        SecretWallTool.AddToSelection(tileX, tileY, GetWallTileAt);
+
+    public void EndWallSelectionDrag() => SecretWallTool.EndSelectionDrag();
 
     public void ClearWallSelection() => SecretWallTool.ClearSelection();
+
+    public IReadOnlyCollection<(int X, int Y)> SelectedWallTiles => SecretWallTool.SelectedTiles;
+
+    public int SelectedWallCount => SecretWallTool.SelectionCount;
+
+    public bool IsSingleWallSelected => SecretWallTool.IsSingleSelection;
 
     public SecretWallPlacement? FindSecretWallAt(int tileX, int tileY) =>
         SecretWallTool.FindAt(tileX, tileY);
@@ -434,6 +448,140 @@ public class EditorState
 
     public void RemoveSecretWallAt(int tileX, int tileY) =>
         SecretWallTool.RemoveAt(tileX, tileY);
+
+    public void RemoveWallFaceOverrideAt(int tileX, int tileY) =>
+        MapData.RemoveWallFaceOverrideAt(tileX, tileY);
+
+    public WallFaceOverride? FindWallFaceOverrideAt(int tileX, int tileY) =>
+        MapData.FindWallFaceOverride(tileX, tileY);
+
+    public uint GetSelectedWallFaceTile(WallFace face) =>
+        TryGetCommonSelectedWallFaceTile(face) ?? 0;
+
+    public uint? TryGetCommonSelectedWallFaceTile(WallFace face)
+    {
+        uint? common = null;
+        foreach (var (x, y) in SecretWallTool.SelectedTiles)
+        {
+            uint id = MapData.GetWallFaceTile(x, y, face);
+            if (common == null)
+                common = id;
+            else if (common != id)
+                return null;
+        }
+
+        return common;
+    }
+
+    public uint? TryGetCommonSelectedDefaultTile()
+    {
+        uint? common = null;
+        foreach (var (x, y) in SecretWallTool.SelectedTiles)
+        {
+            uint id = GetWallTileAt(x, y);
+            if (common == null)
+                common = id;
+            else if (common != id)
+                return null;
+        }
+
+        return common;
+    }
+
+    public bool SelectedWallFaceIsOverride(WallFace face) =>
+        TryGetSelectedWallFaceIsOverride(face) == true;
+
+    public bool? TryGetSelectedWallFaceIsOverride(WallFace face)
+    {
+        bool? common = null;
+        foreach (var (x, y) in SecretWallTool.SelectedTiles)
+        {
+            bool isOverride = WallFaceOverride.IsSet(FindWallFaceOverrideAt(x, y)?.Get(face));
+            if (common == null)
+                common = isOverride;
+            else if (common != isOverride)
+                return null;
+        }
+
+        return common;
+    }
+
+    public void AssignSelectedTileToWallFace(WallFace face) =>
+        ApplyFaceEditsToSelection(face, SelectedTileId);
+
+    public void ResetSelectedWallFace(WallFace face) =>
+        ApplyFaceEditsToSelection(face, 0);
+
+    public void ResetSelectedWallFaces()
+    {
+        var changes = new List<WallFaceOverrideChange>();
+        foreach (var (x, y) in SecretWallTool.SelectedTiles)
+        {
+            var before = FindWallFaceOverrideAt(x, y)?.Clone();
+            if (before == null)
+                continue;
+            changes.Add(new WallFaceOverrideChange(x, y, before, null));
+        }
+
+        ApplyWallFaceChanges(changes);
+    }
+
+    public void SetWallFace(int tileX, int tileY, WallFace face, uint tileId)
+    {
+        var change = BuildFaceChange(tileX, tileY, face, tileId);
+        if (change == null)
+            return;
+        ApplyWallFaceChanges(new List<WallFaceOverrideChange> { change.Value });
+    }
+
+    private void ApplyFaceEditsToSelection(WallFace face, uint tileId)
+    {
+        if (!HasSelectedWall) return;
+
+        var changes = new List<WallFaceOverrideChange>();
+        foreach (var (x, y) in SecretWallTool.SelectedTiles)
+        {
+            var change = BuildFaceChange(x, y, face, tileId);
+            if (change != null)
+                changes.Add(change.Value);
+        }
+
+        ApplyWallFaceChanges(changes);
+    }
+
+    private WallFaceOverrideChange? BuildFaceChange(int tileX, int tileY, WallFace face, uint tileId)
+    {
+        uint defaultTile = GetWallTileAt(tileX, tileY);
+        if (defaultTile == 0)
+            return null;
+
+        var before = FindWallFaceOverrideAt(tileX, tileY)?.Clone();
+        var next = before?.Clone() ?? new WallFaceOverride { TileX = tileX, TileY = tileY };
+        uint? assigned = tileId == 0 || tileId == defaultTile ? null : tileId;
+        next.Set(face, assigned);
+        var after = next.HasAnyFace ? next : null;
+        if (WallFaceOverride.ContentEquals(before, after))
+            return null;
+
+        return new WallFaceOverrideChange(tileX, tileY, before, after?.Clone());
+    }
+
+    private void ApplyWallFaceChanges(List<WallFaceOverrideChange> changes)
+    {
+        if (changes.Count == 0)
+            return;
+
+        foreach (var change in changes)
+        {
+            RemoveWallFaceOverrideAt(change.TileX, change.TileY);
+            if (change.After != null)
+                MapData.WallFaceOverrides.Add(change.After.Clone());
+        }
+
+        UndoStack.Push(new SetWallFaceOverridesCommand(changes));
+        MapData.NotifyGeometryChanged();
+        NotifyStateChanged();
+    }
 
     public int GetMaxSecretTravelTiles(int tileX, int tileY, SecretWallDirection direction) =>
         SecretWallTool.GetMaxTravelTiles(tileX, tileY, direction);
@@ -488,6 +636,7 @@ public class EditorState
             && !_paintStroke.Exists(c => c.LayerIndex == ActiveLayerIndex && c.X == x && c.Y == y))
         {
             SecretWallPlacement? removedSecret = null;
+            WallFaceOverride? removedFaceOverride = null;
             if (IsOnWallsLayer && SelectedTileId == 0)
             {
                 var secret = SecretWallTool.FindAt(x, y);
@@ -501,15 +650,27 @@ public class EditorState
                         TravelTiles = secret.TravelTiles
                     };
                 }
+
+                var faces = FindWallFaceOverrideAt(x, y);
+                if (faces != null)
+                    removedFaceOverride = faces.Clone();
             }
 
-            _paintStroke.Add(new TileChange(ActiveLayerIndex, x, y, oldTile, SelectedTileId, removedSecret));
+            _paintStroke.Add(new TileChange(
+                ActiveLayerIndex, x, y, oldTile, SelectedTileId, removedSecret, removedFaceOverride));
         }
 
         layer.Tiles[idx] = SelectedTileId;
 
         if (IsOnWallsLayer && SelectedTileId == 0)
+        {
             SecretWallTool.RemoveAt(x, y);
+            if (FindWallFaceOverrideAt(x, y) != null)
+            {
+                RemoveWallFaceOverrideAt(x, y);
+                MapData.NotifyGeometryChanged();
+            }
+        }
 
         if (!IsOnEnemyLayer && !IsOnPickupLayer && !IsOnObjectLayer)
             RebuildRoomMap();
@@ -664,6 +825,7 @@ public class EditorState
         MapData.Enemies.Clear();
         MapData.Pickups.Clear();
         MapData.SecretWalls.Clear();
+        MapData.WallFaceOverrides.Clear();
         MapData.Spawn = new PlayerSpawnPlacement();
         DeselectPlayer();
         EnemyTool.ClearSelectionAndHover();

@@ -209,8 +209,11 @@ public class RenderSystem : IDisposable
         var wallTile = _level.GetWallTile(x, y);
         if (wallTile != 0 && wallTile <= _textures.Count)
         {
-            PrimitiveRenderer.DrawCubeTexture(
-                _textures[(int)wallTile - 1],
+            PrimitiveRenderer.DrawCubeTextures(
+                ResolveWallTexture(x, y, WallFace.North, wallTile),
+                ResolveWallTexture(x, y, WallFace.South, wallTile),
+                ResolveWallTexture(x, y, WallFace.East, wallTile),
+                ResolveWallTexture(x, y, WallFace.West, wallTile),
                 new Vector3(worldPos.X, 2, worldPos.Z),
                 4.0f, 4.0f, 4.0f,
                 Color.White,
@@ -219,6 +222,15 @@ public class RenderSystem : IDisposable
         }
 
         RenderFloorAndCeiling(x, y, worldPos);
+    }
+
+    private Texture2D ResolveWallTexture(int x, int y, WallFace face, uint fallbackTile)
+    {
+        uint tileId = _mapData.GetWallFaceTile(x, y, face);
+        int index = (int)tileId - 1;
+        if (index >= 0 && index < _textures.Count)
+            return _textures[index];
+        return _textures[(int)fallbackTile - 1];
     }
 
     public void Dispose() => _staticMeshes.Dispose();

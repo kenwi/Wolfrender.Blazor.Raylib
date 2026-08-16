@@ -111,6 +111,9 @@ public class EditorMapRenderer
                         Color.White
                     );
 
+                    if (layer.Name == EditorState.WallsLayerName)
+                        DrawWallFaceOverrideStrips(x, y, drawX, drawY, tileSize);
+
                     if (isDoorTile && doorInfo.LockKind != DoorLockKind.None)
                     {
                         var lockColor = doorInfo.LockKind == DoorLockKind.Gold
@@ -127,6 +130,47 @@ public class EditorMapRenderer
                 }
             }
         }
+    }
+
+    private void DrawWallFaceOverrideStrips(int tileX, int tileY, float drawX, float drawY, float tileSize)
+    {
+        var faceOverride = _mapData.FindWallFaceOverride(tileX, tileY);
+        if (faceOverride == null || !faceOverride.HasAnyFace)
+            return;
+
+        float thickness = MathF.Max(2f, tileSize * 0.14f);
+        DrawFaceStrip(faceOverride.North, drawX, drawY, tileSize, thickness, WallFace.North);
+        DrawFaceStrip(faceOverride.East, drawX, drawY, tileSize, thickness, WallFace.East);
+        DrawFaceStrip(faceOverride.South, drawX, drawY, tileSize, thickness, WallFace.South);
+        DrawFaceStrip(faceOverride.West, drawX, drawY, tileSize, thickness, WallFace.West);
+    }
+
+    private void DrawFaceStrip(uint? tileId, float drawX, float drawY, float tileSize, float thickness, WallFace face)
+    {
+        if (tileId is not > 0)
+            return;
+
+        int textureIndex = (int)tileId.Value - 1;
+        if (textureIndex < 0 || textureIndex >= _mapData.TileTextures.Count)
+            return;
+
+        var texture = _mapData.TileTextures[textureIndex];
+        var dest = face switch
+        {
+            WallFace.North => new Rectangle(drawX, drawY, tileSize, thickness),
+            WallFace.South => new Rectangle(drawX, drawY + tileSize - thickness, tileSize, thickness),
+            WallFace.West => new Rectangle(drawX, drawY, thickness, tileSize),
+            WallFace.East => new Rectangle(drawX + tileSize - thickness, drawY, thickness, tileSize),
+            _ => default
+        };
+
+        DrawTexturePro(
+            texture,
+            new Rectangle(0, 0, texture.Width, texture.Height),
+            dest,
+            Vector2.Zero,
+            0f,
+            Color.White);
     }
 
     public void RenderLiveDoors(DoorSystem doorSystem, EditorCamera camera)
@@ -696,15 +740,15 @@ public class EditorMapRenderer
             2f, Color.Yellow);
     }
 
-    /// <summary>Draw a cyan highlight around the selected wall tile.</summary>
+    /// <summary>Draw a cyan highlight around a selected wall tile.</summary>
     public void DrawSelectedWallHighlight(int tileX, int tileY, EditorCamera camera)
     {
         float tileSize = camera.TileSize;
         float highlightX = tileX * tileSize + camera.Offset.X;
         float highlightY = tileY * tileSize + camera.Offset.Y;
-        DrawRectangleLinesEx(
-            new Rectangle(highlightX, highlightY, tileSize, tileSize),
-            3f, Color.SkyBlue);
+        var rect = new Rectangle(highlightX, highlightY, tileSize, tileSize);
+        DrawRectangleRec(rect, new Color(80, 180, 255, 50));
+        DrawRectangleLinesEx(rect, 3f, Color.SkyBlue);
     }
 
     /// <summary>Preview secret wall slide path from the selected placement.</summary>

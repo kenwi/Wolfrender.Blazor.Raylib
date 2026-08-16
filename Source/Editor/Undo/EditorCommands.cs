@@ -12,7 +12,8 @@ public readonly record struct TileChange(
     int Y,
     uint OldTileId,
     uint NewTileId,
-    SecretWallPlacement? RemovedSecret);
+    SecretWallPlacement? RemovedSecret,
+    WallFaceOverride? RemovedFaceOverride = null);
 
 public sealed class ReplaceMapDataCommand(string beforeJson, string afterJson, string description) : IEditorCommand
 {
@@ -46,6 +47,14 @@ public sealed class PaintTilesCommand(List<TileChange> changes) : IEditorCommand
                 else
                     state.RemoveSecretWallAt(change.X, change.Y);
             }
+
+            if (change.RemovedFaceOverride != null)
+            {
+                state.RemoveWallFaceOverrideAt(change.X, change.Y);
+                if (reverse)
+                    state.MapData.WallFaceOverrides.Add(change.RemovedFaceOverride.Clone());
+                state.MapData.NotifyGeometryChanged();
+            }
         }
     }
 
@@ -56,6 +65,37 @@ public sealed class PaintTilesCommand(List<TileChange> changes) : IEditorCommand
         Direction = s.Direction,
         TravelTiles = s.TravelTiles
     };
+}
+
+public readonly record struct WallFaceOverrideChange(
+    int TileX,
+    int TileY,
+    WallFaceOverride? Before,
+    WallFaceOverride? After);
+
+public sealed class SetWallFaceOverridesCommand(List<WallFaceOverrideChange> changes) : IEditorCommand
+{
+    public string Description => changes.Count <= 1
+        ? (changes.Count == 1 && changes[0].After != null ? "Set wall face textures" : "Reset wall face textures")
+        : $"Set wall face textures ({changes.Count} walls)";
+
+    public void Undo(EditorState state) => Apply(state, reverse: true);
+
+    public void Redo(EditorState state) => Apply(state, reverse: false);
+
+    private void Apply(EditorState state, bool reverse)
+    {
+        foreach (var change in changes)
+        {
+            var faceOverride = reverse ? change.Before : change.After;
+            state.RemoveWallFaceOverrideAt(change.TileX, change.TileY);
+            if (faceOverride != null)
+                state.MapData.WallFaceOverrides.Add(faceOverride.Clone());
+        }
+
+        if (changes.Count > 0)
+            state.MapData.NotifyGeometryChanged();
+    }
 }
 
 public sealed class AddEnemyCommand(int index, EnemyPlacementData placement) : IEditorCommand

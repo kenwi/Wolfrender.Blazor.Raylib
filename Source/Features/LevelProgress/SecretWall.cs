@@ -12,6 +12,10 @@ public sealed class SecretWall
     public SecretWallDirection Direction { get; init; }
     public int TravelTiles { get; init; }
     public uint WallTileId { get; init; }
+    public uint NorthTileId { get; init; }
+    public uint EastTileId { get; init; }
+    public uint SouthTileId { get; init; }
+    public uint WestTileId { get; init; }
     public SecretWallState State { get; set; } = SecretWallState.Idle;
     public bool HasScored { get; set; }
 

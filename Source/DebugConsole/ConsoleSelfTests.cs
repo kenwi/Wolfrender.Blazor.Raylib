@@ -24,6 +24,7 @@ public static class ConsoleSelfTests
         TestLevelCatalogNormalizePath();
         TestObjectSpritesLayout();
         TestSecretWallJsonRoundTrip();
+        TestWallFaceOverrideJsonRoundTrip();
         TestRecFileRoundTrip();
         TestRecFileLegacyParse();
         TestSimulationChecksumDiff();
@@ -287,6 +288,63 @@ public static class ConsoleSelfTests
         LevelSerializer.DeserializeFromJson(loaded, """{"Width":4,"Height":4,"Floor":[],"Walls":[],"Ceiling":[],"Doors":[],"Objects":[]}""");
         if (loaded.SecretWalls.Count != 0)
             throw new InvalidOperationException("Missing SecretWalls key should deserialize to empty list.");
+    }
+
+    private static void TestWallFaceOverrideJsonRoundTrip()
+    {
+        var mapData = new MapData
+        {
+            Width = 4,
+            Height = 4,
+            Floor = new uint[16],
+            Walls = new uint[16],
+            Ceiling = new uint[16],
+            Doors = new uint[16],
+            Objects = new uint[16]
+        };
+        mapData.Walls[4 * 1 + 2] = 5;
+        mapData.WallFaceOverrides.Add(new WallFaceOverride
+        {
+            TileX = 2,
+            TileY = 1,
+            North = 3,
+            West = 7
+        });
+
+        var json = LevelSerializer.SerializeToJson(mapData);
+        var loaded = new MapData
+        {
+            Floor = new uint[16],
+            Walls = new uint[16],
+            Ceiling = new uint[16],
+            Doors = new uint[16],
+            Objects = new uint[16]
+        };
+        LevelSerializer.DeserializeFromJson(loaded, json);
+
+        if (loaded.WallFaceOverrides.Count != 1)
+            throw new InvalidOperationException("WallFaceOverrides count mismatch after JSON round-trip.");
+        var faceOverride = loaded.WallFaceOverrides[0];
+        if (faceOverride.TileX != 2 || faceOverride.TileY != 1
+            || faceOverride.North != 3 || faceOverride.West != 7
+            || faceOverride.East != null || faceOverride.South != null)
+            throw new InvalidOperationException("WallFaceOverrides field mismatch after JSON round-trip.");
+
+        if (loaded.GetWallFaceTile(2, 1, WallFace.North) != 3)
+            throw new InvalidOperationException("North face should use override tile 3.");
+        if (loaded.GetWallFaceTile(2, 1, WallFace.West) != 7)
+            throw new InvalidOperationException("West face should use override tile 7.");
+        if (loaded.GetWallFaceTile(2, 1, WallFace.East) != 5)
+            throw new InvalidOperationException("East face should fall back to Walls tile 5.");
+        if (loaded.GetWallFaceTile(2, 1, WallFace.South) != 5)
+            throw new InvalidOperationException("South face should fall back to Walls tile 5.");
+
+        if (json.Contains("\"East\"") || json.Contains("\"South\""))
+            throw new InvalidOperationException("Unset faces should be omitted from JSON.");
+
+        LevelSerializer.DeserializeFromJson(loaded, """{"Width":4,"Height":4,"Floor":[],"Walls":[],"Ceiling":[],"Doors":[],"Objects":[]}""");
+        if (loaded.WallFaceOverrides.Count != 0)
+            throw new InvalidOperationException("Missing WallFaceOverrides key should deserialize to empty list.");
     }
 
     private static void TestRecFileRoundTrip()
