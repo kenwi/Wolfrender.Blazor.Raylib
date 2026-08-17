@@ -1,8 +1,17 @@
 #if CONSOLE_APP
 using Game.Core;
 
-var app = new Application();
-app.Run();
+try
+{
+    var app = new Application();
+    app.Run();
+    return 0;
+}
+catch (Exception ex)
+{
+    Console.Error.WriteLine($"[FATAL] {ex.Message}");
+    return 1;
+}
 #else
 using Wolfrender.Blazor.Raylib;
 using Wolfrender.Blazor.Raylib.Services;

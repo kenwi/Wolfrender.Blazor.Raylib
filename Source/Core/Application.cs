@@ -18,7 +18,11 @@ public class Application
     {
         NativeConsole.EnsureAttached();
 
+        EnsureGraphicsEnvironment();
         InitWindow(0, 0, "");
+        if (!IsWindowReady())
+            throw GraphicsInitFailed("see the GLFW error printed above");
+
         WindowDisplayMode.CaptureNativeResolution();
         SetWindowState(ConfigFlags.FullscreenMode);
         SetExitKey(KeyboardKey.Null);
@@ -39,9 +43,26 @@ public class Application
         _activeScene.OnEnter();
     }
 
+    // raylib 5.5 InitWindow() still calls rlglInit() after GLFW failure, which SIGSEGVs.
+    private static void EnsureGraphicsEnvironment()
+    {
+        if (OperatingSystem.IsBrowser() || !OperatingSystem.IsLinux())
+            return;
+
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY"))
+            || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY")))
+            return;
+
+        throw GraphicsInitFailed("no DISPLAY or WAYLAND_DISPLAY");
+    }
+
+    private static InvalidOperationException GraphicsInitFailed(string detail) =>
+        new("Failed to initialize the graphics window / OpenGL context " +
+            $"({detail}).");
+
     public void Run()
     {
-        while (!WindowShouldClose())
+        while (IsWindowReady() && !WindowShouldClose())
         {
             if (!_ensuredStartupDisplay)
             {
