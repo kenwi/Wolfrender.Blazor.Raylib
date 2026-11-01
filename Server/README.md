@@ -79,6 +79,8 @@ No application config is required; the image ships `tzdata` and passes `TZ` thro
 
 Cloudflare Tunnel exposes the API without opening inbound ports on your host. TLS terminates at Cloudflare; `cloudflared` forwards HTTP to the `highscores` container on the internal Docker network.
 
+The Compose file sets `name: wolfrender` (and image `wolfrender-highscores:local`) so this stack does not collide with another game server whose directory also resolves to project name `server` (for example Tetris on the same host). If you previously started this stack before `name:` was set, remove the old project once: `docker compose -p server --profile tunnel down`.
+
 ### 1. Create a tunnel
 
 1. Open [Cloudflare Zero Trust](https://one.dash.cloudflare.com/) > **Networks** > **Tunnels**.

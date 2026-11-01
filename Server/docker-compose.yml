@@ -1,8 +1,11 @@
+name: wolfrender
+
 services:
   highscores:
     build:
       context: ..
       dockerfile: Server/Dockerfile
+    image: wolfrender-highscores:local
     container_name: wolfrender-highscores
     restart: unless-stopped
     environment:
