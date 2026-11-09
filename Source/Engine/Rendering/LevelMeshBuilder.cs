@@ -60,14 +60,14 @@ internal static class LevelMeshBuilder
                 if (floorTile != 0)
                 {
                     foreach (int roomId in roomIds)
-                        AddFloorTile(GetRoomBuilders(floorBuilders, roomId, maxTextureIndex), (int)floorTile - 1, x, y);
+                        AddFloorTile(GetRoomBuilders(floorBuilders, roomId, maxTextureIndex), WallTilePalette.GetTextureIndex(floorTile), x, y);
                 }
 
                 uint ceilingTile = mapData.Ceiling[index];
                 if (ceilingTile != 0)
                 {
                     foreach (int roomId in roomIds)
-                        AddCeilingTile(GetRoomBuilders(ceilingBuilders, roomId, maxTextureIndex), (int)ceilingTile - 1, x, y);
+                        AddCeilingTile(GetRoomBuilders(ceilingBuilders, roomId, maxTextureIndex), WallTilePalette.GetTextureIndex(ceilingTile), x, y);
                 }
             }
         }
@@ -233,7 +233,7 @@ internal static class LevelMeshBuilder
 
     private static int FaceTextureIndex(MapData mapData, int x, int y, WallFace face, int maxTextureIndex)
     {
-        int index = (int)mapData.GetWallFaceTile(x, y, face) - 1;
+        int index = WallTilePalette.GetTextureIndex(mapData.GetWallFaceTile(x, y, face));
         if (index < 0 || index >= maxTextureIndex)
             return -1;
         return index;

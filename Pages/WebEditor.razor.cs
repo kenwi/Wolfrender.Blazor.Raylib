@@ -8,6 +8,7 @@ using static Raylib_cs.Raylib;
 using Raylib_cs;
 using Game.Core;
 using Game.Editor;
+using Game.Features.Doors;
 using Wolfrender.Blazor.Raylib.Components.Editor;
 
 namespace Wolfrender.Blazor.Raylib.Pages;
@@ -54,9 +55,8 @@ public partial class WebEditor : IDisposable
 
     private async Task Init()
     {
-        var resourceFiles = new[]
+        var resourceFiles = new List<string>
         {
-            "resources/spritesheet_tiles.png",
             "resources/enemy_guard.png",
             "resources/Objects.png",
             "resources/level.json",
@@ -69,6 +69,8 @@ public partial class WebEditor : IDisposable
             "resources/shaders/sprite_lit.fs",
             "resources/03.mp3",
         };
+        resourceFiles.AddRange(WallTilePalette.Entries.Select(entry => entry.ResourcePath));
+        resourceFiles.AddRange(DoorTileEncoding.PaletteEntries.Select(entry => entry.ResourcePath));
 
         await Task.WhenAll(resourceFiles.Select(
             Wolfrender.Blazor.Raylib.Components.Raylib.PreloadFile));

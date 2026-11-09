@@ -66,8 +66,13 @@ public sealed class SoundPropagationEditorTool
             return;
 
         bool treatAllDoorsClosed = !_isSimulating();
+
+        // The visualizer shows the room-bounded reach: closed doors stop the
+        // flood-fill, while open/opening/closing doors let it through. Runtime
+        // hearing keeps its separate per-enemy closed-door allowance.
         var reach = SoundPropagation.ComputeReach(
-            _mapData, _doorSystem.Doors, tileX, tileY, treatAllDoorsClosed);
+            _mapData, _doorSystem.Doors, tileX, tileY, treatAllDoorsClosed,
+            maxClosedDoorCrossings: 0);
 
         if (reach.TileCount == 0)
         {
@@ -78,15 +83,11 @@ public sealed class SoundPropagationEditorTool
             return;
         }
 
-        int freeTiles = reach.DoorCrossingsByTile.Count(kv => kv.Value == 0);
-        int throughDoorTiles = reach.TileCount - freeTiles;
-
         OverlayTiles = reach.DoorCrossingsByTile.Keys
             .Select(t => new Vector2(t.X, t.Y))
             .ToList();
         OverlayShowUntil = now + OverlayDurationSeconds;
-        _setStatus(
-            $"Sound reached {reach.TileCount} tiles ({freeTiles} at 0 doors, {throughDoorTiles} through closed doors)");
+        _setStatus($"Sound reached {reach.TileCount} tiles (closed doors block)");
         _notifyChanged();
     }
 

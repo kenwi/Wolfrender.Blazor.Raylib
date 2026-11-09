@@ -3,29 +3,29 @@ using static Raylib_cs.Raylib;
 
 namespace Game.Engine.Rendering;
 
-/// <summary>Bakes per-tile <see cref="Texture2D"/> instances from <see cref="TileSpriteSheet"/>.</summary>
+/// <summary>Loads the individual texture files that make up the tile palette.</summary>
 public static class TileTextureAtlas
 {
-    public static List<Texture2D> LoadFromSheet(string path)
+    /// <summary>
+    /// Load every texture in <paramref name="resourcePaths"/> in order. The list
+    /// order must match the palette texture indices.
+    /// </summary>
+    public static List<Texture2D> LoadAll(IEnumerable<string> resourcePaths)
     {
-        var sheet = LoadImage(path);
-        if (sheet.Width == 0 || sheet.Height == 0)
+        var textures = new List<Texture2D>();
+        foreach (string path in resourcePaths)
         {
-            UnloadImage(sheet);
-            throw new InvalidOperationException($"Failed to load tile spritesheet: {path}");
-        }
+            var texture = LoadTexture(path);
+            if (texture.Id == 0)
+            {
+                foreach (var loaded in textures)
+                    UnloadTexture(loaded);
+                throw new InvalidOperationException($"Failed to load tile texture: {path}");
+            }
 
-        var textures = new List<Texture2D>(TileSpriteSheet.TileCount);
-        for (int i = 0; i < TileSpriteSheet.TileCount; i++)
-        {
-            var frame = TileSpriteSheet.GetFrameRect(i);
-            var crop = ImageFromImage(sheet, frame);
-            var texture = LoadTextureFromImage(crop);
-            UnloadImage(crop);
             textures.Add(texture);
         }
 
-        UnloadImage(sheet);
         return textures;
     }
 }

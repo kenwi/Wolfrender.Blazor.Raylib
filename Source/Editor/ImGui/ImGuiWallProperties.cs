@@ -181,7 +181,7 @@ public sealed class ImGuiWallProperties
 
     private static void DrawTileThumbnail(EditorState state, uint tileId, float size)
     {
-        int index = (int)tileId - 1;
+        int index = WallTilePalette.GetTextureIndex(tileId);
         if (index < 0 || index >= state.MapData.TileTextures.Count)
         {
             ImGui.Dummy(new Vector2(size, size));

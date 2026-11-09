@@ -1,6 +1,6 @@
 using System.Numerics;
+using Game.Engine.Rendering;
 using Game.Features.Doors;
-using Game.Features.Pickups;
 using ImGuiNET;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
@@ -15,7 +15,7 @@ public sealed class ImGuiDoorPalette
     public void EnsureIcons(MapData mapData)
     {
         if (_icons != null) return;
-        int size = PickupSprites.PaletteIconSize;
+        int size = WallTilePalette.PaletteIconSize;
         _icons = new Dictionary<uint, RenderTexture2D>();
         foreach (var entry in DoorTileEncoding.PaletteEntries)
         {
@@ -28,7 +28,7 @@ public sealed class ImGuiDoorPalette
             var rt = LoadRenderTexture(size, size);
             BeginTextureMode(rt);
             ClearBackground(Color.Black);
-            DrawDoorPaletteIcon(doorTex, size, entry.Vertical, entry.LockKind);
+            DrawDoorPaletteIcon(doorTex, size, entry.LockKind);
             EndTextureMode();
             _icons[entry.Id] = rt;
         }
@@ -89,29 +89,15 @@ public sealed class ImGuiDoorPalette
         }
     }
 
-    private static void DrawDoorPaletteIcon(Texture2D doorTex, int size, bool vertical, DoorLockKind lockKind)
+    private static void DrawDoorPaletteIcon(Texture2D doorTex, int size, DoorLockKind lockKind)
     {
-        float half = size / 2f;
-        if (vertical)
-        {
-            DrawTexturePro(
-                doorTex,
-                new Rectangle(0, 0, doorTex.Width, doorTex.Height),
-                new Rectangle(half, half, size, size),
-                new Vector2(half, half),
-                90f,
-                Color.White);
-        }
-        else
-        {
-            DrawTexturePro(
-                doorTex,
-                new Rectangle(0, 0, doorTex.Width, doorTex.Height),
-                new Rectangle(0, 0, size, size),
-                Vector2.Zero,
-                0f,
-                Color.White);
-        }
+        DrawTexturePro(
+            doorTex,
+            new Rectangle(0, 0, doorTex.Width, doorTex.Height),
+            new Rectangle(0, 0, size, size),
+            Vector2.Zero,
+            0f,
+            Color.White);
 
         if (lockKind != DoorLockKind.None)
             DrawDoorLockBadge(size, lockKind);

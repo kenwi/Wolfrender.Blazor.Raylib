@@ -6,6 +6,7 @@ using Microsoft.JSInterop;
 using static Raylib_cs.Raylib;
 using Raylib_cs;
 using Game.Core;
+using Game.Features.Doors;
 using Game.Features.Options;
 using System.Threading.Tasks;
 using Wolfrender.Blazor.Raylib.Components;
@@ -59,9 +60,8 @@ public partial class ThreeDFirstPerson : IDisposable
     {
         await DetectBrowserResolution();
 
-        var resourceFiles = new[]
+        var resourceFiles = new List<string>
         {
-            "resources/spritesheet_tiles.png",
             "resources/enemy_guard.png",
             "resources/weapons2.png",
             "resources/Objects.png",
@@ -79,6 +79,8 @@ public partial class ThreeDFirstPerson : IDisposable
             "resources/EnemyPistolFire.ogg",
             "resources/ChaingunFire.ogg"
         };
+        resourceFiles.AddRange(WallTilePalette.Entries.Select(entry => entry.ResourcePath));
+        resourceFiles.AddRange(DoorTileEncoding.PaletteEntries.Select(entry => entry.ResourcePath));
 
         await Task.WhenAll(resourceFiles.Select(
             Wolfrender.Blazor.Raylib.Components.Raylib.PreloadFile));

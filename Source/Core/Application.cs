@@ -1,5 +1,6 @@
 using System.Numerics;
 using Game.DebugConsole;
+using Game.Features.Doors;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 using static Game.Core.Level.Res;
@@ -103,9 +104,16 @@ public class Application
 
     public static MapData LoadMapData()
     {
+        var tileTexturePaths = new List<string>(
+            WallTilePalette.Count + DoorTileEncoding.PaletteEntries.Length);
+        foreach (var entry in WallTilePalette.Entries)
+            tileTexturePaths.Add(Path(entry.ResourcePath));
+        foreach (var entry in DoorTileEncoding.PaletteEntries)
+            tileTexturePaths.Add(Path(entry.ResourcePath));
+
         var mapData = new MapData
         {
-            TileTextures = TileTextureAtlas.LoadFromSheet(Path(TileSpriteSheet.SheetPath)),
+            TileTextures = TileTextureAtlas.LoadAll(tileTexturePaths),
             GameTextures = new List<Texture2D>
             {
                 LoadTexture(Path("resources/enemy_guard.png")),

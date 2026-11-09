@@ -11,9 +11,9 @@ A secret is a hidden room behind a wall that slides aside when the player stands
 | Walls | Flat `uint[]` on `MapData.Walls`. One sprite ID per cell; no per-wall metadata today. |
 | Editor input | **Paint-only** on tile layers: LMB held calls `EditorState.PaintTile` every frame. No select mode. |
 | Entity editor pattern | Enemies and pickups use click-to-place/select on dedicated layers plus properties panels (`WebEditorEnemyProperties`, `EditorGui.RenderEnemyPropertiesPanel`). |
-| E key interact | `ExitSystem` (wall tile IDs 44/42) runs first and can consume interact; then `DoorSystem` opens doors within **1.5 tiles**. |
+| E key interact | `ExitSystem` (elevator switch down/up tiles) runs first and can consume interact; then `DoorSystem` opens doors within **1.5 tiles**. |
 | Scoring | `ScoreSystem.OnSecretFound()` and HUD `SECRETS: X%` exist, but `TotalSecrets` is always **0** and nothing calls `OnSecretFound()`. |
-| Wall movement | Doors slide via `DoorSystem.Animate`. Static walls do not move except exit art swap (44 to 42). |
+| Wall movement | Doors slide via `DoorSystem.Animate`. Static walls do not move except the exit switch art swap (down to up). |
 | Architecture | Vertical slices under `Source/Features/`. Editor uses **two UIs, one brain** (`EditorState` shared by ImGui and Blazor). |
 
 ---

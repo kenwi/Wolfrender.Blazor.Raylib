@@ -28,10 +28,12 @@ public class EditorGui
     private bool _showLoadJsonDialog;
     private bool _showLoadTmxDialog;
     private bool _showLoadBmpDialog;
+    private bool _showLoadW3dmapDialog;
     private string _savePath = Res.Path("resources/level.json");
     private string _loadJsonPath = Res.Path("resources/level.json");
     private string _loadTmxPath = Res.Path("resources/map1.tmx");
     private string _loadBmpPath = Res.Path("resources/level.bmp");
+    private string _loadW3dmapPath = Res.Path("resources/maps/e1_l1_m0.w3dmap");
     private string _statusMessage = "";
     private float _statusTimer;
 
@@ -148,6 +150,11 @@ public class EditorGui
                 if (ImGui.MenuItem("Load BMP..."))
                 {
                     _showLoadBmpDialog = true;
+                }
+
+                if (ImGui.MenuItem("Load W3DMAP..."))
+                {
+                    _showLoadW3dmapDialog = true;
                 }
 
                 ImGui.Separator();
@@ -342,6 +349,11 @@ public class EditorGui
             ImGui.OpenPopup("Load Level BMP");
             _showLoadBmpDialog = false;
         }
+        if (_showLoadW3dmapDialog)
+        {
+            ImGui.OpenPopup("Load Level W3DMAP");
+            _showLoadW3dmapDialog = false;
+        }
 
         // Save dialog
         ImGui.SetNextWindowSize(new Vector2(500, 0));
@@ -458,6 +470,38 @@ public class EditorGui
                 catch (Exception ex)
                 {
                     _statusMessage = $"Error loading BMP: {ex.Message}";
+                }
+                _statusTimer = 4f;
+                ImGui.CloseCurrentPopup();
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Cancel", new Vector2(120, 0)))
+            {
+                ImGui.CloseCurrentPopup();
+            }
+            ImGui.EndPopup();
+        }
+
+        // Load W3DMAP dialog
+        ImGui.SetNextWindowSize(new Vector2(500, 0));
+        if (ImGui.BeginPopupModal("Load Level W3DMAP", ImGuiWindowFlags.AlwaysAutoResize))
+        {
+            ImGui.SetWindowFontScale(_guiScale);
+            ImGui.Text("Load a Wolfenstein 3D wall/door plane:");
+            ImGui.TextWrapped("64x64 little-endian 16-bit tile dump (plane 0). Walls use the map's VSWAP textures; walkable tiles use 068_grey_brick as the floor.");
+            ImGui.InputText("Path", ref _loadW3dmapPath, 512);
+
+            ImGui.Spacing();
+            if (ImGui.Button("Load", new Vector2(120, 0)))
+            {
+                try
+                {
+                    state.LoadLevelFromW3dmap(_loadW3dmapPath);
+                    _statusMessage = state.StatusMessage;
+                }
+                catch (Exception ex)
+                {
+                    _statusMessage = $"Error loading W3DMAP: {ex.Message}";
                 }
                 _statusTimer = 4f;
                 ImGui.CloseCurrentPopup();
@@ -638,14 +682,16 @@ public class EditorGui
 
         editorState.SanitizeSelectedTileForActiveLayer();
 
-        int columns = TileSpriteSheet.PaletteColumns;
-        for (int i = 0; i < TileSpriteSheet.TileCount && i < _mapData.TileTextures.Count; i++)
+        int columns = WallTilePalette.PaletteColumns;
+        for (int i = 0; i < WallTilePalette.Entries.Length; i++)
         {
-            uint tileId = (uint)(i + 1);
-            if (!EditorTilePalette.IsArchitecturalTileId(tileId))
+            var entry = WallTilePalette.Entries[i];
+            uint tileId = entry.Id;
+            int textureIndex = entry.TextureIndex;
+            if (textureIndex < 0 || textureIndex >= _mapData.TileTextures.Count)
                 continue;
 
-            var texture = _mapData.TileTextures[i];
+            var texture = _mapData.TileTextures[textureIndex];
 
             if (i % columns != 0)
                 ImGui.SameLine();
@@ -677,14 +723,14 @@ public class EditorGui
 
             if (ImGui.IsItemHovered())
             {
-                ImGui.SetTooltip($"Tile ID: {tileId}");
+                ImGui.SetTooltip($"{entry.Name}\nTile ID: {tileId}");
             }
 
             ImGui.PopID();
         }
 
         ImGui.Separator();
-        ImGui.Text($"Selected: {(selectedTileId == 0 ? "Eraser" : $"ID {selectedTileId}")}");
+        ImGui.Text($"Selected: {(selectedTileId == 0 ? "Eraser" : WallTilePalette.GetName(selectedTileId))}");
 
         ImGui.End();
     }

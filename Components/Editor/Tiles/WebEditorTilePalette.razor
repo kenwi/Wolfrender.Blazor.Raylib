@@ -13,24 +13,19 @@
 
     <div class="info-label" style="margin-top: 8px;">Tiles:</div>
     <div class="tile-grid tile-grid-8">
-        @for (int i = 0; i < TileSpriteSheet.TileCount; i++)
+        @foreach (var entry in WallTilePalette.Entries)
         {
-            var index = i;
-            uint tileId = (uint)(index + 1);
-            if (!EditorTilePalette.IsArchitecturalTileId(tileId))
-            {
-                continue;
-            }
+            uint tileId = entry.Id;
             <button class="tile-btn @(State.SelectedTileId == tileId ? "selected" : "")"
-                    title="Tile ID: @tileId"
+                    title="@($"{entry.Name} (ID {tileId})")"
                     @onclick="() => SelectTile(tileId)">
-                <span class="tile-palette-sprite-sheet" style="@TileSpriteSheet.GetPaletteSpriteSheetStyle(index)"></span>
+                <span class="tile-palette-sprite-sheet" style="@WallTilePalette.GetPaletteStyle(tileId)"></span>
             </button>
         }
     </div>
 
     <div class="info-label" style="margin-top: 6px;">
-        Selected: @(State.SelectedTileId == 0 ? "Eraser" : $"ID {State.SelectedTileId}")
+        Selected: @(State.SelectedTileId == 0 ? "Eraser" : WallTilePalette.GetName(State.SelectedTileId))
     </div>
 </div>
 

@@ -25,7 +25,11 @@ public class MapData
     /// <summary>Sparse per-face texture exceptions. Missing faces use <see cref="Walls"/>.</summary>
     public List<WallFaceOverride> WallFaceOverrides { get; set; } = new();
     public PlayerSpawnPlacement Spawn { get; set; } = new();
-    /// <summary>64 baked tiles from <see cref="Rendering.TileSpriteSheet"/> (index 0 = tile ID 1).</summary>
+    /// <summary>
+    /// Combined wall/floor/ceiling and door tile textures. Wall entries use
+    /// <see cref="Game.Engine.Rendering.WallTilePalette"/> texture indices; doors follow them
+    /// using <see cref="Game.Features.Doors.DoorTileEncoding"/> texture indices.
+    /// </summary>
     public List<Texture2D> TileTextures { get; set; } = new();
 
     /// <summary>Enemy, weapons, pickups, and other non-level-tile textures.</summary>

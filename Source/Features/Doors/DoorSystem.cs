@@ -22,35 +22,35 @@ public class DoorSystem : IMovementBlocker, IDoorPortalState
     public string LockedHintOverlayText => _lockedHintOverlayText;
     public Color LockedHintColor => _lockedHintColor;
 
-    public DoorSystem(uint[] doorTiles, int mapWidth, List<Texture2D> textures)
+    public DoorSystem(MapData mapData, List<Texture2D> textures)
     {
         _textures = textures;
         _doors = new List<Door>(20);
         _quadSize = LevelData.QuadSize;
 
-        Rebuild(doorTiles, mapWidth);
+        Rebuild(mapData);
     }
 
     /// <summary>
     /// Rebuild the door list from the current tile data.
     /// Call this when the level data has changed (e.g. after editing in the level editor).
     /// </summary>
-    public void Rebuild(uint[] doorTiles, int mapWidth)
+    public void Rebuild(MapData mapData)
     {
         _doors.Clear();
 
-        for (int index = 0; index < doorTiles.Length; index++)
+        for (int index = 0; index < mapData.Doors.Length; index++)
         {
-            var value = doorTiles[index];
+            var value = mapData.Doors[index];
             if (!DoorTileEncoding.TryParse(value, out var doorInfo))
                 continue;
 
-            var colRow = LevelData.GetColRow(index, mapWidth);
+            var colRow = LevelData.GetColRow(index, mapData.Width);
             _doors.Add(new Door
             {
                 Position = new Vector2(colRow.col, colRow.row),
                 StartPosition = new Vector2(colRow.col, colRow.row),
-                DoorRotation = doorInfo.Rotation,
+                DoorRotation = DoorTileEncoding.DetectRotation(mapData, colRow.col, colRow.row),
                 TextureIndex = doorInfo.TextureIndex,
                 RequiresGoldKey = doorInfo.LockKind == DoorLockKind.Gold,
                 RequiresSilverKey = doorInfo.LockKind == DoorLockKind.Silver,

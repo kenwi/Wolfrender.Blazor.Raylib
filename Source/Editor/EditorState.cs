@@ -306,10 +306,16 @@ public class EditorState
     public void ApplyAfterMapMutation()
     {
         RefreshLayerReferences();
+
+        // Doors live in the map layer, and the editor's sound/pathfinding
+        // tools read the live DoorSystem even when simulation is off. Rebuild
+        // on every map change so loading a level cannot leave behind doors
+        // from the previous one.
+        DoorSystem.Rebuild(MapData);
+
         if (IsSimulating)
         {
             EnemySystem.Rebuild(MapData.Enemies, MapData);
-            DoorSystem.Rebuild(MapData.Doors, MapData.Width);
             SecretSystem.Rebuild(MapData);
         }
     }
@@ -318,6 +324,7 @@ public class EditorState
     {
         LevelSerializer.DeserializeFromJson(MapData, json);
         RefreshLayerReferences();
+        DoorSystem.Rebuild(MapData);
     }
 
     public void ExecuteMapMutation(Action mutate, string description)
@@ -346,6 +353,14 @@ public class EditorState
     {
         ExecuteMapMutation(() => LevelSerializer.LoadFromBmp(MapData, path), $"Load {Path.GetFileName(path)}");
         SetStatus($"Loaded BMP from {path}");
+    }
+
+    public void LoadLevelFromW3dmap(string path)
+    {
+        ExecuteMapMutation(() => LevelSerializer.LoadFromW3dmap(MapData, path), $"Load {Path.GetFileName(path)}");
+        Camera.CenterOnMap(MapData.Width, MapData.Height);
+        SetLevelFilename(Path.GetFileNameWithoutExtension(path) + ".json");
+        SetStatus($"Loaded W3DMAP from {path}");
     }
 
     public void LoadLevelFromJsonString(string json, string description)
@@ -763,7 +778,7 @@ public class EditorState
         if (IsSimulating)
         {
             EnemySystem.Rebuild(MapData.Enemies, MapData);
-            DoorSystem.Rebuild(MapData.Doors, MapData.Width);
+            DoorSystem.Rebuild(MapData);
             SecretSystem.Rebuild(MapData);
         }
         NotifyStateChanged();

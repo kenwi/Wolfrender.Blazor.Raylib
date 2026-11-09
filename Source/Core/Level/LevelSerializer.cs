@@ -1,4 +1,7 @@
+using System.Buffers.Binary;
 using System.Text.Json;
+using Game.Engine.Rendering;
+using Game.Features.Doors;
 using Game.Features.Enemies;
 using Game.Features.LevelProgress;
 using Game.Features.Pickups;
@@ -138,6 +141,126 @@ public static class LevelSerializer
             return layer;
 
         return new uint[tileCount];
+    }
+
+    /// <summary>
+    /// Load a Wolfenstein 3D plane-0 dump (64x64 little-endian uint16 tiles).
+    /// Walls use the VSWAP chunk mapping from SetupWalls(): tile N selects
+    /// chunk (N - 1) * 2. Doors use the ordinary, locked or elevator texture,
+    /// and every walkable tile gets the default floor texture.
+    /// </summary>
+    public static void LoadFromW3dmap(MapData mapData, string path)
+    {
+        DeserializeFromW3dmap(mapData, File.ReadAllBytes(path));
+    }
+
+    /// <summary>Load a W3DMAP plane from raw bytes (suitable for browser file input).</summary>
+    public static void DeserializeFromW3dmap(MapData mapData, ReadOnlySpan<byte> data)
+    {
+        if (data.Length == 0 || data.Length % 2 != 0)
+            throw new InvalidOperationException(
+                $"W3DMAP must contain an even number of bytes, got {data.Length}.");
+
+        int tileCount = data.Length / 2;
+        int side = (int)Math.Sqrt(tileCount);
+        if (side <= 0 || side * side != tileCount)
+            throw new InvalidOperationException(
+                $"W3DMAP contains {tileCount} tiles, which is not a square map.");
+
+        uint defaultFloorTile = WallTilePalette.GetIdByFileName("068_grey_brick.png");
+        if (defaultFloorTile == 0)
+            throw new InvalidOperationException(
+                "Default W3DMAP floor texture '068_grey_brick.png' is missing from the wall palette.");
+
+        mapData.Width = side;
+        mapData.Height = side;
+        mapData.Floor = new uint[tileCount];
+        mapData.Walls = new uint[tileCount];
+        mapData.Ceiling = new uint[tileCount];
+        mapData.Doors = new uint[tileCount];
+        mapData.Objects = new uint[tileCount];
+        mapData.Enemies = new List<EnemyPlacement>();
+        mapData.Pickups = new List<PickupPlacement>();
+        mapData.SecretWalls = new List<SecretWallPlacement>();
+        mapData.WallFaceOverrides = new List<WallFaceOverride>();
+
+        var values = new ushort[tileCount];
+        for (int i = 0; i < tileCount; i++)
+        {
+            ushort value = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(i * 2, 2));
+            values[i] = value;
+
+            if (value is >= 1 and <= 63)
+            {
+                int chunk = (value - 1) * 2;
+                uint wallTile = WallTilePalette.GetIdForChunk(chunk);
+                if (wallTile == 0)
+                    throw new InvalidOperationException(
+                        $"W3DMAP wall value {value} references missing texture chunk {chunk}.");
+
+                mapData.Walls[i] = wallTile;
+                continue;
+            }
+
+            // Plane 0 has no floor texture. Area codes (106..143), empty space
+            // and doors are all walkable and receive the default floor.
+            mapData.Floor[i] = defaultFloorTile;
+
+            if (value is >= 90 and <= 101)
+                mapData.Doors[i] = MapW3dmapDoor(value);
+        }
+
+        var (spawnX, spawnY) = FindW3dmapSpawn(values, side);
+        mapData.Spawn = new PlayerSpawnPlacement
+        {
+            TileX = spawnX,
+            TileY = spawnY,
+            WorldY = 2f,
+            Rotation = -MathF.PI / 2f
+        };
+
+        mapData.ResetGeometryVersion();
+    }
+
+    private static uint MapW3dmapDoor(ushort value) => value switch
+    {
+        // 90/91 and the unused lock slots 98/99 use the ordinary door texture.
+        90 or 91 or 98 or 99 => DoorTileEncoding.DefaultId,
+        >= 92 and <= 97 => DoorTileEncoding.LockedId,
+        100 or 101 => DoorTileEncoding.ElevatorId,
+        _ => DoorTileEncoding.DefaultId
+    };
+
+    private static (int X, int Y) FindW3dmapSpawn(ReadOnlySpan<ushort> values, int side)
+    {
+        int center = side / 2;
+        int bestIndex = -1;
+        long bestDistance = long.MaxValue;
+
+        for (int y = 0; y < side; y++)
+        {
+            for (int x = 0; x < side; x++)
+            {
+                ushort value = values[y * side + x];
+                bool walkable = value == 0 || value is >= 106 and < 144;
+                if (!walkable)
+                    continue;
+
+                long dx = x - center;
+                long dy = y - center;
+                long distance = dx * dx + dy * dy;
+                if (distance >= bestDistance)
+                    continue;
+
+                bestDistance = distance;
+                bestIndex = y * side + x;
+            }
+        }
+
+        // If a malformed map has no explicit open tile, keep the spawn in bounds.
+        return bestIndex >= 0
+            ? (bestIndex % side, bestIndex / side)
+            : (0, 0);
     }
 
     public static void LoadFromTmx(MapData mapData, string path)

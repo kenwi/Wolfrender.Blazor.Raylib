@@ -85,11 +85,12 @@ public class EditorMapRenderer
                 if (isDoorTile)
                 {
                     textureIndex = doorInfo.TextureIndex;
-                    isVerticalDoor = doorInfo.Rotation == DoorRotation.VERTICAL;
+                    isVerticalDoor =
+                        DoorTileEncoding.DetectRotation(_mapData, x, y) == DoorRotation.VERTICAL;
                 }
                 else
                 {
-                    textureIndex = (int)tileId - 1;
+                    textureIndex = WallTilePalette.GetTextureIndex(tileId);
                 }
 
                 if (textureIndex >= 0 && textureIndex < _mapData.TileTextures.Count)
@@ -150,7 +151,7 @@ public class EditorMapRenderer
         if (tileId is not > 0)
             return;
 
-        int textureIndex = (int)tileId.Value - 1;
+        int textureIndex = WallTilePalette.GetTextureIndex(tileId.Value);
         if (textureIndex < 0 || textureIndex >= _mapData.TileTextures.Count)
             return;
 

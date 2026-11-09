@@ -316,7 +316,7 @@ public sealed class SecretSystem : IMovementBlocker
 
     private bool TryGetTexture(uint tileId, out Texture2D texture)
     {
-        int index = (int)tileId - 1;
+        int index = WallTilePalette.GetTextureIndex(tileId);
         if (index < 0 || index >= _textures.Count)
         {
             texture = default;

@@ -210,7 +210,7 @@ public sealed class PlayLevelSession
 
     private void RebuildFeatureSystems()
     {
-        _doorSystem.Rebuild(_mapData.Doors, _mapData.Width);
+        _doorSystem.Rebuild(_mapData);
         _enemySystem.Rebuild(_mapData.Enemies, _mapData);
         _pickupSystem.Rebuild(_mapData.Pickups, _mapData);
         _placedObjectSystem.Rebuild(_mapData);

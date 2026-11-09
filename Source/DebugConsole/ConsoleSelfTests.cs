@@ -1,9 +1,11 @@
+using System.Buffers.Binary;
 using System.Numerics;
 using Game.Core.Level;
 using Game.Engine.Rendering;
 using Game.Features.Doors;
 using Game.Features.LevelProgress;
 using Game.Features.Recording;
+using Game.Features.SoundPropagation;
 using Game.Features.WorldObjects;
 
 namespace Game.DebugConsole;
@@ -29,6 +31,8 @@ public static class ConsoleSelfTests
         TestRecFileLegacyParse();
         TestSimulationChecksumDiff();
         TestRecFileValidator();
+        TestW3dmapImport();
+        TestSoundPropagationClosedDoorBlocks();
         TestLevelRoomMapDoorVisibility();
         TestConsoleTextSelectionNormalizeAndExtract();
         TestConsoleTextSelectionReplaceInputRange();
@@ -497,6 +501,80 @@ public static class ConsoleSelfTests
             throw new InvalidOperationException("Invalid tick index should fail validation.");
     }
 
+    private static void TestW3dmapImport()
+    {
+        const int side = 8;
+        var data = new byte[side * side * 2];
+        for (int i = 0; i < side * side; i++)
+            BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(i * 2, 2), 1);
+
+        void SetTile(int x, int y, ushort value) =>
+            BinaryPrimitives.WriteUInt16LittleEndian(
+                data.AsSpan((y * side + x) * 2, 2), value);
+
+        SetTile(1, 1, 13);   // wall texture chunk 24 (map-only alias)
+        SetTile(3, 3, 106);  // walkable area
+        SetTile(4, 3, 90);   // normal door
+        SetTile(5, 3, 100);  // elevator door
+        SetTile(5, 4, 92);   // locked door
+
+        var map = new MapData();
+        LevelSerializer.DeserializeFromW3dmap(map, data);
+
+        uint floorId = WallTilePalette.GetIdByFileName("068_grey_brick.png");
+        if (floorId == 0 || map.Width != side || map.Height != side)
+            throw new InvalidOperationException("W3DMAP import did not set dimensions or floor palette.");
+        if (map.Walls[1 * side + 1] != WallTilePalette.GetIdForChunk(24))
+            throw new InvalidOperationException("W3DMAP wall 13 should use the map-only chunk 24 alias.");
+        if (map.Walls[0] != 1)
+            throw new InvalidOperationException("W3DMAP wall 1 should use wall tile ID 1.");
+        if (map.Floor[3 * side + 3] != floorId || map.Floor[3 * side + 4] != floorId)
+            throw new InvalidOperationException("W3DMAP walkable and door tiles should receive the default floor.");
+        if (map.Doors[3 * side + 4] != DoorTileEncoding.DefaultId)
+            throw new InvalidOperationException("W3DMAP normal door should use the ordinary door texture.");
+        if (map.Doors[3 * side + 5] != DoorTileEncoding.ElevatorId)
+            throw new InvalidOperationException("W3DMAP elevator door should use the elevator texture.");
+        if (map.Doors[4 * side + 5] != DoorTileEncoding.LockedId)
+            throw new InvalidOperationException("W3DMAP locked door should use the locked texture.");
+        if (map.Ceiling[3 * side + 3] != 0)
+            throw new InvalidOperationException("W3DMAP import should not invent ceiling textures.");
+        if (map.Spawn.TileX != 3 || map.Spawn.TileY != 3)
+            throw new InvalidOperationException("W3DMAP import should choose the nearest open tile for the spawn.");
+    }
+
+    private static void TestSoundPropagationClosedDoorBlocks()
+    {
+        const int doorX = 2;
+        const int doorY = 3;
+        var map = CreateTwoRoomDoorMap(doorX, doorY);
+        var doors = new List<Door>
+        {
+            new()
+            {
+                StartPosition = new Vector2(doorX, doorY),
+                Position = new Vector2(doorX, doorY),
+                DoorState = DoorState.CLOSED
+            }
+        };
+
+        // The editor visualizer uses maxClosedDoorCrossings: 0 so a closed
+        // door bounds sound to the current room.
+        var closed = SoundPropagation.ComputeReach(
+            map, doors, doorX, 1, treatAllDoorsClosed: true, maxClosedDoorCrossings: 0);
+        if (!closed.CanHearAt((doorX, 1), 0) || !closed.CanHearAt((doorX, 2), 0))
+            throw new InvalidOperationException("Sound should reach the origin room.");
+        if (closed.CanHearAt((doorX, doorY), 0)
+            || closed.CanHearAt((doorX, doorY + 1), 0)
+            || closed.CanHearAt((doorX, doorY + 2), 0))
+            throw new InvalidOperationException("Closed doors should block sound propagation.");
+
+        doors[0].DoorState = DoorState.OPEN;
+        var open = SoundPropagation.ComputeReach(
+            map, doors, doorX, 1, treatAllDoorsClosed: false, maxClosedDoorCrossings: 0);
+        if (!open.CanHearAt((doorX, doorY + 2), 0))
+            throw new InvalidOperationException("Open doors should let sound into the next room.");
+    }
+
     private static void TestLevelRoomMapDoorVisibility()
     {
         const int doorX = 2;
@@ -540,7 +618,8 @@ public static class ConsoleSelfTests
             Floor = new uint[tileCount],
             Ceiling = new uint[tileCount],
             Walls = new uint[tileCount],
-            Doors = new uint[tileCount]
+            Doors = new uint[tileCount],
+            Objects = new uint[tileCount]
         };
 
         for (int y = 0; y < height; y++)
@@ -563,7 +642,7 @@ public static class ConsoleSelfTests
 
         int doorIndex = LevelData.GetIndex(doorX, doorY, width);
         map.Walls[doorIndex] = 0;
-        map.Doors[doorIndex] = DoorTileEncoding.LightHorizontal;
+        map.Doors[doorIndex] = DoorTileEncoding.DefaultId;
         return map;
     }
 

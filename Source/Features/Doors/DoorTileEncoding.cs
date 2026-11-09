@@ -1,3 +1,4 @@
+using Game.Core.Level;
 using Game.Engine.Rendering;
 
 namespace Game.Features.Doors;
@@ -10,65 +11,66 @@ public enum DoorLockKind
 }
 
 /// <summary>
-/// Door layer tile IDs 57–68: light door art (sheet tile 57) and dark door art (sheet tile 58),
-/// each with H/V and gold/silver lock variants. Legacy IDs 7–12 map to the light set.
+/// Door layer tile IDs 1001–1010: one entry per extracted texture whose name
+/// contains "door". The tile ID no longer encodes a horizontal/vertical
+/// variant; <see cref="DetectRotation"/> derives the orientation from the
+/// walls next to the door tile.
 /// </summary>
 public static class DoorTileEncoding
 {
     /// <summary>Engine-facing encoding probe (avoids rendering importing this feature type graph).</summary>
     public static readonly IDoorTileEncoding ForEngine = new EngineEncoding();
 
-    public const int LightDoorTextureIndex = TileSpriteSheet.DoorIndex;
-    public const int DarkDoorTextureIndex = TileSpriteSheet.DoorDarkIndex;
-
-    public const uint LightHorizontal = 57;
-    public const uint LightVertical = 58;
-    public const uint LightHorizontalGold = 59;
-    public const uint LightVerticalGold = 60;
-    public const uint LightHorizontalSilver = 61;
-    public const uint LightVerticalSilver = 62;
-
-    public const uint DarkHorizontal = 63;
-    public const uint DarkVertical = 64;
-    public const uint DarkHorizontalGold = 65;
-    public const uint DarkVerticalGold = 66;
-    public const uint DarkHorizontalSilver = 67;
-    public const uint DarkVerticalSilver = 68;
-
-    public const string DoorTexturePath = TileSpriteSheet.SheetPath;
-
+    public const uint FirstId = 1001;
+    public const uint DefaultId = 1003; // 098_door.png
+    public const uint ElevatorId = 1007; // 102_grey_door_red_light_arrows.png
+    public const uint LockedId = 1009; // 104_grey_locked_door.png
     public const int PaletteColumns = 2;
 
     public static readonly PaletteEntry[] PaletteEntries =
     {
-        new(LightHorizontal, "Light H", "Light door", false, DoorLockKind.None, LightDoorTextureIndex),
-        new(LightVertical, "Light V", "Light door rotated 90°", true, DoorLockKind.None, LightDoorTextureIndex),
-        new(LightHorizontalGold, "Light Gold H", "Light door, gold lock", false, DoorLockKind.Gold, LightDoorTextureIndex),
-        new(LightVerticalGold, "Light Gold V", "Light door, gold lock rotated 90°", true, DoorLockKind.Gold, LightDoorTextureIndex),
-        new(LightHorizontalSilver, "Light Silver H", "Light door, silver lock", false, DoorLockKind.Silver, LightDoorTextureIndex),
-        new(LightVerticalSilver, "Light Silver V", "Light door, silver lock rotated 90°", true, DoorLockKind.Silver, LightDoorTextureIndex),
-        new(DarkHorizontal, "Dark H", "Dark door", false, DoorLockKind.None, DarkDoorTextureIndex),
-        new(DarkVertical, "Dark V", "Dark door rotated 90°", true, DoorLockKind.None, DarkDoorTextureIndex),
-        new(DarkHorizontalGold, "Dark Gold H", "Dark door, gold lock", false, DoorLockKind.Gold, DarkDoorTextureIndex),
-        new(DarkVerticalGold, "Dark Gold V", "Dark door, gold lock rotated 90°", true, DoorLockKind.Gold, DarkDoorTextureIndex),
-        new(DarkHorizontalSilver, "Dark Silver H", "Dark door, silver lock", false, DoorLockKind.Silver, DarkDoorTextureIndex),
-        new(DarkVerticalSilver, "Dark Silver V", "Dark door, silver lock rotated 90°", true, DoorLockKind.Silver, DarkDoorTextureIndex),
+        new(1001, "Red Arrow Door", "Grey door with red arrow",
+            DoorLockKind.None, "024_grey_door_red_arrows.png", WallTilePalette.Count + 0),
+        new(1002, "Red Arrow Door Dark", "Dark grey door with red arrow",
+            DoorLockKind.None, "025_grey_door_red_arrows_dark.png", WallTilePalette.Count + 1),
+        new(1003, "Door", "Blue steel door",
+            DoorLockKind.None, "098_door.png", WallTilePalette.Count + 2),
+        new(1004, "Door Dark", "Dark blue steel door",
+            DoorLockKind.None, "099_door_dark.png", WallTilePalette.Count + 3),
+        new(1005, "Door Side", "Blue steel door side panel",
+            DoorLockKind.None, "100_door_side.png", WallTilePalette.Count + 4),
+        new(1006, "Door Side Dark", "Dark blue steel door side panel",
+            DoorLockKind.None, "101_door_side_dark.png", WallTilePalette.Count + 5),
+        new(1007, "Red Light Door", "Grey door with red light arrows",
+            DoorLockKind.None, "102_grey_door_red_light_arrows.png", WallTilePalette.Count + 6),
+        new(1008, "Red Light Door Dark", "Dark grey door with red light arrows",
+            DoorLockKind.None, "103_grey_door_red_light_arrows_dark.png", WallTilePalette.Count + 7),
+        new(1009, "Locked Door", "Grey locked door; needs the gold key",
+            DoorLockKind.Gold, "104_grey_locked_door.png", WallTilePalette.Count + 8),
+        new(1010, "Locked Door Dark", "Dark grey locked door; needs the gold key",
+            DoorLockKind.Gold, "105_grey_locked_door_dark.png", WallTilePalette.Count + 9),
     };
 
     public readonly record struct PaletteEntry(
         uint Id,
         string ShortLabel,
         string Description,
-        bool Vertical,
         DoorLockKind LockKind,
-        int TextureIndex);
+        string FileName,
+        int TextureIndex)
+    {
+        public string ResourcePath => $"{WallTilePalette.TextureDirectory}/{FileName}";
+        public string PaletteStyle =>
+            $"background-color:#000;background-image:url({ResourcePath});" +
+            "background-size:100% 100%;background-repeat:no-repeat;";
+    }
 
     public readonly record struct DoorTileInfo(
-        DoorRotation Rotation,
         DoorLockKind LockKind,
         int TextureIndex);
 
-    public static bool IsDoorTile(uint value) => value > 0 && TryParse(value, out _);
+    public static bool IsDoorTile(uint value) =>
+        value >= FirstId && value < FirstId + PaletteEntries.Length;
 
     public static bool TryParse(uint tileValue, out DoorTileInfo info)
     {
@@ -76,60 +78,38 @@ public static class DoorTileEncoding
         {
             if (entry.Id != tileValue)
                 continue;
-            info = new DoorTileInfo(
-                entry.Vertical ? DoorRotation.VERTICAL : DoorRotation.HORIZONTAL,
-                entry.LockKind,
-                entry.TextureIndex);
+
+            info = new DoorTileInfo(entry.LockKind, entry.TextureIndex);
             return true;
         }
-
-        if (TryParseLegacy(tileValue, out info))
-            return true;
 
         info = default;
         return false;
     }
 
-    public static bool TryParse(uint tileValue, out DoorRotation rotation, out DoorLockKind lockKind)
+    /// <summary>
+    /// Horizontal when the door is framed by walls on its left and right (X-1/X+1);
+    /// vertical when it is framed above and below (Y-1/Y+1).
+    /// </summary>
+    public static DoorRotation DetectRotation(MapData mapData, int tileX, int tileY)
     {
-        if (!TryParse(tileValue, out var info))
-        {
-            rotation = default;
-            lockKind = default;
-            return false;
-        }
+        bool wallLeft = mapData.GetTile(mapData.Walls, tileX - 1, tileY) != 0;
+        bool wallRight = mapData.GetTile(mapData.Walls, tileX + 1, tileY) != 0;
+        bool wallUp = mapData.GetTile(mapData.Walls, tileX, tileY - 1) != 0;
+        bool wallDown = mapData.GetTile(mapData.Walls, tileX, tileY + 1) != 0;
 
-        rotation = info.Rotation;
-        lockKind = info.LockKind;
-        return true;
-    }
+        if (wallLeft && wallRight)
+            return DoorRotation.HORIZONTAL;
 
-    private static bool TryParseLegacy(uint tileValue, out DoorTileInfo info)
-    {
-        info = default;
-        switch (tileValue)
-        {
-            case 7:
-                info = new DoorTileInfo(DoorRotation.HORIZONTAL, DoorLockKind.None, LightDoorTextureIndex);
-                return true;
-            case 8:
-                info = new DoorTileInfo(DoorRotation.VERTICAL, DoorLockKind.None, LightDoorTextureIndex);
-                return true;
-            case 9:
-                info = new DoorTileInfo(DoorRotation.HORIZONTAL, DoorLockKind.Gold, LightDoorTextureIndex);
-                return true;
-            case 10:
-                info = new DoorTileInfo(DoorRotation.VERTICAL, DoorLockKind.Gold, LightDoorTextureIndex);
-                return true;
-            case 11:
-                info = new DoorTileInfo(DoorRotation.HORIZONTAL, DoorLockKind.Silver, LightDoorTextureIndex);
-                return true;
-            case 12:
-                info = new DoorTileInfo(DoorRotation.VERTICAL, DoorLockKind.Silver, LightDoorTextureIndex);
-                return true;
-            default:
-                return false;
-        }
+        if (wallUp && wallDown)
+            return DoorRotation.VERTICAL;
+
+        // While a door is being painted there may not be walls on both sides
+        // yet. Use whichever axis has a wall, then fall back to horizontal.
+        if (!(wallLeft || wallRight) && (wallUp || wallDown))
+            return DoorRotation.VERTICAL;
+
+        return DoorRotation.HORIZONTAL;
     }
 
     public static string GetPaletteLabel(uint tileId)
@@ -150,6 +130,16 @@ public static class DoorTileEncoding
                 return entry.Description;
         }
         return $"Tile ID {tileId}";
+    }
+
+    public static string GetPaletteStyle(uint tileId)
+    {
+        foreach (var entry in PaletteEntries)
+        {
+            if (entry.Id == tileId)
+                return entry.PaletteStyle;
+        }
+        return "background-color:#000;";
     }
 
     private sealed class EngineEncoding : IDoorTileEncoding

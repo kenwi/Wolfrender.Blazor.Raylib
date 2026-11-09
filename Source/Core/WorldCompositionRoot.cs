@@ -86,7 +86,7 @@ public static class WorldCompositionRoot
         var combatFeedback = new CombatFeedback(soundSystem, effectSystem);
         var inputSystem = new InputSystem();
         var recordingSystem = new RecordingSystem(inputSystem);
-        var doorSystem = new DoorSystem(mapData.Doors, mapData.Width, tileTextures);
+        var doorSystem = new DoorSystem(mapData, tileTextures);
         var scoreSystem = new ScoreSystem(scoreSignals);
         var secretSystem = new SecretSystem(scoreSignals, tileTextures);
         var collisionSystem = new CollisionSystem(
