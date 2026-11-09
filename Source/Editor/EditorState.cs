@@ -172,7 +172,7 @@ public class EditorState
         SecretSystem = secretSystem;
         Player = player;
         Camera = new EditorCamera();
-        Camera.CenterOnMap(mapData.Width, mapData.Height);
+        Camera.CenterOnTile(mapData.Spawn.TileX, mapData.Spawn.TileY);
 
         PathfindingEditorTool? pathTool = null;
         SoundPropagationEditorTool? soundTool = null;
@@ -363,7 +363,7 @@ public class EditorState
     public void LoadLevelFromW3dmap(string path)
     {
         ExecuteMapMutation(() => LevelSerializer.LoadFromW3dmap(MapData, path), $"Load {Path.GetFileName(path)}");
-        Camera.CenterOnMap(MapData.Width, MapData.Height);
+        Camera.CenterOnTile(MapData.Spawn.TileX, MapData.Spawn.TileY);
         SetLevelFilename(LevelSerializer.W3dmapLevelFileName(path));
         SetStatus($"Loaded W3DMAP from {path}");
     }

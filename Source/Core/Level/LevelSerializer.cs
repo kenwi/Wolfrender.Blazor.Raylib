@@ -251,6 +251,7 @@ public static class LevelSerializer
                 things[i] = BinaryPrimitives.ReadUInt16LittleEndian(plane1.Slice(i * 2, 2));
 
             W3dmapEnemyImport.ApplyPlane1(mapData, things, values);
+            W3dmapPickupImport.ApplyPlane1(mapData, things);
         }
 
         DoorSideFaceAutoDetect.ApplyAllDoors(mapData);

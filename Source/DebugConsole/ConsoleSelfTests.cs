@@ -5,6 +5,7 @@ using Game.Engine.Rendering;
 using Game.Features.Doors;
 using Game.Features.Enemies;
 using Game.Features.LevelProgress;
+using Game.Features.Pickups;
 using Game.Features.Recording;
 using Game.Features.SoundPropagation;
 using Game.Features.WorldObjects;
@@ -34,6 +35,7 @@ public static class ConsoleSelfTests
         TestRecFileValidator();
         TestW3dmapImport();
         TestW3dmapPlane1Import();
+        TestW3dmapPickupImport();
         TestDoorSideFaceAutoDetect();
         TestSoundPropagationClosedDoorBlocks();
         TestLevelRoomMapDoorVisibility();
@@ -641,6 +643,10 @@ public static class ConsoleSelfTests
         Set1(6, 3, 94); // west
         // Dead guard corpse.
         Set1(5, 3, 124);
+        // Collectibles on open tiles (row 5).
+        Set1(2, 5, 49); // ammo
+        Set1(3, 5, 48); // first aid
+        Set1(4, 5, 43); // gold key
 
         var map = new MapData();
         LevelSerializer.DeserializeFromW3dmap(map, plane0, plane1);
@@ -678,6 +684,15 @@ public static class ConsoleSelfTests
         if (!corpse.StartsAsCorpse || corpse.EnemyType != "Guard")
             throw new InvalidOperationException("Dead guard thing should import as a corpse Guard.");
 
+        if (map.Pickups.Count != 3)
+            throw new InvalidOperationException($"Expected 3 pickups from plane 1, got {map.Pickups.Count}.");
+        if (map.Pickups.Single(p => p.TileX == 2 && p.TileY == 5).Type != PickupType.Ammo)
+            throw new InvalidOperationException("Thing 49 should import as Ammo.");
+        if (map.Pickups.Single(p => p.TileX == 3 && p.TileY == 5).Type != PickupType.Health)
+            throw new InvalidOperationException("Thing 48 should import as Health.");
+        if (map.Pickups.Single(p => p.TileX == 4 && p.TileY == 5).Type != PickupType.GoldKey)
+            throw new InvalidOperationException("Thing 43 should import as GoldKey.");
+
         if (LevelSerializer.W3dmapLevelFileName("resources/maps/e1_l1_m0.w3dmap") != "e1_l1.json")
             throw new InvalidOperationException("W3dmapLevelFileName should strip plane suffixes.");
 
@@ -700,7 +715,27 @@ public static class ConsoleSelfTests
             if (patrolCount != 9)
                 throw new InvalidOperationException(
                     $"E1L1 should reconstruct 9 patrol paths, got {patrolCount}.");
+            // Collectibles only (decorations/extra-life skipped): 47 on E1L1.
+            if (e1.Pickups.Count != 47)
+                throw new InvalidOperationException(
+                    $"E1L1 should import 47 pickups, got {e1.Pickups.Count}.");
+            if (e1.Pickups.Count(p => p.Type == PickupType.Ammo) != 11)
+                throw new InvalidOperationException("E1L1 should import 11 ammo clips.");
         }
+    }
+
+    private static void TestW3dmapPickupImport()
+    {
+        if (!W3dmapPickupImport.TryMapThing(49, out var ammoType, out _)
+            || ammoType != PickupType.Ammo)
+            throw new InvalidOperationException("Thing 49 should map to Ammo.");
+        if (!W3dmapPickupImport.TryMapThing(51, out var gunType, out _)
+            || gunType != PickupType.ChainGun)
+            throw new InvalidOperationException("Thing 51 should map to ChainGun.");
+        if (W3dmapPickupImport.TryMapThing(37, out _, out _))
+            throw new InvalidOperationException("Decorations must not map to pickups.");
+        if (W3dmapPickupImport.TryMapThing(56, out _, out _))
+            throw new InvalidOperationException("Extra-life orb has no PickupType yet and must be skipped.");
     }
 
     private static void TestSoundPropagationClosedDoorBlocks()

@@ -38,6 +38,16 @@ public class EditorCamera
         );
     }
 
+    /// <summary>Center the view on a tile (e.g. player spawn after W3DMAP import).</summary>
+    public void CenterOnTile(int tileX, int tileY)
+    {
+        float tileSize = TileSize;
+        Offset = new Vector2(
+            GetScreenWidth() / 2f - (tileX + 0.5f) * tileSize,
+            GetScreenHeight() / 2f - (tileY + 0.5f) * tileSize
+        );
+    }
+
     /// <summary>
     /// Handle panning (RMB drag + WASD) and zooming (scroll wheel + +/- keys).
     /// When disableKeyboardPan is true, WASD panning is skipped (e.g. during simulation).
