@@ -125,7 +125,15 @@ public class Application
                 LoadTexture(Path("resources/enemy_officer.png")),
             }
         };
+#if EDITOR
+        string editorW3dmap = Path(LevelCatalog.DefaultEditorW3dmapPath);
+        if (File.Exists(editorW3dmap))
+            LevelSerializer.LoadFromW3dmap(mapData, editorW3dmap);
+        else
+            LevelSerializer.LoadFromJson(mapData, Path(LevelCatalog.DefaultLevelPath));
+#else
         LevelSerializer.LoadFromJson(mapData, Path(LevelCatalog.DefaultLevelPath));
+#endif
 
         return mapData;
     }

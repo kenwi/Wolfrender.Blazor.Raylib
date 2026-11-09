@@ -9,6 +9,9 @@ public static class LevelCatalog
     public const string ResourcesDirectory = "resources";
     public const string DefaultLevelPath = $"{ResourcesDirectory}/level.json";
 
+    /// <summary>W3DMAP the desktop editor opens by default while importing Wolf maps.</summary>
+    public const string DefaultEditorW3dmapPath = $"{ResourcesDirectory}/maps/e1_l1_m0.w3dmap";
+
     /// <summary>Levels shipped for browser play when directory listing is unavailable.</summary>
     private static readonly string[] BrowserFallbackLevels =
     {

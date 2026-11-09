@@ -154,7 +154,12 @@ public class EditorState
     public float StatusTimer;
 
     /// <summary>Current level JSON filename used for quick save (e.g. level.json).</summary>
-    public string LevelFilename { get; private set; } = Path.GetFileName(LevelCatalog.DefaultLevelPath);
+    public string LevelFilename { get; private set; } =
+#if EDITOR
+        LevelSerializer.W3dmapLevelFileName(LevelCatalog.DefaultEditorW3dmapPath);
+#else
+        Path.GetFileName(LevelCatalog.DefaultLevelPath);
+#endif
 
     // Fires when state changes that the Blazor UI should reflect
     public event Action? StateChanged;

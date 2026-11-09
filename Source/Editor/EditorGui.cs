@@ -33,7 +33,7 @@ public class EditorGui
     private string _loadJsonPath = Res.Path("resources/level.json");
     private string _loadTmxPath = Res.Path("resources/map1.tmx");
     private string _loadBmpPath = Res.Path("resources/level.bmp");
-    private string _loadW3dmapPath = Res.Path("resources/maps/e1_l1_m0.w3dmap");
+    private string _loadW3dmapPath = Res.Path(LevelCatalog.DefaultEditorW3dmapPath);
     private string _statusMessage = "";
     private float _statusTimer;
 
