@@ -34,6 +34,7 @@ public static class ConsoleSelfTests
         TestRecFileValidator();
         TestW3dmapImport();
         TestW3dmapPlane1Import();
+        TestDoorSideFaceAutoDetect();
         TestSoundPropagationClosedDoorBlocks();
         TestLevelRoomMapDoorVisibility();
         TestConsoleTextSelectionNormalizeAndExtract();
@@ -544,6 +545,57 @@ public static class ConsoleSelfTests
             throw new InvalidOperationException("W3DMAP import should choose the nearest open tile for the spawn.");
         if (map.Enemies.Count != 0)
             throw new InvalidOperationException("Plane-0-only W3DMAP import should leave enemies empty.");
+
+        // Door at (4,3) is framed above/below by solid walls → vertical → door-side on N/S.
+        uint doorSideId = DoorSideFaceAutoDetect.DoorSideTileId;
+        if (doorSideId == 0)
+            throw new InvalidOperationException("Door-side wall texture is missing from the palette.");
+        if (map.GetWallFaceTile(4, 4, WallFace.North) != doorSideId
+            || map.GetWallFaceTile(4, 2, WallFace.South) != doorSideId)
+            throw new InvalidOperationException(
+                "W3DMAP import should auto-apply door-side faces on vertical door neighbors.");
+    }
+
+    private static void TestDoorSideFaceAutoDetect()
+    {
+        uint doorSideId = DoorSideFaceAutoDetect.DoorSideTileId;
+        if (doorSideId == 0)
+            throw new InvalidOperationException("Door-side wall texture is missing from the palette.");
+
+        const int side = 5;
+        var map = new MapData
+        {
+            Width = side,
+            Height = side,
+            Floor = new uint[side * side],
+            Walls = new uint[side * side],
+            Ceiling = new uint[side * side],
+            Doors = new uint[side * side],
+            Objects = new uint[side * side],
+        };
+
+        // Horizontal door: walls on X±1.
+        map.Walls[2 * side + 1] = 1;
+        map.Walls[2 * side + 3] = 1;
+        map.Doors[2 * side + 2] = DoorTileEncoding.DefaultId;
+        DoorSideFaceAutoDetect.ApplyForDoor(map, 2, 2);
+
+        if (map.GetWallFaceTile(3, 2, WallFace.West) != doorSideId
+            || map.GetWallFaceTile(1, 2, WallFace.East) != doorSideId)
+            throw new InvalidOperationException("Horizontal door should stamp west/east door-side faces.");
+
+        // Vertical door: walls on Y±1.
+        map.WallFaceOverrides.Clear();
+        Array.Clear(map.Walls);
+        Array.Clear(map.Doors);
+        map.Walls[1 * side + 2] = 1;
+        map.Walls[3 * side + 2] = 1;
+        map.Doors[2 * side + 2] = DoorTileEncoding.DefaultId;
+        DoorSideFaceAutoDetect.ApplyForDoor(map, 2, 2);
+
+        if (map.GetWallFaceTile(2, 3, WallFace.North) != doorSideId
+            || map.GetWallFaceTile(2, 1, WallFace.South) != doorSideId)
+            throw new InvalidOperationException("Vertical door should stamp north/south door-side faces.");
     }
 
     private static void TestW3dmapPlane1Import()

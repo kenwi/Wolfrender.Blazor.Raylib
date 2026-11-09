@@ -248,6 +248,8 @@ public static class LevelSerializer
             W3dmapEnemyImport.ApplyPlane1(mapData, things, values);
         }
 
+        DoorSideFaceAutoDetect.ApplyAllDoors(mapData);
+
         mapData.ResetGeometryVersion();
     }
 

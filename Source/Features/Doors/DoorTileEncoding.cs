@@ -37,10 +37,10 @@ public static class DoorTileEncoding
             DoorLockKind.None, "098_door.png", WallTilePalette.Count + 2),
         new(1004, "Door Dark", "Dark blue steel door",
             DoorLockKind.None, "099_door_dark.png", WallTilePalette.Count + 3),
-        new(1005, "Door Side", "Blue steel door side panel",
-            DoorLockKind.None, "100_door_side.png", WallTilePalette.Count + 4),
-        new(1006, "Door Side Dark", "Dark blue steel door side panel",
-            DoorLockKind.None, "101_door_side_dark.png", WallTilePalette.Count + 5),
+        //new(1005, "Door Side", "Blue steel door side panel",
+        //    DoorLockKind.None, "100_door_side.png", WallTilePalette.Count + 4),
+        //new(1006, "Door Side Dark", "Dark blue steel door side panel",
+        //    DoorLockKind.None, "101_door_side_dark.png", WallTilePalette.Count + 5),
         new(1007, "Red Light Door", "Grey door with red light arrows",
             DoorLockKind.None, "102_grey_door_red_light_arrows.png", WallTilePalette.Count + 6),
         new(1008, "Red Light Door Dark", "Dark grey door with red light arrows",
@@ -69,8 +69,7 @@ public static class DoorTileEncoding
         DoorLockKind LockKind,
         int TextureIndex);
 
-    public static bool IsDoorTile(uint value) =>
-        value >= FirstId && value < FirstId + PaletteEntries.Length;
+    public static bool IsDoorTile(uint value) => TryParse(value, out _);
 
     public static bool TryParse(uint tileValue, out DoorTileInfo info)
     {

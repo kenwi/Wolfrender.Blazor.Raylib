@@ -617,9 +617,101 @@ public class EditorState
             return;
         }
 
-        UndoStack.Push(new PaintTilesCommand(_paintStroke));
+        var stroke = _paintStroke;
         _paintStroke = null;
+
+        var faceChanges = ApplyDoorSideFacesForPaintStroke(stroke);
+        var paintCommand = new PaintTilesCommand(stroke);
+        if (faceChanges.Count == 0)
+        {
+            UndoStack.Push(paintCommand);
+        }
+        else
+        {
+            UndoStack.Push(new CompositeEditorCommand(
+                paintCommand.Description,
+                [paintCommand, new SetWallFaceOverridesCommand(faceChanges)]));
+            MapData.NotifyGeometryChanged();
+        }
+
+        ApplyAfterMapMutation();
         NotifyStateChanged();
+    }
+
+    /// <summary>
+    /// After door (or framing wall) paint, stamp door-side textures on the
+    /// inward faces of neighboring walls. Returns undo diffs for faces that changed.
+    /// </summary>
+    private List<WallFaceOverrideChange> ApplyDoorSideFacesForPaintStroke(List<TileChange> stroke)
+    {
+        var doorCells = new HashSet<(int X, int Y)>();
+        int doorsLayer = -1;
+        int wallsLayer = -1;
+        for (int i = 0; i < Layers.Count; i++)
+        {
+            if (Layers[i].Name == DoorsLayerName) doorsLayer = i;
+            if (Layers[i].Name == WallsLayerName) wallsLayer = i;
+        }
+
+        foreach (var change in stroke)
+        {
+            if (change.LayerIndex == doorsLayer && DoorTileEncoding.IsDoorTile(change.NewTileId))
+                doorCells.Add((change.X, change.Y));
+
+            if (change.LayerIndex != wallsLayer || change.NewTileId == 0)
+                continue;
+
+            // Framing walls may complete a door's orientation; refresh nearby doors.
+            TryAddDoorCell(doorCells, change.X - 1, change.Y);
+            TryAddDoorCell(doorCells, change.X + 1, change.Y);
+            TryAddDoorCell(doorCells, change.X, change.Y - 1);
+            TryAddDoorCell(doorCells, change.X, change.Y + 1);
+        }
+
+        if (doorCells.Count == 0)
+            return new List<WallFaceOverrideChange>();
+
+        var planned = new List<DoorSideFaceAutoDetect.FaceAssignment>();
+        var touchedCells = new HashSet<(int X, int Y)>();
+        foreach (var (x, y) in doorCells)
+        {
+            foreach (var assignment in DoorSideFaceAutoDetect.PlanForDoor(MapData, x, y))
+            {
+                planned.Add(assignment);
+                touchedCells.Add((assignment.TileX, assignment.TileY));
+            }
+        }
+
+        if (planned.Count == 0)
+            return new List<WallFaceOverrideChange>();
+
+        var beforeByCell = new Dictionary<(int X, int Y), WallFaceOverride?>();
+        foreach (var cell in touchedCells)
+            beforeByCell[cell] = FindWallFaceOverrideAt(cell.X, cell.Y)?.Clone();
+
+        DoorSideFaceAutoDetect.ApplyAssignments(MapData, planned);
+
+        var changes = new List<WallFaceOverrideChange>();
+        foreach (var cell in touchedCells)
+        {
+            beforeByCell.TryGetValue(cell, out var before);
+            var after = FindWallFaceOverrideAt(cell.X, cell.Y)?.Clone();
+            if (after != null && !after.HasAnyFace)
+                after = null;
+            if (WallFaceOverride.ContentEquals(before, after))
+                continue;
+            changes.Add(new WallFaceOverrideChange(cell.X, cell.Y, before, after));
+        }
+
+        return changes;
+    }
+
+    private void TryAddDoorCell(HashSet<(int X, int Y)> doorCells, int x, int y)
+    {
+        if (x < 0 || y < 0 || x >= MapData.Width || y >= MapData.Height)
+            return;
+        if (DoorTileEncoding.IsDoorTile(MapData.GetTile(MapData.Doors, x, y)))
+            doorCells.Add((x, y));
     }
 
     public void PaintTile(int x, int y)

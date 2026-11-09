@@ -112,6 +112,8 @@ public static class WallTilePalette
         "095_sand_blank_dark.png",
         "096_grey_brick_hitler_portrait.png",
         "097_grey_brick_hitler_portrait_dark.png",
+        "100_door_side.png",
+        "101_door_side_dark.png",
     };
 
     // Wolf3D wall tile 13 selects VSWAP chunks 24/25, whose filenames contain

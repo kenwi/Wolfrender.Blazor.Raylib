@@ -6,6 +6,24 @@ using Game.Features.Players;
 
 namespace Game.Editor.Undo;
 
+/// <summary>Runs several commands as one undo/redo step (already-applied order).</summary>
+public sealed class CompositeEditorCommand(string description, IReadOnlyList<IEditorCommand> commands) : IEditorCommand
+{
+    public string Description { get; } = description;
+
+    public void Undo(EditorState state)
+    {
+        for (int i = commands.Count - 1; i >= 0; i--)
+            commands[i].Undo(state);
+    }
+
+    public void Redo(EditorState state)
+    {
+        foreach (var command in commands)
+            command.Redo(state);
+    }
+}
+
 public readonly record struct TileChange(
     int LayerIndex,
     int X,
