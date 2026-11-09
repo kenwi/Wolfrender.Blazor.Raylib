@@ -554,6 +554,8 @@ public class EditorMapRenderer
                 stateColor = new Color(255, 0, 0, 255);
             else if (liveEnemy.EnemyState == EnemyState.COLLIDING)
                 stateColor = new Color(255, 40, 40, 255);
+            else if (liveEnemy.EnemyState == EnemyState.WAITING_FOR_DOOR)
+                stateColor = new Color(255, 180, 40, 255);
             else if (liveEnemy.EnemyState == EnemyState.CORPSE)
                 stateColor = new Color(120, 120, 120, 255);
             else if (liveEnemy.EnemyState == EnemyState.HIT)

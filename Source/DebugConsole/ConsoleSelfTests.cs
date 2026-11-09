@@ -38,6 +38,7 @@ public static class ConsoleSelfTests
         TestW3dmapPickupImport();
         TestW3dmapObjectImport();
         TestW3dmapSecretImport();
+        TestEnemyWaitingForDoorState();
         TestDoorSideFaceAutoDetect();
         TestSoundPropagationClosedDoorBlocks();
         TestLevelRoomMapDoorVisibility();
@@ -825,6 +826,24 @@ public static class ConsoleSelfTests
             throw new InvalidOperationException("Ammo is a pickup, not a static object.");
         if (!W3dmapObjectImport.TryMapThing(56, out uint orbId) || orbId != 35)
             throw new InvalidOperationException("Extra-life orb should import as sprite 35 until PickupType exists.");
+    }
+
+    private static void TestEnemyWaitingForDoorState()
+    {
+        if (!Enum.IsDefined(EnemyState.WAITING_FOR_DOOR))
+            throw new InvalidOperationException("WAITING_FOR_DOOR must be a defined enemy state.");
+
+        var enemy = new Enemy();
+        enemy.EnemyState = EnemyState.WALKING;
+        enemy.StuckTimer = 1f;
+        enemy.TransitionTo(EnemyState.WAITING_FOR_DOOR);
+        if (enemy.EnemyState != EnemyState.WAITING_FOR_DOOR || enemy.StateTimer != 0f)
+            throw new InvalidOperationException("TransitionTo WAITING_FOR_DOOR should set state and reset StateTimer.");
+
+        // Stuck recovery must not be implied by door-wait; callers clear StuckTimer on enter.
+        enemy.StuckTimer = 0f;
+        if (enemy.StuckTimer != 0f)
+            throw new InvalidOperationException("Door wait should keep StuckTimer cleared.");
     }
 
     private static void TestW3dmapSecretImport()

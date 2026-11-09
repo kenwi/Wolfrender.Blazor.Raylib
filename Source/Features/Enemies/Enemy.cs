@@ -17,6 +17,8 @@ public enum EnemyState
     HIT,
     DYING,
     COLLIDING,
+    /// <summary>Blocked by a door that is opening; hold still until it is fully open.</summary>
+    WAITING_FOR_DOOR,
     /// <summary>Death animation finished; body lies here until linger time elapses.</summary>
     CORPSE
 }

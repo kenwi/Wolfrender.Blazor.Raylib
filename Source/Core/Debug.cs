@@ -94,7 +94,7 @@ public static class Debug
 
         foreach (var enemy in _enemySystem.Enemies)
         {
-            if (enemy.EnemyState != EnemyState.COLLIDING)
+            if (enemy.EnemyState is not (EnemyState.COLLIDING or EnemyState.WAITING_FOR_DOOR))
                 continue;
 
             // Project the enemy's position to the render texture's screen space
@@ -104,11 +104,15 @@ public static class Debug
 
             if (sx >= 0 && sx < screenW && sy >= 0 && sy < screenH)
             {
-                const string text = "COLLIDING";
+                string text = enemy.EnemyState == EnemyState.WAITING_FOR_DOOR
+                    ? "WAITING_FOR_DOOR"
+                    : "COLLIDING";
                 const int fontSize = 24;
                 int textW = MeasureText(text, fontSize);
-                DrawText(text, (int)(sx - textW / 2f), (int)(sy - fontSize), fontSize,
-                    new Raylib_cs.Color(255, 40, 40, 255));
+                var color = enemy.EnemyState == EnemyState.WAITING_FOR_DOOR
+                    ? new Raylib_cs.Color(255, 180, 40, 255)
+                    : new Raylib_cs.Color(255, 40, 40, 255);
+                DrawText(text, (int)(sx - textW / 2f), (int)(sy - fontSize), fontSize, color);
             }
         }
     }
@@ -263,6 +267,7 @@ public static class Debug
                                 EnemyState.HIT => new System.Numerics.Vector4(1, 0.55f, 0.15f, 1), // Orange
                                 EnemyState.DYING => new System.Numerics.Vector4(0.7f, 0.3f, 0.7f, 1), // Purple
                                 EnemyState.COLLIDING => new System.Numerics.Vector4(1, 0, 0, 1), // Red
+                                EnemyState.WAITING_FOR_DOOR => new System.Numerics.Vector4(1, 0.7f, 0.2f, 1), // Amber
                                 EnemyState.CORPSE => new System.Numerics.Vector4(0.35f, 0.35f, 0.35f, 1), // Dark gray
                                 _ => new System.Numerics.Vector4(1, 1, 1, 1) // White
                             };

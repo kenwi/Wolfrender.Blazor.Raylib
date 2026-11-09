@@ -149,6 +149,7 @@ public class AnimationSystem
             {
                 case EnemyState.IDLE:
                 case EnemyState.COLLIDING:
+                case EnemyState.WAITING_FOR_DOOR:
                     enemy.FrameRowIndex = 0;
                     break;
                 case EnemyState.WALKING:

@@ -134,11 +134,12 @@ public class EnemySystem
         // Debug: cycle enemy state
         if (inputState.IsChangeStatePressed)
         {
+            int stateCount = Enum.GetValues<EnemyState>().Length;
             foreach (var enemy in _enemies)
             {
                 enemy.EnemyState++;
                 var state = (int)enemy.EnemyState;
-                enemy.EnemyState = (EnemyState)(state % 9);
+                enemy.EnemyState = (EnemyState)(state % stateCount);
             }
         }
     }
@@ -200,6 +201,10 @@ public class EnemySystem
                     UpdatePatrol(enemy, deltaTime);
                 break;
 
+            case EnemyState.WAITING_FOR_DOOR:
+                OnWaitingForDoor(enemy, deltaTime);
+                break;
+
             default:
                 break;
         }
@@ -210,7 +215,8 @@ public class EnemySystem
         return enemy.ResumeStateAfterHit switch
         {
             EnemyState.DYING or EnemyState.CORPSE or EnemyState.HIT or EnemyState.SEARCHING => EnemyState.IDLE,
-            EnemyState.COLLIDING => enemy.HasPatrolPath ? EnemyState.WALKING : EnemyState.IDLE,
+            EnemyState.COLLIDING or EnemyState.WAITING_FOR_DOOR =>
+                enemy.HasPatrolPath ? EnemyState.WALKING : EnemyState.IDLE,
             _ => enemy.ResumeStateAfterHit
         };
     }
@@ -251,6 +257,39 @@ public class EnemySystem
 
         if (enemy.HasPatrolPath)
             UpdatePatrol(enemy, deltaTime);
+    }
+
+    /// <summary>
+    /// Hold at an opening door: keep requesting open and retry the same path intent.
+    /// Combat sight still interrupts. Stuck recovery does not run here.
+    /// </summary>
+    private void OnWaitingForDoor(Enemy enemy, float deltaTime)
+    {
+        enemy.StuckTimer = 0f;
+
+        if (enemy.CanSeePlayer && IsPlayerTargetable)
+        {
+            enemy.IsPatrolReturnPath = false;
+            enemy.TransitionTo(EnemyState.NOTICING);
+            return;
+        }
+
+        if (enemy.LastSeenPlayerPosition.HasValue)
+        {
+            FollowChasePath(enemy, deltaTime);
+            return;
+        }
+
+        if (enemy.IsPatrolReturnPath)
+        {
+            FollowPatrolReturnPath(enemy, deltaTime);
+            return;
+        }
+
+        if (enemy.HasPatrolPath)
+            UpdatePatrol(enemy, deltaTime);
+        else
+            enemy.TransitionTo(EnemyState.IDLE);
     }
 
     private void OnNoticing(Enemy enemy, float deltaTime)
@@ -735,6 +774,7 @@ public class EnemySystem
 
     /// <summary>
     /// Move the enemy toward a target direction, handling wall and door collisions.
+    /// Door blocks wait in place (no axis slide) until the door is fully open.
     /// </summary>
     private void MoveToward(
         Enemy enemy,
@@ -751,10 +791,17 @@ public class EnemySystem
         // Always face the intent direction so a sliding/blocked enemy keeps looking where it wants to go.
         enemy.Rotation = MathF.Atan2(direction.X, -direction.Z) - MathF.PI / 2f;
 
-        // Open any closed door directly between us and the desired position so the slide
-        // doesn't simply route around it without ever opening it.
+        // Closed/opening doors: open and wait. Do not ResolveMovement-slide along the door,
+        // and do not enter COLLIDING stuck-recovery (that advances patrol waypoints).
         if (_doorSystem.IsDoorBlocking(desired, EnemyCollisionRadius))
+        {
             TryOpenBlockingDoor(desired);
+            enemy.StuckTimer = 0f;
+            if (!preserveCombatState
+                && enemy.EnemyState != EnemyState.WAITING_FOR_DOOR)
+                enemy.TransitionTo(EnemyState.WAITING_FOR_DOOR);
+            return;
+        }
 
         Vector3 resolved = _collisionSystem.ResolveMovement(from, desired, EnemyCollisionRadius);
 
@@ -951,6 +998,7 @@ public class EnemySystem
             case EnemyState.WALKING:
             case EnemyState.SEARCHING:
             case EnemyState.COLLIDING:
+            case EnemyState.WAITING_FOR_DOOR:
                 enemy.TransitionTo(EnemyState.NOTICING);
                 break;
         }
@@ -1017,13 +1065,14 @@ public class EnemySystem
             else if (couldSeeBefore && enemy.LastSeenPlayerPosition.HasValue)
             {
                 // Pre-compute chase path when LOS breaks (behavior uses it on next tick).
-                // Include COLLIDING so an enemy that was wedged against a wall when the
+                // Include COLLIDING / WAITING_FOR_DOOR so an enemy that was blocked when the
                 // player slipped out of sight still gets a fresh path.
                 if (enemy.EnemyState is EnemyState.ATTACKING
                     or EnemyState.NOTICING
                     or EnemyState.WALKING
                     or EnemyState.SEARCHING
-                    or EnemyState.COLLIDING)
+                    or EnemyState.COLLIDING
+                    or EnemyState.WAITING_FOR_DOOR)
                     ComputeChasePath(enemy, enemy.LastSeenPlayerPosition.Value);
             }
         }
