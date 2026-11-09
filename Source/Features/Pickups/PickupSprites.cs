@@ -1,5 +1,4 @@
 using System.Numerics;
-using Game.Features.WorldObjects;
 using Raylib_cs;
 
 namespace Game.Features.Pickups;
@@ -14,9 +13,11 @@ public static class PickupSprites
 
     /// <summary>Column count for tile and pickup palette grids.</summary>
     public const int PaletteColumns = 3;
-    public const int SheetWidth = ObjectSprites.SheetWidth;
-    public const int SheetHeight = ObjectSprites.SheetHeight;
-    public const string SheetPath = ObjectSprites.SheetPath;
+
+    /// <summary>Legacy pickup art still lives on <c>Objects.png</c> (separate from Wolf static sprites).</summary>
+    public const int SheetWidth = 261;
+    public const int SheetHeight = 1053;
+    public const string SheetPath = "resources/Objects.png";
 
     /// <summary>Index of <see cref="SheetPath"/> in <see cref="MapData.GameTextures"/> (<see cref="Game.GameTextureIndex.Objects"/>).</summary>
     public const int ObjectsTextureIndex = GameTextureIndex.Objects;
@@ -56,6 +57,7 @@ public static class PickupSprites
     {
         PickupType.Health => new Rectangle(HealthX, HealthY, FrameSize, FrameSize),
         PickupType.Ammo => new Rectangle(AmmoX, AmmoY, FrameSize, FrameSize),
+        PickupType.GuardUsedAmmo => new Rectangle(AmmoX, AmmoY, FrameSize, FrameSize),
         PickupType.MachineGun => new Rectangle(MachineGunX, MachineGunY, FrameSize, FrameSize),
         PickupType.ChainGun => new Rectangle(ChainGunX, ChainGunY, FrameSize, FrameSize),
         PickupType.GoldKey => new Rectangle(GoldKeyX, GoldKeyY, FrameSize, FrameSize),

@@ -6,6 +6,7 @@ public enum PickupType
 {
     Health,
     Ammo,
+    GuardUsedAmmo,
     MachineGun,
     ChainGun,
     GoldKey,

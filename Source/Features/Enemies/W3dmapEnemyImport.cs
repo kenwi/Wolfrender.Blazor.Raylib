@@ -1,4 +1,5 @@
 using Game.Core.Level;
+using Game.Features.Pickups;
 using Game.Features.Players;
 
 namespace Game.Features.Enemies;
@@ -56,6 +57,12 @@ public static class W3dmapEnemyImport
         { 214, "Boss" }, // Hans
         { 215, "Boss" }, // Giftmacher
     };
+
+    /// <summary>
+    /// Gun-carrying soldiers that drop a used clip in Wolf3D (not dogs or bosses).
+    /// </summary>
+    private static readonly HashSet<string> AmmoDropEnemyTypes =
+        new(StringComparer.Ordinal) { "Guard", "Officer", "Ss", "Mutant" };
 
     public readonly record struct DecodedThing(
         int TileX,
@@ -143,6 +150,7 @@ public static class W3dmapEnemyImport
                 EnemyType = decoded.EnemyType,
                 StartsAsCorpse = decoded.StartsAsCorpse,
                 ShowPatrolPath = true,
+                DropsAmmo = !decoded.StartsAsCorpse && AmmoDropEnemyTypes.Contains(decoded.EnemyType),
             };
 
             if (decoded.Stance == "patrol")
@@ -152,6 +160,18 @@ public static class W3dmapEnemyImport
             }
 
             mapData.Enemies.Add(placement);
+
+            // Pre-placed corpses already "dropped" their clip in Wolf3D.
+            if (decoded.StartsAsCorpse && AmmoDropEnemyTypes.Contains(decoded.EnemyType))
+            {
+                mapData.Pickups.Add(new PickupPlacement
+                {
+                    TileX = decoded.TileX,
+                    TileY = decoded.TileY,
+                    Type = PickupType.GuardUsedAmmo,
+                    Amount = 0
+                });
+            }
         }
 
         if (playerStart != null)

@@ -90,7 +90,7 @@ public class PickupSystem
                 player.Health = MathF.Min(player.MaxHealth, player.Health + amount);
                 Debug.Log($"Picked up health (+{amount}), HP {(int)player.Health}/{(int)player.MaxHealth}. {positions}");
                 break;
-            case PickupType.Ammo:
+            case PickupType.Ammo or PickupType.GuardUsedAmmo:
                 player.Ammo += amount;
                 Debug.Log($"Picked up ammo (+{amount}), total {player.Ammo}. {positions}");
                 break;

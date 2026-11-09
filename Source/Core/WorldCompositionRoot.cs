@@ -108,7 +108,7 @@ public static class WorldCompositionRoot
 
         pickupSystem.SetObjectsTexture(gameTextures[GameTextureIndex.Objects]);
         pickupSystem.Rebuild(mapData.Pickups, mapData);
-        placedObjectSystem.SetObjectsTexture(gameTextures[GameTextureIndex.Objects]);
+        placedObjectSystem.SetObjectsTexture(gameTextures[GameTextureIndex.StaticObjects]);
         placedObjectSystem.Rebuild(mapData);
 
         var animationSystem = new AnimationSystem(

@@ -6,6 +6,7 @@ using Game.Features.Enemies;
 using Game.Features.LevelProgress;
 using Game.Features.Pickups;
 using Game.Features.Players;
+using Game.Features.WorldObjects;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 
@@ -187,6 +188,10 @@ public static class LevelSerializer
         if (defaultFloorTile == 0)
             throw new InvalidOperationException(
                 "Default W3DMAP floor texture '068_grey_brick.png' is missing from the wall palette.");
+        uint defaultCeilingTile = WallTilePalette.GetIdByFileName("069_grey_brick_dark.png");
+        if (defaultCeilingTile == 0)
+            throw new InvalidOperationException(
+                "Default W3DMAP ceiling texture '069_grey_brick_dark.png' is missing from the wall palette.");
 
         mapData.Width = side;
         mapData.Height = side;
@@ -218,9 +223,10 @@ public static class LevelSerializer
                 continue;
             }
 
-            // Plane 0 has no floor texture. Area codes (106..143), empty space
-            // and doors are all walkable and receive the default floor.
+            // Plane 0 has no floor/ceiling textures. Area codes (106..143), empty
+            // space and doors are walkable: default floor + matching ceiling.
             mapData.Floor[i] = defaultFloorTile;
+            mapData.Ceiling[i] = defaultCeilingTile;
 
             if (value is >= 90 and <= 101)
                 mapData.Doors[i] = MapW3dmapDoor(value);
@@ -252,6 +258,8 @@ public static class LevelSerializer
 
             W3dmapEnemyImport.ApplyPlane1(mapData, things, values);
             W3dmapPickupImport.ApplyPlane1(mapData, things);
+            W3dmapObjectImport.ApplyPlane1(mapData, things);
+            W3dmapSecretImport.ApplyPlane1(mapData, things, values);
         }
 
         DoorSideFaceAutoDetect.ApplyAllDoors(mapData);

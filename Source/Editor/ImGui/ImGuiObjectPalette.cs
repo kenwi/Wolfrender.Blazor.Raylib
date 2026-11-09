@@ -1,5 +1,5 @@
 using System.Numerics;
-using Game.Features.Pickups;
+using Game.Core;
 using Game.Features.WorldObjects;
 using ImGuiNET;
 using Raylib_cs;
@@ -15,9 +15,9 @@ public sealed class ImGuiObjectPalette
     public void EnsureIcons(MapData mapData)
     {
         if (_icons != null) return;
-        if (mapData.GameTextures.Count <= PickupSprites.ObjectsTextureIndex) return;
+        if (mapData.GameTextures.Count <= GameTextureIndex.StaticObjects) return;
 
-        var objectsTex = mapData.GameTextures[PickupSprites.ObjectsTextureIndex];
+        var objectsTex = mapData.GameTextures[GameTextureIndex.StaticObjects];
         if (objectsTex.Id == 0) return;
 
         int size = ObjectSprites.PaletteIconSize;
@@ -48,7 +48,7 @@ public sealed class ImGuiObjectPalette
             if (i % columns != 0)
                 ImGui.SameLine();
 
-            uint objectId = (uint)(i + 1);
+            uint objectId = ObjectSprites.AtlasIndexToObjectId(i);
             ImGui.PushID(i + 700);
 
             bool selected = selectedTileId == objectId;
@@ -85,7 +85,12 @@ public sealed class ImGuiObjectPalette
             }
 
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip($"Object ID: {objectId}");
+            {
+                string tip = ObjectSprites.IsLightObject(objectId)
+                    ? $"Object {objectId} - light fixture"
+                    : $"Object {objectId}";
+                ImGui.SetTooltip(tip);
+            }
 
             ImGui.PopID();
         }

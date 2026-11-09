@@ -36,6 +36,8 @@ public static class ConsoleSelfTests
         TestW3dmapImport();
         TestW3dmapPlane1Import();
         TestW3dmapPickupImport();
+        TestW3dmapObjectImport();
+        TestW3dmapSecretImport();
         TestDoorSideFaceAutoDetect();
         TestSoundPropagationClosedDoorBlocks();
         TestLevelRoomMapDoorVisibility();
@@ -242,16 +244,21 @@ public static class ConsoleSelfTests
     private static void TestObjectSpritesLayout()
     {
         var rect = ObjectSprites.GetFrameRect(0);
-        if (rect.X != ObjectSprites.OriginX || rect.Y != ObjectSprites.OriginY
+        if (rect.X != 0 || rect.Y != 0
             || rect.Width != ObjectSprites.FrameSize || rect.Height != ObjectSprites.FrameSize)
             throw new InvalidOperationException("ObjectSprites.GetFrameRect(0) layout mismatch.");
 
-        if (ObjectSprites.ObjectCount != 20)
-            throw new InvalidOperationException("ObjectSprites.ObjectCount should be 20.");
+        if (ObjectSprites.ObjectCount != 48)
+            throw new InvalidOperationException("ObjectSprites.ObjectCount should be 48 (sprites 002..049).");
 
-        if (!ObjectSprites.IsValidObjectId(1) || !ObjectSprites.IsValidObjectId(20)
-            || ObjectSprites.IsValidObjectId(0) || ObjectSprites.IsValidObjectId(21))
+        if (!ObjectSprites.IsValidObjectId(2) || !ObjectSprites.IsValidObjectId(49)
+            || ObjectSprites.IsValidObjectId(0) || ObjectSprites.IsValidObjectId(1)
+            || ObjectSprites.IsValidObjectId(50))
             throw new InvalidOperationException("ObjectSprites.IsValidObjectId range mismatch.");
+
+        if (!ObjectSprites.IsLightObject(5) || !ObjectSprites.IsLightObject(16)
+            || ObjectSprites.BlocksMovement(16) || !ObjectSprites.BlocksMovement(5))
+            throw new InvalidOperationException("Light/block flags mismatch for floor lamp vs hanging light.");
     }
 
     private static void TestSecretWallJsonRoundTrip()
@@ -527,8 +534,9 @@ public static class ConsoleSelfTests
         LevelSerializer.DeserializeFromW3dmap(map, data);
 
         uint floorId = WallTilePalette.GetIdByFileName("068_grey_brick.png");
-        if (floorId == 0 || map.Width != side || map.Height != side)
-            throw new InvalidOperationException("W3DMAP import did not set dimensions or floor palette.");
+        uint ceilingId = WallTilePalette.GetIdByFileName("069_grey_brick_dark.png");
+        if (floorId == 0 || ceilingId == 0 || map.Width != side || map.Height != side)
+            throw new InvalidOperationException("W3DMAP import did not set dimensions or floor/ceiling palette.");
         if (map.Walls[3 * side + 2] != WallTilePalette.GetIdForChunk(24))
             throw new InvalidOperationException("W3DMAP wall 13 should use the map-only chunk 24 alias.");
         if (map.Walls[3 * side + 3] != 0)
@@ -547,8 +555,10 @@ public static class ConsoleSelfTests
             throw new InvalidOperationException("W3DMAP elevator door should use the elevator texture.");
         if (map.Doors[4 * side + 5] != DoorTileEncoding.LockedId)
             throw new InvalidOperationException("W3DMAP locked door should use the locked texture.");
-        if (map.Ceiling[3 * side + 3] != 0)
-            throw new InvalidOperationException("W3DMAP import should not invent ceiling textures.");
+        if (map.Ceiling[3 * side + 3] != ceilingId || map.Ceiling[3 * side + 4] != ceilingId)
+            throw new InvalidOperationException("W3DMAP walkable tiles should receive the default ceiling.");
+        if (map.Ceiling[3 * side + 2] != 0)
+            throw new InvalidOperationException("Solid wall tiles should not receive a ceiling.");
         if (map.Spawn.TileX != 3 || map.Spawn.TileY != 3)
             throw new InvalidOperationException("W3DMAP import should choose the nearest open tile for the spawn.");
         if (map.Enemies.Count != 0)
@@ -647,6 +657,17 @@ public static class ConsoleSelfTests
         Set1(2, 5, 49); // ammo
         Set1(3, 5, 48); // first aid
         Set1(4, 5, 43); // gold key
+        // Static props on free tiles (do not overwrite patrol markers at 1,5 / 6,5).
+        Set1(5, 5, 37); // hanging light
+        Set1(6, 4, 24); // green barrel
+        Set1(1, 4, 23); // water puddle (skipped)
+        // Pushwall at (7,2): sealed 2-tile north pocket + open south room → slide North.
+        Set0(7, 1, 106);
+        Set0(7, 0, 106);
+        Set0(7, 3, 106);
+        Set0(7, 4, 106);
+        Set0(7, 5, 106);
+        Set1(7, 2, W3dmapSecretImport.PushwallThing);
 
         var map = new MapData();
         LevelSerializer.DeserializeFromW3dmap(map, plane0, plane1);
@@ -661,12 +682,16 @@ public static class ConsoleSelfTests
         var standing = map.Enemies.Single(e => e.TileX == 3 && e.TileY == 3);
         if (standing.EnemyType != "Guard" || standing.PatrolPath.Count != 0 || standing.StartsAsCorpse)
             throw new InvalidOperationException("Standing guard import mismatch.");
+        if (!standing.DropsAmmo)
+            throw new InvalidOperationException("Living guards should drop ammo on import.");
         if (Math.Abs(standing.Rotation - MathF.PI / 2f) > 0.001f)
             throw new InvalidOperationException("South-facing guard should use rotation PI/2.");
 
         var patrol = map.Enemies.Single(e => e.TileX == 4 && e.TileY == 3);
         if (patrol.EnemyType != "Guard" || patrol.PatrolPath.Count == 0)
             throw new InvalidOperationException("Patrol guard should receive reconstructed waypoints.");
+        if (!patrol.DropsAmmo)
+            throw new InvalidOperationException("Patrol guards should drop ammo on import.");
         // From (4,3) facing west: markers at (1,3)->(1,5)->(6,5)->(6,3) then back past start.
         var expected = new (int X, int Y)[] { (1, 3), (1, 5), (6, 5), (6, 3) };
         if (patrol.PatrolPath.Count != expected.Length)
@@ -683,15 +708,31 @@ public static class ConsoleSelfTests
         var corpse = map.Enemies.Single(e => e.TileX == 5 && e.TileY == 3);
         if (!corpse.StartsAsCorpse || corpse.EnemyType != "Guard")
             throw new InvalidOperationException("Dead guard thing should import as a corpse Guard.");
+        if (corpse.DropsAmmo)
+            throw new InvalidOperationException("Corpse guards should not drop ammo.");
+        if (map.Pickups.Count(p => p.TileX == 5 && p.TileY == 3 && p.Type == PickupType.GuardUsedAmmo) != 1)
+            throw new InvalidOperationException("Dead guard should place a GuardUsedAmmo pickup on its tile.");
 
-        if (map.Pickups.Count != 3)
-            throw new InvalidOperationException($"Expected 3 pickups from plane 1, got {map.Pickups.Count}.");
+        if (map.Pickups.Count != 4)
+            throw new InvalidOperationException($"Expected 4 pickups from plane 1, got {map.Pickups.Count}.");
         if (map.Pickups.Single(p => p.TileX == 2 && p.TileY == 5).Type != PickupType.Ammo)
             throw new InvalidOperationException("Thing 49 should import as Ammo.");
         if (map.Pickups.Single(p => p.TileX == 3 && p.TileY == 5).Type != PickupType.Health)
             throw new InvalidOperationException("Thing 48 should import as Health.");
         if (map.Pickups.Single(p => p.TileX == 4 && p.TileY == 5).Type != PickupType.GoldKey)
             throw new InvalidOperationException("Thing 43 should import as GoldKey.");
+        if (map.Objects[5 * side + 5] != 16)
+            throw new InvalidOperationException("Thing 37 should import as extractor sprite 16.");
+        if (map.Objects[4 * side + 6] != 3)
+            throw new InvalidOperationException("Thing 24 should import as extractor sprite 3 (barrel).");
+        if (map.Objects[4 * side + 1] != 2)
+            throw new InvalidOperationException("Thing 23 should import as extractor sprite 2 (puddle).");
+        if (map.SecretWalls.Count != 1
+            || map.SecretWalls[0].TileX != 7
+            || map.SecretWalls[0].TileY != 2
+            || map.SecretWalls[0].TravelTiles != W3dmapSecretImport.TravelTiles
+            || map.SecretWalls[0].Direction != SecretWallDirection.North)
+            throw new InvalidOperationException("Thing 98 should infer North into the sealed 2-tile pocket.");
 
         if (LevelSerializer.W3dmapLevelFileName("resources/maps/e1_l1_m0.w3dmap") != "e1_l1.json")
             throw new InvalidOperationException("W3dmapLevelFileName should strip plane suffixes.");
@@ -715,12 +756,46 @@ public static class ConsoleSelfTests
             if (patrolCount != 9)
                 throw new InvalidOperationException(
                     $"E1L1 should reconstruct 9 patrol paths, got {patrolCount}.");
-            // Collectibles only (decorations/extra-life skipped): 47 on E1L1.
-            if (e1.Pickups.Count != 47)
+            // Collectibles (47) + one corpse GuardUsedAmmo clip.
+            if (e1.Pickups.Count != 48)
                 throw new InvalidOperationException(
-                    $"E1L1 should import 47 pickups, got {e1.Pickups.Count}.");
+                    $"E1L1 should import 48 pickups, got {e1.Pickups.Count}.");
+            if (e1.Pickups.Count(p => p.Type == PickupType.GuardUsedAmmo) != 1)
+                throw new InvalidOperationException("E1L1 should place one GuardUsedAmmo on the corpse tile.");
             if (e1.Pickups.Count(p => p.Type == PickupType.Ammo) != 11)
                 throw new InvalidOperationException("E1L1 should import 11 ammo clips.");
+            // All non-pickup statics 23..70, including gore + extra-life orb.
+            int objectCount = e1.Objects.Count(id => id != 0);
+            if (objectCount != 74)
+                throw new InvalidOperationException(
+                    $"E1L1 should import 74 static objects, got {objectCount}.");
+            int lightCount = e1.Objects.Count(ObjectSprites.IsLightObject);
+            if (lightCount != 38)
+                throw new InvalidOperationException(
+                    $"E1L1 should map 38 lights (5/6/16), got {lightCount}.");
+            if (e1.Objects.Count(id => id == 16) != 30)
+                throw new InvalidOperationException("E1L1 should import 30 hanging-green lights.");
+            if (e1.SecretWalls.Count != 5)
+                throw new InvalidOperationException(
+                    $"E1L1 should import 5 pushwall secrets, got {e1.SecretWalls.Count}.");
+            if (e1.SecretWalls.Any(s => s.TravelTiles != W3dmapSecretImport.TravelTiles))
+                throw new InvalidOperationException("E1L1 secrets should travel 2 tiles.");
+            var expectedSecrets = new (int X, int Y, SecretWallDirection Dir)[]
+            {
+                (10, 13, SecretWallDirection.North),
+                (30, 22, SecretWallDirection.West),
+                (18, 49, SecretWallDirection.South),
+                (17, 50, SecretWallDirection.West),
+                (13, 53, SecretWallDirection.South),
+            };
+            foreach (var (x, y, dir) in expectedSecrets)
+            {
+                var secret = e1.SecretWalls.SingleOrDefault(s => s.TileX == x && s.TileY == y);
+                if (secret is null || secret.Direction != dir)
+                    throw new InvalidOperationException(
+                        $"E1L1 secret at ({x},{y}) should face {dir}, " +
+                        $"got {secret?.Direction.ToString() ?? "missing"}.");
+            }
         }
     }
 
@@ -736,6 +811,56 @@ public static class ConsoleSelfTests
             throw new InvalidOperationException("Decorations must not map to pickups.");
         if (W3dmapPickupImport.TryMapThing(56, out _, out _))
             throw new InvalidOperationException("Extra-life orb has no PickupType yet and must be skipped.");
+    }
+
+    private static void TestW3dmapObjectImport()
+    {
+        if (!W3dmapObjectImport.TryMapThing(37, out uint lightId) || lightId != 16)
+            throw new InvalidOperationException("Hanging lights should map to extractor sprite 16.");
+        if (!W3dmapObjectImport.TryMapThing(24, out uint barrelId) || barrelId != 3)
+            throw new InvalidOperationException("Barrels should map to extractor sprite 3.");
+        if (!W3dmapObjectImport.TryMapThing(23, out uint puddleId) || puddleId != 2)
+            throw new InvalidOperationException("Water puddles should map to extractor sprite 2.");
+        if (W3dmapObjectImport.TryMapThing(49, out _))
+            throw new InvalidOperationException("Ammo is a pickup, not a static object.");
+        if (!W3dmapObjectImport.TryMapThing(56, out uint orbId) || orbId != 35)
+            throw new InvalidOperationException("Extra-life orb should import as sprite 35 until PickupType exists.");
+    }
+
+    private static void TestW3dmapSecretImport()
+    {
+        if (!W3dmapSecretImport.IsPushwallThing(98))
+            throw new InvalidOperationException("Thing 98 should be recognized as a pushwall.");
+        if (W3dmapSecretImport.IsPushwallThing(99))
+            throw new InvalidOperationException("Exit trigger must not be treated as a pushwall.");
+        if (W3dmapSecretImport.TravelTiles != 2)
+            throw new InvalidOperationException("Pushwall travel should be 2 tiles.");
+
+        // Secret at (2,2): north has exactly 2 open; south has 3 open → slide into the north pocket.
+        const int side = 6;
+        var walls = new ushort[side * side];
+        var things = new ushort[side * side];
+        Array.Fill(walls, (ushort)1);
+        walls[1 * side + 2] = 106;
+        walls[0 * side + 2] = 106;
+        walls[3 * side + 2] = 106;
+        walls[4 * side + 2] = 106;
+        walls[5 * side + 2] = 106;
+
+        if (!W3dmapSecretImport.TryInferDirection(2, 2, walls, things, side, out var dir)
+            || dir != SecretWallDirection.North)
+            throw new InvalidOperationException("Sealed 2-tile north pocket should win over a 3-tile south room.");
+
+        // Cap south at exactly 2 open (wall at step 3) → both axes have 2 → ambiguous.
+        walls[5 * side + 2] = 1;
+        if (W3dmapSecretImport.TryInferDirection(2, 2, walls, things, side, out _))
+            throw new InvalidOperationException("Equal 2-tile clearances should not invent a direction.");
+
+        // Pickup blocking south step 1 leaves only north with 2 → North.
+        things[3 * side + 2] = 49;
+        if (!W3dmapSecretImport.TryInferDirection(2, 2, walls, things, side, out dir)
+            || dir != SecretWallDirection.North)
+            throw new InvalidOperationException("Things should block slide clearance like walls.");
     }
 
     private static void TestSoundPropagationClosedDoorBlocks()

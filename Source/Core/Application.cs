@@ -1,6 +1,7 @@
 using System.Numerics;
 using Game.DebugConsole;
 using Game.Features.Doors;
+using Game.Features.WorldObjects;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 using static Game.Core.Level.Res;
@@ -143,6 +144,7 @@ public class Application
                 LoadTexture(Path("resources/enemy_dog.png")),
                 // Placeholder: same sheet layout as guard until a dedicated officer spritesheet exists.
                 LoadTexture(Path("resources/enemy_officer.png")),
+                ObjectSprites.BuildAtlas(Path),
             }
         };
 #if EDITOR

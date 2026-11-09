@@ -491,7 +491,7 @@ public class EnemySystem
             return;
 
         enemy.PendingAmmoDrop = false;
-        _pickupSystem.TrySpawnDroppedPickup(PickupType.Ammo, enemy.Position);
+        _pickupSystem.TrySpawnDroppedPickup(PickupType.GuardUsedAmmo, enemy.Position);
     }
 
     private void RemoveDeadEnemies()

@@ -1,4 +1,5 @@
 using System.Numerics;
+using Game.Core;
 using Game.Engine.Rendering;
 using Game.Features.Doors;
 using Game.Features.Enemies;
@@ -348,8 +349,8 @@ public class EditorMapRenderer
         int endX = Math.Min(_mapData.Width - 1, (int)((screenW - camera.Offset.X) / tileSize) + 1);
         int endY = Math.Min(_mapData.Height - 1, (int)((screenH - camera.Offset.Y) / tileSize) + 1);
 
-        var objectsTex = _mapData.GameTextures.Count > PickupSprites.ObjectsTextureIndex
-            ? _mapData.GameTextures[PickupSprites.ObjectsTextureIndex]
+        var objectsTex = _mapData.GameTextures.Count > GameTextureIndex.StaticObjects
+            ? _mapData.GameTextures[GameTextureIndex.StaticObjects]
             : default;
         if (objectsTex.Id == 0)
             return;

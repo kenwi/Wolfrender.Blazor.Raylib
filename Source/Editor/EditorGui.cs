@@ -488,7 +488,7 @@ public class EditorGui
         {
             ImGui.SetWindowFontScale(_guiScale);
             ImGui.Text("Load a Wolfenstein 3D wall/door plane:");
-            ImGui.TextWrapped("64x64 little-endian 16-bit tile dump (plane 0). Walls use the map's VSWAP textures; walkable tiles use 068_grey_brick as the floor.");
+            ImGui.TextWrapped("64x64 little-endian 16-bit tile dump (plane 0). Walls use the map's VSWAP textures; walkable tiles use 068_grey_brick floor and 069_grey_brick_dark ceiling.");
             ImGui.InputText("Path", ref _loadW3dmapPath, 512);
 
             ImGui.Spacing();
