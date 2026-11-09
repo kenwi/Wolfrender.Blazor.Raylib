@@ -1,5 +1,4 @@
-using Raylib_cs;
-using static Raylib_cs.Raylib;
+using Game.Core;
 
 namespace Game.DebugConsole.Commands;
 
@@ -15,7 +14,7 @@ public sealed class QuitCommand : IConsoleCommand
             return ConsoleCommandResult.Fail($"Usage: {Usage}");
 
         // Ends the Application.Run loop so Cleanup restores display and closes audio/window.
-        CloseWindow();
+        Application.RequestQuit();
         return ConsoleCommandResult.Ok("Quitting...");
     }
 }

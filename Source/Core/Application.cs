@@ -10,13 +10,17 @@ namespace Game.Core;
 
 public class Application
 {
+    private static Application? _instance;
+
     private IScene _activeScene;
     private readonly IScene _gameScene;
     private readonly IScene _editorScene;
     private bool _ensuredStartupDisplay;
+    private bool _quitRequested;
 
     public Application()
     {
+        _instance = this;
         NativeConsole.EnsureAttached();
 
         EnsureGraphicsEnvironment();
@@ -44,6 +48,17 @@ public class Application
         _activeScene.OnEnter();
     }
 
+    /// <summary>
+    /// Ask the host loop to exit after the current update. Prefer this over
+    /// <see cref="CloseWindow"/> mid-frame so render/cleanup never touch a
+    /// destroyed GLFW/GL context (which SIGSEGVs on quit).
+    /// </summary>
+    public static void RequestQuit()
+    {
+        if (_instance != null)
+            _instance._quitRequested = true;
+    }
+
     // raylib 5.5 InitWindow() still calls rlglInit() after GLFW failure, which SIGSEGVs.
     private static void EnsureGraphicsEnvironment()
     {
@@ -63,7 +78,7 @@ public class Application
 
     public void Run()
     {
-        while (IsWindowReady() && !WindowShouldClose())
+        while (IsWindowReady() && !WindowShouldClose() && !_quitRequested)
         {
             if (!_ensuredStartupDisplay)
             {
@@ -80,6 +95,11 @@ public class Application
 
             var deltaTime = GetFrameTime();
             _activeScene.Update(deltaTime);
+
+            // Quit may be requested during Update; skip Render on a closing window.
+            if (!IsWindowReady() || WindowShouldClose() || _quitRequested)
+                break;
+
             _activeScene.Render();
         }
 
@@ -140,8 +160,12 @@ public class Application
 
     private void Cleanup()
     {
-        WindowDisplayMode.RestoreNativeResolutionIfNeeded();
+        if (IsWindowReady())
+            WindowDisplayMode.RestoreNativeResolutionIfNeeded();
+
         CloseAudioDevice();
-        CloseWindow();
+
+        if (IsWindowReady())
+            CloseWindow();
     }
 }

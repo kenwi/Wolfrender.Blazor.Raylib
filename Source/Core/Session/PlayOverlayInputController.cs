@@ -243,7 +243,7 @@ public sealed class PlayOverlayInputController
         if (IsKeyPressed(KeyboardKey.Escape))
             _optionsMenu.Close(_inputSystem);
         else if (IsKeyPressed(KeyboardKey.Q))
-            CloseWindow();
+            Application.RequestQuit();
     }
 
     private void HandleBrowserPointerLockLost(bool escapeHeld)
