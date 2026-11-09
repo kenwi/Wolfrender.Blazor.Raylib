@@ -226,6 +226,11 @@ public static class LevelSerializer
                 mapData.Doors[i] = MapW3dmapDoor(value);
         }
 
+        // Wolf fills the void with solid wall cells. Keep only walls that
+        // touch a floor tile (orthogonal distance 1) so the editor shows the
+        // playable outline instead of a solid brick field.
+        CullW3dmapWallsNotAdjacentToFloor(mapData);
+
         var (spawnX, spawnY) = FindW3dmapSpawn(values, side);
         mapData.Spawn = new PlayerSpawnPlacement
         {
@@ -296,6 +301,43 @@ public static class LevelSerializer
         100 or 101 => DoorTileEncoding.ElevatorId,
         _ => DoorTileEncoding.DefaultId
     };
+
+    /// <summary>
+    /// Clear wall cells that are not orthogonally adjacent to a floor tile
+    /// (exactly one step in X or Y). Diagonal-only contact does not keep a wall.
+    /// </summary>
+    private static void CullW3dmapWallsNotAdjacentToFloor(MapData mapData)
+    {
+        int width = mapData.Width;
+        int height = mapData.Height;
+        int tileCount = width * height;
+        var keep = new bool[tileCount];
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int index = width * y + x;
+                if (mapData.Walls[index] == 0)
+                    continue;
+
+                if (HasOrthogonallyAdjacentFloor(mapData, x, y))
+                    keep[index] = true;
+            }
+        }
+
+        for (int i = 0; i < tileCount; i++)
+        {
+            if (mapData.Walls[i] != 0 && !keep[i])
+                mapData.Walls[i] = 0;
+        }
+    }
+
+    private static bool HasOrthogonallyAdjacentFloor(MapData mapData, int x, int y) =>
+        mapData.GetTile(mapData.Floor, x - 1, y) != 0
+        || mapData.GetTile(mapData.Floor, x + 1, y) != 0
+        || mapData.GetTile(mapData.Floor, x, y - 1) != 0
+        || mapData.GetTile(mapData.Floor, x, y + 1) != 0;
 
     private static (int X, int Y) FindW3dmapSpawn(ReadOnlySpan<ushort> values, int side)
     {

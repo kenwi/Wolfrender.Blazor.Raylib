@@ -515,7 +515,7 @@ public static class ConsoleSelfTests
             BinaryPrimitives.WriteUInt16LittleEndian(
                 data.AsSpan((y * side + x) * 2, 2), value);
 
-        SetTile(1, 1, 13);   // wall texture chunk 24 (map-only alias)
+        SetTile(2, 3, 13);   // wall next to floor; chunk 24 map-only alias
         SetTile(3, 3, 106);  // walkable area
         SetTile(4, 3, 90);   // normal door
         SetTile(5, 3, 100);  // elevator door
@@ -527,10 +527,16 @@ public static class ConsoleSelfTests
         uint floorId = WallTilePalette.GetIdByFileName("068_grey_brick.png");
         if (floorId == 0 || map.Width != side || map.Height != side)
             throw new InvalidOperationException("W3DMAP import did not set dimensions or floor palette.");
-        if (map.Walls[1 * side + 1] != WallTilePalette.GetIdForChunk(24))
+        if (map.Walls[3 * side + 2] != WallTilePalette.GetIdForChunk(24))
             throw new InvalidOperationException("W3DMAP wall 13 should use the map-only chunk 24 alias.");
-        if (map.Walls[0] != 1)
-            throw new InvalidOperationException("W3DMAP wall 1 should use wall tile ID 1.");
+        if (map.Walls[3 * side + 3] != 0)
+            throw new InvalidOperationException("Walkable tiles must not keep a wall after import.");
+        // Far void wall (0,0) is not adjacent to floor and must be culled.
+        if (map.Walls[0] != 0)
+            throw new InvalidOperationException("W3DMAP import should cull walls not adjacent to floor.");
+        // Framing wall next to the door/floor must remain.
+        if (map.Walls[2 * side + 4] == 0)
+            throw new InvalidOperationException("Walls adjacent to floor/door must be kept.");
         if (map.Floor[3 * side + 3] != floorId || map.Floor[3 * side + 4] != floorId)
             throw new InvalidOperationException("W3DMAP walkable and door tiles should receive the default floor.");
         if (map.Doors[3 * side + 4] != DoorTileEncoding.DefaultId)
