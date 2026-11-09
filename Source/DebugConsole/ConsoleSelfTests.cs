@@ -3,6 +3,7 @@ using System.Numerics;
 using Game.Core.Level;
 using Game.Engine.Rendering;
 using Game.Features.Doors;
+using Game.Features.Enemies;
 using Game.Features.LevelProgress;
 using Game.Features.Recording;
 using Game.Features.SoundPropagation;
@@ -32,6 +33,7 @@ public static class ConsoleSelfTests
         TestSimulationChecksumDiff();
         TestRecFileValidator();
         TestW3dmapImport();
+        TestW3dmapPlane1Import();
         TestSoundPropagationClosedDoorBlocks();
         TestLevelRoomMapDoorVisibility();
         TestConsoleTextSelectionNormalizeAndExtract();
@@ -540,6 +542,107 @@ public static class ConsoleSelfTests
             throw new InvalidOperationException("W3DMAP import should not invent ceiling textures.");
         if (map.Spawn.TileX != 3 || map.Spawn.TileY != 3)
             throw new InvalidOperationException("W3DMAP import should choose the nearest open tile for the spawn.");
+        if (map.Enemies.Count != 0)
+            throw new InvalidOperationException("Plane-0-only W3DMAP import should leave enemies empty.");
+    }
+
+    private static void TestW3dmapPlane1Import()
+    {
+        const int side = 8;
+        var plane0 = new byte[side * side * 2];
+        var plane1 = new byte[side * side * 2];
+        for (int i = 0; i < side * side; i++)
+            BinaryPrimitives.WriteUInt16LittleEndian(plane0.AsSpan(i * 2, 2), 1);
+
+        void Set0(int x, int y, ushort value) =>
+            BinaryPrimitives.WriteUInt16LittleEndian(plane0.AsSpan((y * side + x) * 2, 2), value);
+        void Set1(int x, int y, ushort value) =>
+            BinaryPrimitives.WriteUInt16LittleEndian(plane1.AsSpan((y * side + x) * 2, 2), value);
+
+        // Open hallway on row 3: walls around, walkable 106 corridor with markers.
+        for (int x = 1; x <= 6; x++)
+            Set0(x, 3, 106);
+        Set0(1, 4, 106);
+        Set0(1, 5, 106);
+        Set0(6, 4, 106);
+        Set0(6, 5, 106);
+        for (int x = 1; x <= 6; x++)
+            Set0(x, 5, 106);
+
+        // Player start facing east at (2,3).
+        Set1(2, 3, 20);
+        // Standing guard facing south at (3,3).
+        Set1(3, 3, 111);
+        // Patrol guard facing east at (2,3) is occupied; place at (4,3) facing west (114).
+        Set1(4, 3, 114);
+        // Patrol markers: west-end turns south (96), south-west corner turns east (90),
+        // east-end turns north (92), north-east corner turns west (94).
+        Set1(1, 3, 96); // south
+        Set1(1, 5, 90); // east
+        Set1(6, 5, 92); // north
+        Set1(6, 3, 94); // west
+        // Dead guard corpse.
+        Set1(5, 3, 124);
+
+        var map = new MapData();
+        LevelSerializer.DeserializeFromW3dmap(map, plane0, plane1);
+
+        if (map.Spawn.TileX != 2 || map.Spawn.TileY != 3)
+            throw new InvalidOperationException("W3DMAP plane 1 should override spawn from player start.");
+        if (Math.Abs(map.Spawn.Rotation - 0f) > 0.001f)
+            throw new InvalidOperationException("W3DMAP east-facing player start should use rotation 0.");
+        if (map.Enemies.Count != 3)
+            throw new InvalidOperationException($"Expected 3 enemies from plane 1, got {map.Enemies.Count}.");
+
+        var standing = map.Enemies.Single(e => e.TileX == 3 && e.TileY == 3);
+        if (standing.EnemyType != "Guard" || standing.PatrolPath.Count != 0 || standing.StartsAsCorpse)
+            throw new InvalidOperationException("Standing guard import mismatch.");
+        if (Math.Abs(standing.Rotation - MathF.PI / 2f) > 0.001f)
+            throw new InvalidOperationException("South-facing guard should use rotation PI/2.");
+
+        var patrol = map.Enemies.Single(e => e.TileX == 4 && e.TileY == 3);
+        if (patrol.EnemyType != "Guard" || patrol.PatrolPath.Count == 0)
+            throw new InvalidOperationException("Patrol guard should receive reconstructed waypoints.");
+        // From (4,3) facing west: markers at (1,3)->(1,5)->(6,5)->(6,3) then back past start.
+        var expected = new (int X, int Y)[] { (1, 3), (1, 5), (6, 5), (6, 3) };
+        if (patrol.PatrolPath.Count != expected.Length)
+            throw new InvalidOperationException(
+                $"Patrol path length {patrol.PatrolPath.Count} != {expected.Length}.");
+        for (int i = 0; i < expected.Length; i++)
+        {
+            if (patrol.PatrolPath[i].TileX != expected[i].X || patrol.PatrolPath[i].TileY != expected[i].Y)
+                throw new InvalidOperationException(
+                    $"Patrol waypoint {i} was ({patrol.PatrolPath[i].TileX},{patrol.PatrolPath[i].TileY}), " +
+                    $"expected ({expected[i].X},{expected[i].Y}).");
+        }
+
+        var corpse = map.Enemies.Single(e => e.TileX == 5 && e.TileY == 3);
+        if (!corpse.StartsAsCorpse || corpse.EnemyType != "Guard")
+            throw new InvalidOperationException("Dead guard thing should import as a corpse Guard.");
+
+        if (LevelSerializer.W3dmapLevelFileName("resources/maps/e1_l1_m0.w3dmap") != "e1_l1.json")
+            throw new InvalidOperationException("W3dmapLevelFileName should strip plane suffixes.");
+
+        // Optional: real E1L1 planes when present next to the test host.
+        string e1m0 = Path.Combine("resources", "maps", "e1_l1_m0.w3dmap");
+        string e1m1 = Path.Combine("resources", "maps", "e1_l1_m1.w3dmap");
+        if (File.Exists(e1m0) && File.Exists(e1m1))
+        {
+            var e1 = new MapData();
+            LevelSerializer.LoadFromW3dmap(e1, e1m0);
+            // 37 living actors + 1 dead-guard corpse (thing 124).
+            if (e1.Enemies.Count != 38)
+                throw new InvalidOperationException(
+                    $"E1L1 should import 38 enemies (incl. corpse), got {e1.Enemies.Count}.");
+            if (e1.Enemies.Count(e => e.StartsAsCorpse) != 1)
+                throw new InvalidOperationException("E1L1 should import exactly one dead-guard corpse.");
+            if (e1.Spawn.TileX != 29 || e1.Spawn.TileY != 57)
+                throw new InvalidOperationException("E1L1 player start should be (29,57).");
+            int patrolCount = e1.Enemies.Count(e => e.PatrolPath.Count > 0);
+            if (patrolCount != 9)
+                throw new InvalidOperationException(
+                    $"E1L1 should reconstruct 9 patrol paths, got {patrolCount}.");
+        }
     }
 
     private static void TestSoundPropagationClosedDoorBlocks()

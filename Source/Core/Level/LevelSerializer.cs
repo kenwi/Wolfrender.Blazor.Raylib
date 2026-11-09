@@ -144,24 +144,40 @@ public static class LevelSerializer
     }
 
     /// <summary>
-    /// Load a Wolfenstein 3D plane-0 dump (64x64 little-endian uint16 tiles).
-    /// Walls use the VSWAP chunk mapping from SetupWalls(): tile N selects
-    /// chunk (N - 1) * 2. Doors use the ordinary, locked or elevator texture,
-    /// and every walkable tile gets the default floor texture.
+    /// Load a Wolfenstein 3D map dump. Pass either plane file (<c>_m0</c>/<c>_m1</c>)
+    /// or a shared prefix; plane 0 supplies walls/doors and a sibling <c>_m1</c>
+    /// supplies enemies, player start, and patrol markers when present.
     /// </summary>
     public static void LoadFromW3dmap(MapData mapData, string path)
     {
-        DeserializeFromW3dmap(mapData, File.ReadAllBytes(path));
+        var (plane0Path, plane1Path) = ResolveW3dmapPlanePaths(path);
+        if (plane0Path == null || !File.Exists(plane0Path))
+            throw new FileNotFoundException(
+                $"W3DMAP plane 0 not found next to '{path}'. Expected a *_m0.w3dmap file.",
+                plane0Path ?? path);
+
+        byte[] plane0 = File.ReadAllBytes(plane0Path);
+        byte[]? plane1 = plane1Path != null && File.Exists(plane1Path)
+            ? File.ReadAllBytes(plane1Path)
+            : null;
+        DeserializeFromW3dmap(mapData, plane0, plane1);
     }
 
-    /// <summary>Load a W3DMAP plane from raw bytes (suitable for browser file input).</summary>
-    public static void DeserializeFromW3dmap(MapData mapData, ReadOnlySpan<byte> data)
-    {
-        if (data.Length == 0 || data.Length % 2 != 0)
-            throw new InvalidOperationException(
-                $"W3DMAP must contain an even number of bytes, got {data.Length}.");
+    /// <summary>Load a W3DMAP plane 0 from raw bytes (suitable for browser file input).</summary>
+    public static void DeserializeFromW3dmap(MapData mapData, ReadOnlySpan<byte> plane0) =>
+        DeserializeFromW3dmap(mapData, plane0, plane1: default);
 
-        int tileCount = data.Length / 2;
+    /// <summary>
+    /// Load plane 0 walls/doors and optional plane 1 actors from raw bytes.
+    /// </summary>
+    public static void DeserializeFromW3dmap(
+        MapData mapData, ReadOnlySpan<byte> plane0, ReadOnlySpan<byte> plane1)
+    {
+        if (plane0.Length == 0 || plane0.Length % 2 != 0)
+            throw new InvalidOperationException(
+                $"W3DMAP must contain an even number of bytes, got {plane0.Length}.");
+
+        int tileCount = plane0.Length / 2;
         int side = (int)Math.Sqrt(tileCount);
         if (side <= 0 || side * side != tileCount)
             throw new InvalidOperationException(
@@ -187,7 +203,7 @@ public static class LevelSerializer
         var values = new ushort[tileCount];
         for (int i = 0; i < tileCount; i++)
         {
-            ushort value = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(i * 2, 2));
+            ushort value = BinaryPrimitives.ReadUInt16LittleEndian(plane0.Slice(i * 2, 2));
             values[i] = value;
 
             if (value is >= 1 and <= 63)
@@ -219,7 +235,55 @@ public static class LevelSerializer
             Rotation = -MathF.PI / 2f
         };
 
+        if (plane1.Length > 0)
+        {
+            if (plane1.Length != plane0.Length)
+                throw new InvalidOperationException(
+                    $"W3DMAP plane 1 length {plane1.Length} does not match plane 0 ({plane0.Length}).");
+
+            var things = new ushort[tileCount];
+            for (int i = 0; i < tileCount; i++)
+                things[i] = BinaryPrimitives.ReadUInt16LittleEndian(plane1.Slice(i * 2, 2));
+
+            W3dmapEnemyImport.ApplyPlane1(mapData, things, values);
+        }
+
         mapData.ResetGeometryVersion();
+    }
+
+    /// <summary>
+    /// Resolve <c>*_m0.w3dmap</c> / <c>*_m1.w3dmap</c> siblings from a plane
+    /// path or shared level prefix.
+    /// </summary>
+    public static (string? Plane0Path, string? Plane1Path) ResolveW3dmapPlanePaths(string path)
+    {
+        string? directory = Path.GetDirectoryName(path);
+        string stem = Path.GetFileNameWithoutExtension(path);
+        if (stem.EndsWith("_m0", StringComparison.OrdinalIgnoreCase)
+            || stem.EndsWith("_m1", StringComparison.OrdinalIgnoreCase)
+            || stem.EndsWith("_m2", StringComparison.OrdinalIgnoreCase))
+        {
+            stem = stem[..^3];
+        }
+
+        string prefix = string.IsNullOrEmpty(directory)
+            ? stem
+            : Path.Combine(directory, stem);
+        return (prefix + "_m0.w3dmap", prefix + "_m1.w3dmap");
+    }
+
+    /// <summary>Strip plane suffixes so <c>e1_l1_m0.w3dmap</c> becomes <c>e1_l1.json</c>.</summary>
+    public static string W3dmapLevelFileName(string path)
+    {
+        string stem = Path.GetFileNameWithoutExtension(path);
+        if (stem.EndsWith("_m0", StringComparison.OrdinalIgnoreCase)
+            || stem.EndsWith("_m1", StringComparison.OrdinalIgnoreCase)
+            || stem.EndsWith("_m2", StringComparison.OrdinalIgnoreCase))
+        {
+            stem = stem[..^3];
+        }
+
+        return stem + ".json";
     }
 
     private static uint MapW3dmapDoor(ushort value) => value switch

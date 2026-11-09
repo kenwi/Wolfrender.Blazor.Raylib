@@ -359,7 +359,7 @@ public class EditorState
     {
         ExecuteMapMutation(() => LevelSerializer.LoadFromW3dmap(MapData, path), $"Load {Path.GetFileName(path)}");
         Camera.CenterOnMap(MapData.Width, MapData.Height);
-        SetLevelFilename(Path.GetFileNameWithoutExtension(path) + ".json");
+        SetLevelFilename(LevelSerializer.W3dmapLevelFileName(path));
         SetStatus($"Loaded W3DMAP from {path}");
     }
 
